@@ -1,3 +1,13 @@
+# Hello, world
+Fork of [https://github.com/NYUMedML/conditional_ssl_hist](https://github.com/NYUMedML/conditional_ssl_hist)  
+
+Relevant papers:  
+* https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7794818/
+
+Relevant study (maybe):  
+* https://portal.gdc.cancer.gov/cases/17919a6e-3106-49fa-9fea-8f06c595d617?filters=%7B%22op%22%3A%22and%22%2C%22content%22%3A%5B%7B%22op%22%3A%22in%22%2C%22content%22%3A%7B%22field%22%3A%22cases.demographic.race%22%2C%22value%22%3A%5B%22white%22%5D%7D%7D%2C%7B%22op%22%3A%22in%22%2C%22content%22%3A%7B%22field%22%3A%22cases.demographic.vital_status%22%2C%22value%22%3A%5B%22alive%22%5D%7D%7D%2C%7B%22content%22%3A%7B%22field%22%3A%22cases.diagnoses.age_at_diagnosis%22%2C%22value%22%3A%5B18626%5D%7D%2C%22op%22%3A%22%3C%3D%22%7D%2C%7B%22content%22%3A%7B%22field%22%3A%22cases.project.project_id%22%2C%22value%22%3A%5B%22TCGA-LUSC%22%5D%7D%2C%22op%22%3A%22in%22%7D%2C%7B%22content%22%3A%7B%22field%22%3A%22files.experimental_strategy%22%2C%22value%22%3A%5B%22Diagnostic%20Slide%22%5D%7D%2C%22op%22%3A%22in%22%7D%5D%7D
+
+
 # Conditional Self-supervised for histopathology images
 
 This repository contains the code for the paper [Interpretable Prediction of Lung Squamous Cell Carcinoma Recurrence With Self-supervised Learning](https://arxiv.org/pdf/2203.12204.pdf).
