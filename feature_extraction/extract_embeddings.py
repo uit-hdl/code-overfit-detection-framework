@@ -1,7 +1,6 @@
 import sys
-sys.path.append('../')
+sys.path.append('./')
 import argparse
-from inception_v4 import InceptionV4
 import numpy as np
 import pickle
 import torch
@@ -15,6 +14,7 @@ import pandas as pd
 from PIL import Image
 import shelve
 from dataset.dataloader import TCGA_CPTAC_Bag_Dataset
+from network.inception_v4 import InceptionV4
 
 if torch.cuda.is_available():
     device = 'cuda'
@@ -55,6 +55,7 @@ def load_pretrained(net, model_dir):
 
     print(model_dir)
     checkpoint = torch.load(model_dir)
+    import ipdb; ipdb.set_trace()
     model_state_dict = {k.replace("module.encoder_q.", ""): v for k, v in checkpoint['state_dict'].items() if
                         "encoder_q" in k}
     net.load_state_dict(model_state_dict)
@@ -70,9 +71,10 @@ parser.add_argument('--out_dir', type=str)
 
 args = parser.parse_args()
 
-tcga_annotation = pickle.load(open('../TCGA/recurrence_annotation.pkl', 'rb'))
-cptac_annotation = pickle.load(open('../CPTAC/recurrence_annotation.pkl', 'rb'))
-annotations = {**tcga_annotation, **cptac_annotation}
+tcga_annotation = pickle.load(open('./TCGA/annotations/recurrence_annotation.pkl', 'rb'))
+# cptac_annotation = pickle.load(open('../CPTAC/recurrence_annotation.pkl', 'rb'))
+# annotations = {**tcga_annotation, **cptac_annotation}
+annotations = {**tcga_annotation}
 feature_extractor = InceptionV4(num_classes=256)
 load_pretrained(feature_extractor, args.feature_extractor_dir)
 feature_extractor.to('cuda')

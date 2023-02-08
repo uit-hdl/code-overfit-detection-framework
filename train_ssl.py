@@ -270,7 +270,7 @@ args.distributed = args.world_size > 1 or args.multiprocessing_distributed
 ngpus_per_node = torch.cuda.device_count()
 
 
-print("=> creating model '{}'".format(args.arch))
+print("=> creating model '{}'".format('x64'))
 
 encoder = InceptionV4
 
@@ -294,7 +294,7 @@ augmentation = [
             transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)  # not strengthened
         ], p=0.8),
         transforms.RandomGrayscale(p=0.2),
-        transforms.RandomApply([moco.loader.GaussianBlur([.1, 2.])], p=0.5),
+        transforms.RandomApply([condssl.loader.GaussianBlur([.1, 2.])], p=0.5),
         transforms.RandomHorizontalFlip(),
         transforms.RandomVerticalFlip(),
         transforms.ToTensor()
@@ -306,7 +306,7 @@ print('Create dataset')
 
 train_dataset = TCGA_CPTAC_Dataset(cptac_dir=args.data_dir + "/CPTAC/tiles/",
                           tcga_dir=args.data_dir + "/TCGA/tiles/",
-                          split_dir=arg.split_dir,
+                          split_dir=args.split_dir,
                           transform=TwoCropsTransform(transforms.Compose(augmentation)), 
                           batch_slide_num=args.batch_slide_num)
 
@@ -336,7 +336,7 @@ for epoch in range(args.start_epoch, args.epochs):
         if (epoch + 1) % 50 == 0:
             save_checkpoint({
                 'epoch': epoch + 1,
-                'arch': args.arch,
+                'arch': 'x64',
                 'state_dict': model.state_dict(),
                 'optimizer' : optimizer.state_dict(),
             }, is_best=False, filename='{}/checkpoint_{:04d}.pth.tar'.format(args.out_dir, epoch))

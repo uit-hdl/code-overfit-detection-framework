@@ -11,6 +11,7 @@ class TCGA_CPTAC_Dataset(Dataset):
         self.cptac_dir = cptac_dir
         self.tcga_dir = tcga_dir
 
+        import ipdb; ipdb.set_trace()
         slide_list = pickle.load(open(split_dir + '/case_split.pkl', 'rb'))[mode + "_id"]
         # slide_list = [s for s in slide_list if "TCGA" in s]
         self.slide2tiles = {}
