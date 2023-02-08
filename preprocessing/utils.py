@@ -1,4 +1,6 @@
 import cv2
+import sys
+import os
 from openslide import OpenSlide
 from PIL import Image
 import numpy as np
@@ -23,7 +25,7 @@ def wsi_to_tiles(idx, wsi, refer_img, s):
     count = 0
     sys.stdout.write('Start task %d: %s \n' % (idx, wsi))
     slide_id = wsi.rsplit('/', 1)[1].split('.')[0]
-    tile_path = os.path.join('./tiles', slide_id)
+    tile_path = os.path.join('./TCGA/tiles', slide_id)
     img = OpenSlide(os.path.join(wsi))
     if str(img.properties.values.__self__.get('tiff.ImageDescription')).split("|")[1] == "AppMag = 40":
         sz = 2048

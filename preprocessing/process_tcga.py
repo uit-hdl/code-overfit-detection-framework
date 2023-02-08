@@ -1,5 +1,6 @@
 import os
 import argparse
+import sys
 import pandas as pd
 from utils import wsi_to_tiles
 import pickle
@@ -15,7 +16,7 @@ parser.add_argument('--s', default=0.9, type=float, help='The proportion of tiss
 
 args = parser.parse_args()
 
-followupTable = pd.read_excel(args.followup_path, skiprows=[1,2], engine='openpyxl')
+followupTable = pd.read_excel(args.followup_path, skiprows=[1,2,3], engine='openpyxl')
 followupTable = followupTable.loc[followupTable['new_tumor_event_dx_indicator'].isin({'YES', 'NO'})]
 followupTable['recurrence'] = ((followupTable['new_tumor_event_dx_indicator'] == 'YES') &
                     (followupTable['new_tumor_event_type'] != 'New Primary Tumor'))
@@ -23,12 +24,12 @@ followupTable = followupTable.sort_values(['bcr_patient_barcode', 'form_completi
 LUSC_patientids = set(followupTable['bcr_patient_barcode'])
 
 
-wsi_list = os.popen("find {} -name '*.svs'".format(wsi_path)).read().strip('\n').split('\n')
+wsi_list = os.popen("find {} -name '*.svs'".format(args.wsi_path)).read().strip('\n').split('\n')
 wsi_list_LUSC = []
 for idx in range(len(wsi_list)):
     slide_id = wsi_list[idx].rsplit('/', 1)[1].split('.')[0]
     patient_id = '-'.join(slide_id.split('-', 3)[:3])
-    tile_path = os.path.join('../TCGA/tiles', slide_id)
+    tile_path = os.path.join('./TCGA/tiles', slide_id)
     if patient_id in LUSC_patientids:
         if not os.path.exists(tile_path):
             os.mkdir(tile_path)
