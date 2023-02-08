@@ -5,15 +5,21 @@ from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import transforms
 import cv2
+import numpy as np
 
 class TCGA_CPTAC_Dataset(Dataset):
     def __init__(self, cptac_dir, tcga_dir, split_dir, transform=None, mode='train', batch_slide_num=4, batch_size=128):
         self.cptac_dir = cptac_dir
         self.tcga_dir = tcga_dir
 
-        import ipdb; ipdb.set_trace()
-        slide_list = pickle.load(open(split_dir + '/case_split.pkl', 'rb'))[mode + "_id"]
+        #slide_list = pickle.load(open(split_dir + '/case_split.pkl', 'rb'))[mode + "_id"]
         # slide_list = [s for s in slide_list if "TCGA" in s]
+        # TODO: temporary hack
+        slide_list = [
+                'TCGA-39-5016-01A-01-BS1',
+                'TCGA-39-5016-01A-01-TS1',
+                'TCGA-39-5016-11A-01-TS1',
+        ]
         self.slide2tiles = {}
         for slide_id in slide_list:
             if "TCGA" in slide_id:
