@@ -27,6 +27,7 @@ import sys
 from network.inception_v4 import InceptionV4
 from dataset.dataloader import TCGA_CPTAC_Dataset
 
+# os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:1024"
 
 class TwoCropsTransform:
     """Take two random crops of one image as the query and key."""
@@ -68,12 +69,13 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
     for i, (images) in enumerate(train_loader):
         # measure data loading time
         data_time.update(time.time() - end)
-        if args.gpu is not None:
-            images[0] = images[0].cuda(args.gpu, non_blocking=True)
-            images[1] = images[1].cuda(args.gpu, non_blocking=True)
+        # if args.gpu is not None:
+        #     images[0] = images[0].cuda(args.gpu, non_blocking=True)
+        #     images[1] = images[1].cuda(args.gpu, non_blocking=True)
         # compute output
-        output, target = model(im_q=images[0].cuda(), im_k=images[1].cuda())
-        loss = criterion(output, target)
+        with torch.autocast(device_type='cuda', dtype=torch.float16):
+            output, target = model(im_q=images[0].cuda(non_blocking=(args.gpu is not None)), im_k=images[1].cuda(non_blocking=(args.gpu is not None)))
+            loss = criterion(output, target)
 
         # acc1/acc5 are (K+1)-way contrast classifier accuracy
         # measure accuracy and record loss
@@ -279,7 +281,6 @@ model = condssl.builder.MoCo(
 
 model = model.cuda()
 torch.distributed.init_process_group('nccl')
-
 model = torch.nn.parallel.DistributedDataParallel(model)
 
 print('Model builder Done.')
