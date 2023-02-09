@@ -32,12 +32,13 @@ def get_embeddings_bagging(feature_extractor, subtype_model, data_set):
         for batch in tqdm(data_loader, position=0, leave=True):
             count += 1
             img, _, bag_idx = batch
-            feat = feature_extractor(img.to(device)).cpu()
+            # feat = feature_extractor(img.to(device)).cpu()
+            feat = feature_extractor(img.to(device))
             subtype_model.eval()
             subtype_prob = subtype_model(img)
             subtype_pred = torch.argmax(subtype_prob, dim=1)
-            tumor_idx = (subtype_pred != 0)
-            feat = feat[tumor_idx].numpy()
+            tumor_idx = (subtype_pred != 0).cpu().numpy()
+            feat = feat[tumor_idx].cpu().numpy()
             bag_idx = bag_idx[tumor_idx]
             for i in range(len(bag_idx)):
                 embedding_dict[bag_idx[i].item()].append(feat[i][np.newaxis,:])
@@ -55,11 +56,11 @@ def load_pretrained(net, model_dir):
 
     print(model_dir)
     checkpoint = torch.load(model_dir)
-    import ipdb; ipdb.set_trace()
-    model_state_dict = {k.replace("module.encoder_q.", ""): v for k, v in checkpoint['state_dict'].items() if
-                        "encoder_q" in k}
-    net.load_state_dict(model_state_dict)
+    # model_state_dict = {k.replace("module.encoder_q.", ""): v for k, v in checkpoint['state_dict'].items() if
+                        # "encoder_q" in k}
+    # net.load_state_dict(model_state_dict)
     net.last_linear = nn.Identity()
+    net.load_state_dict(checkpoint)
 
 parser = argparse.ArgumentParser(description='Extract embeddings ')
 
@@ -78,10 +79,14 @@ annotations = {**tcga_annotation}
 feature_extractor = InceptionV4(num_classes=256)
 load_pretrained(feature_extractor, args.feature_extractor_dir)
 feature_extractor.to('cuda')
+device_ids = [0]
 feature_extractor = nn.DataParallel(feature_extractor, device_ids=device_ids)
 
 subtype_model = InceptionV4(num_classes=2).to('cuda')
-subtype_model.load_state_dict(torch.load(args.subtype_model_dir))
+cancer_subtype_model_load = torch.load(args.subtype_model_dir)
+# FIXME: I have no idea what I'm doing?
+subtype_model.last_linear = nn.Identity()
+subtype_model.load_state_dict(cancer_subtype_model_load)
 subtype_model = nn.DataParallel(subtype_model, device_ids=device_ids)
 
 
@@ -95,6 +100,6 @@ with torch.no_grad():
     for name, data_set in zip(names, [train_dataset, val_dataset, test_dataset]):
         print(name)
         embedding_dict, outcomes_dict = get_embeddings_bagging(feature_extractor, subtype_model, data_set)
-        pickle.dump(embedding_dict, open("{}_{}_embedding.pkl".format(args.out_dir), 'wb'), protocol=4)
-        pickle.dump((outcomes_dict), open("{}_{}_outcomes.pkl".format(args.out_dir), 'wb'), protocol=4)
+        pickle.dump(embedding_dict, open("{}/{}_embedding.pkl".format(args.out_dir, name), 'wb'), protocol=4)
+        pickle.dump((outcomes_dict), open("{}/{}_outcomes.pkl".format(args.out_dir, name), 'wb'), protocol=4)
 

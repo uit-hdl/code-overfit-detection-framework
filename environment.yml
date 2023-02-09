@@ -77,6 +77,7 @@ dependencies:
   - ipython=8.9.0=pyh41d4057_0
   - isort=5.11.4=pyhd8ed1ab_1
   - jedi=0.18.2=pyhd8ed1ab_0
+  - joblib=1.2.0=pyhd8ed1ab_0
   - jpeg=9e=h7f8727e_0
   - lame=3.100=h7b6447c_0
   - lazy-object-proxy=1.6.0=py310h7f8727e_0
@@ -170,11 +171,13 @@ dependencies:
   - pytz=2022.7.1=pyhd8ed1ab_0
   - readline=8.2=h5eee18b_0
   - requests=2.28.1=py310h06a4308_0
+  - scikit-learn=1.0.2=py310h1246948_0
   - scipy=1.8.1=py310h7612f91_0
   - setuptools=65.6.3=py310h06a4308_0
   - six=1.16.0=pyhd3eb1b0_1
   - sqlite=3.40.1=h5082296_0
   - stack_data=0.6.2=pyhd8ed1ab_0
+  - threadpoolctl=3.1.0=pyh8a188c0_0
   - tk=8.6.12=h1ccaba5_0
   - toml=0.10.2=pyhd8ed1ab_0
   - tomli=2.0.1=pyhd8ed1ab_0

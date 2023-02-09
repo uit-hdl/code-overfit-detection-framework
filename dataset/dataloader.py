@@ -63,7 +63,12 @@ class TCGA_CPTAC_Dataset(Dataset):
 class TCGA_CPTAC_Bag_Dataset(Dataset):
     def __init__(self, data_dir, split_dir, mode='train'):
         self.data_dir = data_dir
-        slide_list = pickle.load(open(os.path.join(split_dir, 'case_split_2yr.pkl'), 'rb'))[mode + '_id']
+        # slide_list = pickle.load(open(os.path.join(split_dir, 'case_split_2yr.pkl'), 'rb'))[mode + '_id']
+        slide_list = [
+                'TCGA-39-5016-01A-01-BS1',
+                'TCGA-39-5016-01A-01-TS1',
+                'TCGA-39-5016-11A-01-TS1',
+        ]
         self.slide2tiles = {}
         for slide_id in slide_list:
             if "TCGA" in slide_id:

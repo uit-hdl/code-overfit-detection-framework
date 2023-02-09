@@ -280,8 +280,8 @@ model = condssl.builder.MoCo(
     encoder, args.moco_dim, args.moco_k, args.moco_m, args.moco_t, args.mlp, condition=args.condition)
 
 model = model.cuda()
-torch.distributed.init_process_group('nccl')
-model = torch.nn.parallel.DistributedDataParallel(model)
+# torch.distributed.init_process_group('nccl')
+# model = torch.nn.parallel.DistributedDataParallel(model)
 
 print('Model builder Done.')
 criterion = nn.CrossEntropyLoss().cuda(args.gpu)
@@ -330,11 +330,14 @@ for epoch in range(args.start_epoch, args.epochs):
     adjust_learning_rate(optimizer, epoch, args)
 
     # train for one epoch
+    import ipdb; ipdb.set_trace()
     train(train_loader, model, criterion, optimizer, epoch, args)
 
     if not args.multiprocessing_distributed or (args.multiprocessing_distributed
             and args.rank % ngpus_per_node == 0):
-        if (epoch + 1) % 50 == 0:
+        if 0 == 0:
+        #TODO: fixup
+        # if (epoch + 1) % 50 == 0:
             save_checkpoint({
                 'epoch': epoch + 1,
                 'arch': 'x64',

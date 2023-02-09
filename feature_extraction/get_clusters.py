@@ -17,15 +17,15 @@ parser.add_argument('--out_dir', default='./', type=str)
 
 args = parser.parse_args()
 
-train_features = pickle.load(open(args.data_dir + 'train_embedding.pkl', 'rb'))
+train_features = pickle.load(open(args.data_dir + '/train_embedding.pkl', 'rb'))
 train_features = np.concatenate(list(train_features.values()), axis=0)
 if args.cluster_type == "kmeans":
     print('kmeans')
     cluster = KMeans(n_clusters=n_cluster).fit(train_features)
-    pickle.dump(cluster, open(data_dir + 'kmeans_{}.pkl'.format(args.n_cluster), 'wb'))
+    pickle.dump(cluster, open(args.out_dir + '/kmeans_{}.pkl'.format(args.n_cluster), 'wb'))
 else:
     print('gmm')
-    cluster = GaussianMixture(n_components=n_cluster).fit(train_features)
-    pickle.dump(cluster, open(data_dir + 'gmm_{}.pkl'.format(args.n_cluster), 'wb'))
+    cluster = GaussianMixture(n_components=args.n_cluster).fit(train_features)
+    pickle.dump(cluster, open(args.out_dir + '/gmm_{}.pkl'.format(args.n_cluster), 'wb'))
 
 

@@ -1,6 +1,12 @@
 # Hello, world
 Fork of [https://github.com/NYUMedML/conditional_ssl_hist](https://github.com/NYUMedML/conditional_ssl_hist)  
 
+Command lines:  
+  * `torchrun --standalone --nnodes=1 ./train_ssl.py  --data_dir . --split_dir my_split_dir/ --batch_slide_num 4 --cos --out_dir my_output/ --gpu 0 --epochs 1 --moco-dim 256`
+  * `ipython ./feature_extraction/extract_embeddings.py -- --feature_extractor_dir my_pretrained_weights/pretrained_inception.pth.tar --root_dir . --split_dir my_split_dir/ --out_dir my_embeddings_output --subtype_model_dir my_pretrained_weights/pretrained_inception.pth.tar`
+  * `ipython ./preprocessing/process_tcga.py -- --followup_path TCGA/clinical_follow_up_v1.0_lusc.xlsx --clinical_table_path TCGA/nationwidechildrens.org_clinical_patient_lusc.txt --wsi_path TCGA/ --refer_img preprocessing/colorstandard.png`
+  * `ipython ./feature_extraction/get_clusters.py -- --data_dir my_embeddings_output --cluster_type gmm --n_cluster 5 --out_dir my_cluster_output`
+
 Relevant papers:  
 * https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7794818/
 
