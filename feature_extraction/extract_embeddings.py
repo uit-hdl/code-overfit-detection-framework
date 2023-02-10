@@ -28,28 +28,42 @@ def get_embeddings_bagging(feature_extractor, subtype_model, data_set):
     feature_extractor.eval()
     data_loader = torch.utils.data.DataLoader(data_set, batch_size=256, shuffle=False, num_workers=torch.cuda.device_count())
     with torch.no_grad():
-        count = 0
+        count = 1
         for batch in tqdm(data_loader, position=0, leave=True):
             count += 1
-            img, _, bag_idx = batch
-            # feat = feature_extractor(img.to(device)).cpu()
-            feat = feature_extractor(img.to(device))
+            # bag idx is same as slide_id. 0 is first slide, 1 is second, etc
+            img_batch, _, bag_idx = batch
+            # feat = feature_extractor(img_batch.to(device)).cpu()
+
+            # for each image, 1536 output neurons
+            feat_out = feature_extractor(img_batch.to(device)) 
             subtype_model.eval()
-            subtype_prob = subtype_model(img)
-            subtype_pred = torch.argmax(subtype_prob, dim=1)
+            subtype_prob = subtype_model(img_batch)
+            # For each image, binary has tumor or not
+            subtype_pred = torch.argmax(subtype_prob, dim=1) # fo
+            # Convert to boolean
             tumor_idx = (subtype_pred != 0).cpu().numpy()
-            feat = feat[tumor_idx].cpu().numpy()
+            # Feat and bag_idx now has images with tumors, those that didn't are excluded
+            feat = feat_out[tumor_idx].cpu().numpy()
             bag_idx = bag_idx[tumor_idx]
+            # For each image in current batch that has tumors
             for i in range(len(bag_idx)):
+                # Append all tensor values from tile (feat[i]) into embedding_dict which is indexed by slide
                 embedding_dict[bag_idx[i].item()].append(feat[i][np.newaxis,:])
                 slide_id = data_set.idx2slide[bag_idx[i].item()]
                 if "TCGA" in slide_id:
                     case_id = '-'.join(slide_id.split('-', 3)[:3])
                 else:
                     case_id = slide_id.rsplit('-', 1)[0]
+                # Yes, this line will execute redundantly
                 outcomes_dict[bag_idx[i].item()] = annotations[case_id]
         for k in embedding_dict:
+            # flatten the array: np.concatenate(np.array([[1,2],[3,4]]), axis=0) = array([1, 2, 3, 4])
             embedding_dict[k] = np.concatenate(embedding_dict[k], axis=0)
+    # Embedding dict now has all tensors for each tiles with tumour
+    # Outcomes_dict has annotation info for all slides with tumorous tile, e.g.
+    # ... {0: {'recurrence': 0, 'slide_id': ['TCGA-   ...
+    import ipdb; ipdb.set_trace()
     return embedding_dict, outcomes_dict
 
 def load_pretrained(net, model_dir):
