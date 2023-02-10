@@ -60,7 +60,7 @@ def get_embeddings_bagging(feature_extractor, subtype_model, data_set):
         for k in embedding_dict:
             # flatten the array: np.concatenate(np.array([[1,2],[3,4]]), axis=0) = array([1, 2, 3, 4])
             embedding_dict[k] = np.concatenate(embedding_dict[k], axis=0)
-    # Embedding dict now has all tensors for each tiles with tumour
+    # Embedding dict now has all tensors for each tiles with tumour, grouped by slide
     # Outcomes_dict has annotation info for all slides with tumorous tile, e.g.
     # ... {0: {'recurrence': 0, 'slide_id': ['TCGA-   ...
     import ipdb; ipdb.set_trace()
