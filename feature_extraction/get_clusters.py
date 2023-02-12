@@ -39,7 +39,7 @@ else:
     ax.get_xaxis().set_visible(False)
     ax.get_yaxis().set_visible(False)
     plt.title('UMAP projection of tile representations', fontsize=20)
-    plt.savefig('../doc/comparison_slides_umap.png')
+    plt.savefig(os.path.join('doc', 'comparison_slides_umap.png'))
     # plt.show()
     # pickle.dump(cluster, open(args.out_dir + '/gmm_{}.pkl'.format(args.n_cluster), 'wb'))
 
