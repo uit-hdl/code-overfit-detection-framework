@@ -1,3 +1,4 @@
+---
 name: conditional_ssl_hist
 channels:
   - pytorch
