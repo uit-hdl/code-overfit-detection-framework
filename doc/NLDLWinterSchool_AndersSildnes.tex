@@ -1,0 +1,134 @@
+\documentclass[10pt,twocolumn,letterpaper]{article}
+
+% \usepackage{cvpr}              % To produce the CAMERA-READY version
+\usepackage[pagenumbers]{cvpr} % To force page numbers, e.g. for an arXiv version
+
+% Include other packages here, before hyperref.
+\usepackage{graphicx}
+\usepackage{comment}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage[toc,acronym]{glossaries}
+\input{abbreviations.tex}
+
+\usepackage[pagebackref,breaklinks,colorlinks]{hyperref}
+\usepackage[capitalize]{cleveref}
+\crefname{section}{Sec.}{Secs.}
+\Crefname{section}{Section}{Sections}
+\Crefname{table}{Table}{Tables}
+\crefname{table}{Tab.}{Tabs.}
+
+\def\cvprPaperID{*****}
+\def\confName{NLDL}
+\def\confYear{2023}
+
+% TODO Cite presentations?
+
+\begin{comment}
+The report should include both a short summary of the material covered (approx. 4 pages) and a description of the solution to a practical component.
+
+Remember that the first four pages of your final report should cover aspects from all tutorials (not only focusing on the one relevant for the practical task)
+
+Topics covered:
+A gentle introduction to Deep Reinforcement Learning
+
+Self-Supervised Learning: Training Targets and Loss Functions
+
+The Challenge of Unverfiability in eXplainable AI Evaluation
+
+Data representativity and low-resource modeling in deep learning
+
+High Performance Computing for Deep Learning
+
+Representation learning and learning with few data
+
+\end{comment}
+
+% if lacking text, write about the presentors (https://www.nldl.org/winter-school)
+
+\begin{document}
+\title{NLDL Winter School 2023}
+
+\author{Anders Sildnes\\
+University of Tromsø\\
+Postboks 6050 Langnes\\
+{\tt\small anders.sildnes@uit.no}
+}
+\maketitle
+% Computational pathology is study of disease using methods such as artificial intelligence. For building models, there are three main hindrances: 1) lack of publicly available data, 2) large image-size and high number of details and 3) lack of ground truth data due to expert disagreeance. Consequently, developers have to compromise when building a model. To know if models are accurate enough, explainable AI can help. But, are the explanations good enough that a pathologist can trust a model used to evaluate patient diagnosis and/or prognosis? 
+
+
+\section{Introduction}
+\label{sec:intro}
+This is a report from the 2023 Northern Lights Deep Learning (NLDL) conference. The first four pages contains a summary from each of the topics covered Monday 9th of January and Friday 13th January. A detailed programme can be found on the website: https://www.nldl.org/winter-school.
+% To make the first four pages I have followed each of the presentation slides and supplemented with extra information found in other sources, which of course are cited.
+% if need be, summarize my findings here
+
+\section{Deep Reinforcement Learning}
+\begin{comment}
+  \gls{RL} has emerged as a powerful technique in modern machine learning, allowing a system to learn through trial and error. We will introduce some fundamental principles upon which this family of methods is based. In the first part, we give a summary of classical reinforcement learning and thus provide the essentials for understanding Deep Reinforcement Learning (DRL). In the second part, we shift the focus onto DRL and look at how deep learning enhances classical reinforcement learning, leading to powerful new algorithms. These algorithms include DQN playing Atari games at a superhuman level, PPO solving robot locomotion problems, and Alpha Zero learning to play GO, Chess, and Shogi. In the limited time of such a mini-tutorial, we can of course only sketch the main characteristics, but we intend to motivate to look deeper into this fascinating family of methods.
+\end{comment}
+\gls{RL} is a branch of AI. One or more agents interact with a given environment and teach themselves 
+behaviours that maximize a goal-function. Often this relies a great number of iterations; e.g. AlphaGo Zero played 4.9 million rounds of Go with itself before being released~\cite{goWithoutHumans}. This got news coverage all over the world as Go had long been considered to be a game too complicated for computers.
+
+\gls{RL} agents operates in discrete time. At each timestep $t$ the agent observes its environment. Each observation $O_{t}$ modifies the agent state $s_{t}$, a processed representation to the history of events. Based on $s_{t}$ the agent chooses it's action $A_{t}$. The choice is made by choosing the action thought to maximize the reward $R_{t}$ of the agent in the future (next state). The expected return from the eyes of an agent is measured by it's goal function $G_{t}$, being the sum $G_{t} = \sum_{k=t+1}^{\inf{}}{R_{k}}$.
+A problem with this goal function is that the agent can get stuck. E.g. in a dead end of a labyrinth; refusing to take a step back to find another path to the goal. A discount factor, noted $\gamma{}$, ensures that rewards less valuable over time, typically modelled as $G_{t} = \sum_{k=t+1}^{\inf{}}\gamma^{k}{R_{k}}$ (which can also be expressed a recursive $R_{t+1} + \gamma{G_{t+1}}$). Hence, if you stick in a dead end for too long, it doesn't pay off, and any other path that penultimately gets to another reward faster is better.
+
+But how is the reward chosen? Each state is given a \textit{value function}. This is the expected value from being in a state $s$: $V_{\pi} = \mathbb{E}_{\pi} [ G_{t} | s = s_{t}]$. $\pi$ is here defined as the policy for what action to choose. Usually we cannot know exactly what the outcome of an action is, therefore we model actions by stochastic policies $\pi{}(a | s)$ which gives likelyhood of future actions. An example is a robot taking a step forward, but sliding on a banana peel and consequently falling. This lesson means that re-visiting the same state later in the future should not yield the same action, even if the policy is the same. The same does not apply to e.g. chess, where we can set a deterministic policy since we know exact outcomes from actions (moving pieces). 
+
+% TODO cite bellman?
+To resolve which future state that is desirable, the Bellman equation~\cite{bellman} is often used.
+It sums over all possible state successor states $s'$ and evaluates their estimated values given policy $\pi{}$ and probabilistic expection $p(s', r \vert{} s, a)$. It's full formal notation is given in~\Cref{eq:bellman}:
+\begin{equation}\label{eq:bellman}
+  V_{\pi}(s) = \sum_{a}{\pi(a\vert{}s})\sum_{s'}\sum_{r}{p(s', r \vert{} s, a) * [r + \gamma * v_{\pi{}}(s')]}
+\end{equation}
+
+\gls{} has recently been enhanced with deep neural networks.
+
+
+% The bellman equation is commonly used to asses a state value.
+
+% This is often a greedy process where short-term benefits are prioritized over long-term benefits, similar to laws of finance, future gains are discounted. 
+
+
+% \gls{RL} is sequential, i.e. future actions depend on previous ones. Unlike 
+
+
+% TODO: Ai gyms?
+
+\section{Self Supervised Learning}
+
+\section{Unverfiability in eXplainable AI Evaluation}
+
+\section{Data representativity and low-resource in Deep Learning}
+
+\section{High Performance Computing for Deep Learning}
+
+\section{Practical project}
+\cite{sslUMAP} uses self-supervised learning to learn morphological features of Lung Squamous Cell Carcinoma (LSCC). In training they use public TCGA and CPTAC datasets of H\&E-stained biopsy slides. They observe from previous work that other training algorithms cluster together tiles from the same slides, creating a batch effect where the algorithm learns features that are more slide specific than feature specific. This indicates that the network might do poorly on generalized input. They visualize this using 2D UMAP, shown in~\cref{fig:umap}.
+
+\begin{figure}
+  \includegraphics[scale=.17]{./umap.png}
+  \caption{Figure taken entirely from~\cite{sslUMAP}. Both pictures show a 2D UMAP projection of tile representations. On the left a training algorithm with randomly sampled tiles from slides, showing that features learned in the same slide cluster together. Using a different sampling algorithm, the picture on the right shows a more even distribution w.r.t slides}
+  \label{fig:umap}
+\end{figure}
+
+\subsection{UMAP}
+ The algorithm is founded on three assumptions about the data
+ \begin{enumerate}
+   \item The data is uniformly distributed on Riemannian manifold;
+   \item The Riemannian metric is locally constant (or can be approximated as such);
+   \item The manifold is locally connected.
+ \end{enumerate}
+
+
+I wish to evaluate~\cite{sslUMAP} and quantify the quality of \textit{the explanation} using metrics inspired by Quantus~\cite{hedstrom2022quantus}. This means 1) finding relevant qualitative metrics for the given batch effect plots and 2) testing how the metrics change with model, batch and image adjustments. In particular, I am curious how well the metrics show batch/clustering effects for few (1-3) slides. This can be a useful indication early during a training process.
+
+%%%%%%%%% REFERENCES
+{\small
+\bibliographystyle{ieee_fullname}
+\bibliography{egbib}
+}
+
+\end{document}
