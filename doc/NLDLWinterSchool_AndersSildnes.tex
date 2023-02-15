@@ -149,6 +149,13 @@ Talk about semi-supervised tranfser? ugh
    \item The manifold is locally connected.
  \end{enumerate}
 
+lack of ground truth in the data; I cannot say that two neighbors should be similar, since a model may model two samples differently even if the samples themselves are similar.
+
+A good scoring method can indicate for each slide whether there is overlap with others; this slides is probably overfitted
+A good scoring method can also average, though.
+Have to keep in mind that two photos can be disparate, e.g. 1 photo can have tumours, the other can be healthy, e.g.
+
+
 
 
 I wish to evaluate~\cite{sslUMAP} and quantify the quality of \textit{the explanation} using metrics inspired by Quantus~\cite{hedstrom2022quantus}. This means 1) finding relevant qualitative metrics for the given batch effect plots and 2) testing how the metrics change with model, batch and image adjustments. In particular, I am curious how well the metrics show batch/clustering effects for few (1-3) slides. This can be a useful indication early during a training process.
