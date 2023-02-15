@@ -111,6 +111,22 @@ So far in this summary the \gls{RL} approaches have been \textit{model-free}: to
 \begin{comment}
 This tutorial first introduces data representativity in artificial intelligence and machine learning, in particular how to measure data representativity and construct datasets that are fair and unbiased in contrast to datasets that work best on average. Secondly, we look at semi-supervised learning and transfer learning for low-resource applications, including a variational autoencoder for speech. The two parts consider robustness towards distribution shifts from a data and a modelling perspective.
 \end{comment}
+\gls{DL} depends on many iterations with data to improve its accuracy. If there are biases in the training data, this will also affect the inference results. We are therefore quite keen on getting \textit{representative samples} for our model training. But the term representative is ambigious and that in this ambiguity there are many research projects that fallaciously claim that their model is general. As a sidenote, it is also important to remember that we sometimes do not want our model to only work well in general cases. A medical scanner should work just as well for a representative user as any other user. E.g. most hearth disease occurs in elderly, but scanners should work well on children, too, unless you build another machine for non-specific usecases.
+
+CITE Kruskal
+According to there are 6 notions that are used to claim representativity.
+The first is \textbf{assertive claims}, which state that they have general or all-covering data without explaining why. One might say that since ImageNet CITE has many photos, it is general, but this has been found to not be the case CITE.
+Second, there is \textbf{``the miniature''}, wherein sub-populations might be over- or undersampled. These miniature models may suffer from a poor choice of stratifying attributes, either from misconceptions or subjective biases of the sampling author.
+Third, there is \textbf{absence or presence of selective forces}. A survey will never measure non-responsders for example (``selection force'') and a random sample may not be representative if e.g. the sampling phase is chosen poorly (``absence of selective forces'').
+Forth, there is the \textbf{Typical/Ideal} sample, wherein samples used are supposedly averages of their subgroup. One example is choosing cluster centers from Gaussian Mixture Models.
+Fifth, there is \textbf{Coverage Claims}. In a ``Noah's Ark-esque'' fashion, subgroups of data are sampled in equal numbers so as to avoid the potential of other biases. There are pitfalls here too, however, such as not covering the entire data span. To do full coverage, it is often common to see both random and non-random sampling used together: selecting groups deliberately, but samples from that group randomly.
+Sixth, there is a the deferral of defining representativity, giving instead a \textbf{reference to sampling methods}. The notion is carried by the idea that all datasets will \textit{always} be only a minitature model and subject to bias, so rather than claiming a \textit{definitive} data representativity, you leave it to the reader. 
+
+\Cref{datarepresentativity} additionally defines two other notions particlarly relevant for \gls{AI}. The seventh notion is \textbf{the copycat}, where synthetic data is used to claim representativeness. Finally, the last notion is the simplest one: you do not talk about representativity at all. 
+
+Assertive and ``no-notion''-claims are to be avoided in science. The rest may, however, be viable based on the context.
+
+Talk about semi-supervised tranfser? ugh
 
 \section{High Performance Computing for Deep Learning}
 
