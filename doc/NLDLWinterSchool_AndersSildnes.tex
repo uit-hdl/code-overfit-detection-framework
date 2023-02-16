@@ -113,6 +113,9 @@ There are now four different training paradigms in machine learning. 1) is super
 
 For speech and text, one technique to make \gls{SSL} efficient is \gls{APC}~\cite{chung2020generative}. This technique relies on encoding context in the form of past elements into a latent space (a model's interpretation) in order to predict future elements. This prediction is made using a softmax-layer which effectively calculates the probability of future tokens (referred to as frames). The loss function of the model also uses the probability of past and future frames as an optimizer. The difficulty of this approach is having enough computer memory to store all the past tokens. To aid this it is helpful to use \textit{transformers}, which have attention-based learning and may compress some of past frames. This could e.g. be elimiting noise in audio sounds.
 
+Since \gls{SSL} only defines \textit{pretext} tasks, it does mean that results from \gls{SSL} may not be transferrable to other domains or objects. For example, data2vec (CITE), another \gls{SSL} technique for \gls{NLP}, relies on having contextualized training targets to learn the embedding of words and documents. I.e. by calculating a \gls{tf-idf} from carefully selected documents it is able to calculate a good word embedding to be used in later analysis. For non-related domains the \gls{tf-idf} would be off, however. 
+% TODO: compare program's description of talks vs what I have written
+
 
 
 \section{Unverfiability in eXplainable AI Evaluation}\label{sec:xai}
