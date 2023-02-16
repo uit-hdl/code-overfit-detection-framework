@@ -103,9 +103,17 @@ So far in this summary the \gls{RL} approaches have been \textit{model-free}: to
 
 % TODO: Ai gyms?
 
-\section{Self Supervised Learning}
+\section{Self Supervised Learning}\label{sec:ssl}
+\begin{comment}
+Humans learn much under supervision but even more without. Such will apply to machines. Self-supervised learning is paving the way by leveraging unlabeled data which is vastly available. In this emerging learning paradigm, deep representation models are trained by supervised learning with supervisory signals (i.e., training targets) derived automatically from unlabeled data itself. It is abundantly clear that such a learnt representation can be useful for a broad spectrum of downstream tasks with the need of significantly less supervised data.
+
+As in supervised learning, key considerations in devising self-supervised learning methods include training targets and loss functions. The difference is that training targets for self-supervised learning are not pre-defined and greatly dependent on the choice of pretext tasks. This leads to a variety of novel training targets and their corresponding loss functions. This tutorial aims to provide an overview of training targets and loss functions developed in the domains of speech, vision and text. Further, we will discuss some open questions, e.g., transferability, and under-explored problems, e.g., learning across modalities. For example, the pretext tasks, and thus the training targets, can be drastically distant from the downstream tasks. This raises the questions like how transferrable the learnt representations are, how to choose training targets and how to explore representations. We will also discuss the link between semi-supervised and self-supervised learning.
+\end{comment}
 
 \section{Unverfiability in eXplainable AI Evaluation}
+\begin{comment}
+In recent years, the interest in eXplainable AI (XAI) techniques has undoubtedly exploded and countless methods and toolboxes are now at the disposal of XAI researchers, ML practitioners and data scientists alike. Despite my shared enthusiasm for this productive development, until recently, the topic of XAI evaluation was grossly understudied — and caused confusion about which explanation methods work and under what conditions. In this tutorial, we will take an in-depth look at some of the most recent developments in XAI evaluation and review the solutions that the community has put forward to circumvent the fundamental problem of XAI — the lack of ground-truth explanations. In addition to this, we will discuss The Challenge of Unverfiability — why evaluation is so difficult to get right (and what we can do about it). At the end of the tutorial, a brief yet hands-on introduction to Quantus will be given, which is an open-source library intended for XAI researchers to evaluate local neural network explanations.
+\end{comment}
 
 \section{Data representativity and low-resource in Deep Learning}
 \begin{comment}
@@ -115,7 +123,7 @@ This tutorial first introduces data representativity in artificial intelligence 
 
 CITE Kruskal
 According to there are 6 notions that are used to claim representativity.
-The first is \textbf{assertive claims}, which state that they have general or all-covering data without explaining why. One might say that since ImageNet CITE has many photos, it is general, but this has been found to not be the case CITE.
+The first is \textbf{assertive claims}, which state that they have general or all-covering data without explaining why. One might say that since ImageNet~\cite{imageNet} has many photos, it is general, but this has been found to not be the case CITE.
 Second, there is \textbf{``the miniature''}, wherein sub-populations might be over- or undersampled. These miniature models may suffer from a poor choice of stratifying attributes, either from misconceptions or subjective biases of the sampling author.
 Third, there is \textbf{absence or presence of selective forces}. A survey will never measure non-responsders for example (``selection force'') and a random sample may not be representative if e.g. the sampling phase is chosen poorly (``absence of selective forces'').
 Forth, there is the \textbf{Typical/Ideal} sample, wherein samples used are supposedly averages of their subgroup. One example is choosing cluster centers from Gaussian Mixture Models.
@@ -136,6 +144,31 @@ The \gls{NRIS} (formerly ``the Metacenter'') is a collaboration of multiple orga
 In \gls{DL}, an immediate advantage of \gls{HPC} is the higher number of \gls{GPU} available, potentially removing the need for batch-processing. However, working with multiple \gls{GPU} introduces some challenges: how and when do we communicate between nodes? There's two primary modes: synchronous and asynchronous. Synchronous processing is often faster~\cite{distributedDL}, but may be bottlenecked by slower or interrupted machines. Furthermore, synchronization points may be costly (slow), leaving nodes idling. Asynchronous processing mitigates these problems, but have other costs. Many asynchronous frameworks will e.g. have smaller workloads per kernel, giving extra overhead to load balancers that have to distribute remaining work~\cite{pan2017synchronous}.
 
 \section{Representation learning and learning with few data}
+\begin{comment}
+Deep Neural Networks are data hungry, they require millions of labelled data in order to work! --- Really? --- The last decade has shown useful approaches to work with less labelled data, either by having a lot of data from a similar domain or by letting the network learn meaningful representations without explicit supervision. On Monday, you learned already about self-supervised learning. This tutorial first brings it in to general perspective of learning with few data, covering typical transfer learning  and auto-encoder approaches or perceptual loss. Furthermore, the tutorial will investigate some typical (mis-) conceptions of these methods and suggests some practical tips on how to learn with few data. By participating in this tutorial, you will get deep insights in representation learning and learning with few data, as well as practical tools to start working on data in your own domain.
+\end{comment}
+
+Labelling data takes time and is tedious for annotators. We can try to use \textit{transfer learning}, other's labels, to improve our own results. But this approach has been shown to only help for low-level features, thus still leaving a need for labelling of your own datasets. This even in transfer learning from big datasets such as ImageNet~\cite{imageNet}. Models trained on this network has e.g. been shown to be biased for textures rather than shapes. Furthermore, the images mostly take on natural scenes and may therefore perform poorly on domain-specific tasks such as histopathology.
+
+Another ideal is \textit{representation learning}, where the model is able to generalize features from training. One way to do so is the use of autoencoders. These neural networks are made to reconstruct input data after they have been compressed or distorted. This way, they should in theory be good at understanding the features of their data. However, it is crucial that data is not biased or noisy, otherwise the learned features may be incorrect.
+
+% this is also contrastive learning
+\gls{SSL} is covered in~\Cref{sec:ssl}. One way to make \gls{SSL} work is to use distorted inputs together with the original data, e.g. in image processing this could be by rotating or cropping the image, or occluding parts of the image. It should still be possible (at least for humans) to understand what the core feature/object of the image is, otherwise the model wouldn't learn any features. SimCLR(CITE) has a nice table to show which alterations/augmentations work better or worse than others for ImageNet. The alterations are also called \textit{human priors}, since they rely on keeping features that humans need to understand the object. While this has gotten good results on natural images, there are some domains such as medicine where the augmentations are less efficient. Especially in histopathology where there are many small details in each section of an image that are all important to make a classification.
+
+
+% Representation learning is a type of machine learning technique that aims to automatically learn meaningful representations or features of raw data. In traditional machine learning, humans usually engineer or handcraft features that are used as input to the learning algorithm. However, with representation learning, the algorithm itself learns these features from the raw data.
+% 
+% The goal of representation learning is to transform the raw input data into a more meaningful and useful representation, which captures the underlying structure and patterns of the data. The learned representation should be informative, efficient, and generalizable to new and unseen data.
+% 
+% There are different types of representation learning techniques, including:
+% 
+%     Autoencoders: These are neural networks that learn to reconstruct their input data from a compressed representation or bottleneck. The bottleneck is typically a low-dimensional vector that captures the most important features of the input data.
+% 
+%     Convolutional Neural Networks (CNNs): These are neural networks that are particularly well-suited for learning representations from image data. They use convolutional layers that learn to extract local features from the image, which are then combined and transformed in subsequent layers to produce a high-level representation.
+% 
+%     Recurrent Neural Networks (RNNs): These are neural networks that are used for learning representations from sequential data such as text or time series. They use recurrent connections to maintain a memory of past inputs, and learn to extract meaningful representations from the sequence.
+% 
+% Representation learning has become an important technique in many areas of machine learning, including computer vision, natural language processing, and speech recognition. By automatically learning informative representations from raw data, representation learning can help improve the accuracy and efficiency of machine learning algorithms, and enable them to tackle more complex and challenging tasks.
 
 \section{Practical project}
 \cite{sslUMAP} uses self-supervised learning to learn morphological features of Lung Squamous Cell Carcinoma (LSCC). In training they use public TCGA and CPTAC datasets of H\&E-stained biopsy slides. They observe from previous work that other training algorithms cluster together tiles from the same slides, creating a batch effect where the algorithm learns features that are more slide specific than feature specific. This indicates that the network might do poorly on generalized input. They visualize this using 2D UMAP, shown in~\cref{fig:umap}.
@@ -160,7 +193,7 @@ A good scoring method can indicate for each slide whether there is overlap with 
 A good scoring method can also average, though.
 Have to keep in mind that two photos can be disparate, e.g. 1 photo can have tumours, the other can be healthy, e.g.
 
-TODOØ 2.9.1 Reflection in Clemmensen has a lot of stuff about metrics.
+TODO: 2.9.1 Reflection in Clemmensen has a lot of stuff about metrics.
 
 
 I wish to evaluate~\cite{sslUMAP} and quantify the quality of \textit{the explanation} using metrics inspired by Quantus~\cite{hedstrom2022quantus}. This means 1) finding relevant qualitative metrics for the given batch effect plots and 2) testing how the metrics change with model, batch and image adjustments. In particular, I am curious how well the metrics show batch/clustering effects for few (1-3) slides. This can be a useful indication early during a training process.
