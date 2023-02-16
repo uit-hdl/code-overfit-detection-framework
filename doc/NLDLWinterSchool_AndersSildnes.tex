@@ -133,10 +133,7 @@ The \gls{NRIS} (formerly ``the Metacenter'') is a collaboration of multiple orga
 
 \gls{HPC} are comprised of a large number of storage and processing units, allowing programmers to solve problems that are too big for consumer-level computers. Unlike another option, cloud environments, \gls{HPC} store all their resources in the same location and usually have shared file drives. This makes it fast to launch distributed workloads. There are two paradigm shifts according to CITE sigma2 that you need to overcome when using \gls{HPC}; 1) working with \gls{CLI} and 2) working with multiple computers. Additionaly, \gls{HPC} clusters are often in high demand, resulting in the need of job schedulers. 
 
-In \gls{DL}, an immediate advantage of \gls{HPC} is the higher number of \gls{GPU} available, potentially removing the need for batch-processing. However, working with multiple \gls{GPU} introduces some challenges: how and when do we communicate between nodes? There's two primary modes: synchronous and asynchronous. Synchronous processing is often faster (CITE file:///C:/Users/ander/Downloads/Distributing_Deeplearning_on_HPC.pdf), but may be bottlenecked by slower or interrupted machines. Furthermore, synchronization points may be costly (slow), leaving nodes idling. Asynchronous processing mitigates these problems, but have other costs. Many asynchronous frameworks will e.g. have smaller workloads per kernel, giving extra overhead to load balancers that have to distribute remaining work~\cite{pan2017synchronous}.
-
-
-
+In \gls{DL}, an immediate advantage of \gls{HPC} is the higher number of \gls{GPU} available, potentially removing the need for batch-processing. However, working with multiple \gls{GPU} introduces some challenges: how and when do we communicate between nodes? There's two primary modes: synchronous and asynchronous. Synchronous processing is often faster~\cite{distributedDL}, but may be bottlenecked by slower or interrupted machines. Furthermore, synchronization points may be costly (slow), leaving nodes idling. Asynchronous processing mitigates these problems, but have other costs. Many asynchronous frameworks will e.g. have smaller workloads per kernel, giving extra overhead to load balancers that have to distribute remaining work~\cite{pan2017synchronous}.
 
 \section{Representation learning and learning with few data}
 
