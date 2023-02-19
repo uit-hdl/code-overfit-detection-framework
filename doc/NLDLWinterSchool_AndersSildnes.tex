@@ -26,7 +26,7 @@
 % TODO Cite presentations?
 
 \begin{comment}
-The report should include both a short summary of the material covered (approx. 4 pages) and a description of the solution to a practical component.
+The written report should be 8 pages in length (double column, excl. references). To standardise things, please use the CVPR formatThe report should include both a short summary of the material covered (approx. 4 pages) and a description of the solution to a practical component.
 
 Remember that the first four pages of your final report should cover aspects from all tutorials (not only focusing on the one relevant for the practical task)
 
@@ -200,10 +200,37 @@ Finally\dots{}
 
 \newpage
 
-\section{Practical project}
+\section{Practical Project - Introduction}
+\begin{comment}
+The report should include both a short summary of the material covered (approx. 4 pages) and a description of the solution to a practical component.
+
+For the practical component, you are asked to find a project that is related to one of the topics covered in the tutorials. This could for instance be self-supervised learning, where you try one of the self-supervised learning techniques on the data that you are working on in your PhD and analyse the results and or hyperparameters. Or you could take a method and evaluate its effect in new scenarios, for instance when faced with highly imbalanced data.
+\end{comment}
+\subsection{Background}
+\dots{}summary of the paper, chatGPT maybe.
+
+
 \cite{sslUMAP} uses self-supervised learning to learn morphological features of Lung Squamous Cell Carcinoma (LSCC). In training they use public TCGA and CPTAC datasets of H\&E-stained biopsy slides. They observe from previous work that other training algorithms cluster together tiles from the same slides, creating a batch effect where the algorithm learns features that are more slide specific than feature specific. This indicates that the network might do poorly on generalized input. They visualize this using 2D UMAP, shown in~\cref{fig:umap}.
 
+\subsection{Problem Introduction}
+\dots{}batches sometimes has a problem X
+\dots{} They claim to have fixed the problem, but to what extent?
+
+\section{Methodology}
+\subsection{Recreating Work}
+\dots{}difficult to get the code to run
+\dots{}difficult to find the dataset with annotations
+\dots{}difficult to find the dataset with annotations
+
+\subsection{DataSet}
+
+\subsection{MoCo}
+\gls{MOCO}
+
+
 \subsection{Quantifyable explanations}\label{sec:quantifiable}
+\subsubsection{Quantus}
+
 
 \begin{figure}
   \includegraphics[scale=.17]{./umap.png}
@@ -224,6 +251,27 @@ lack of ground truth in the data; I cannot say that two neighbors should be simi
 A good scoring method can indicate for each slide whether there is overlap with others; this slides is probably overfitted
 A good scoring method can also average, though.
 Have to keep in mind that two photos can be disparate, e.g. 1 photo can have tumours, the other can be healthy, e.g.
+
+\subsection{Results}
+\begin{table}
+\centering
+  \begin{tabular}{l l l l}
+    Input & m1 & m2 & m3 \\
+    Euclidean & 1 & 2 & 3 \\
+  \end{tabular}
+  \caption{Output from different sets}
+  \label{tab:singleres}
+\end{table}
+
+\begin{table}
+\centering
+  \begin{tabular}{l l l l}
+    Input & m1 & m2 & m3 \\
+    Euclidean & 1 & 2 & 3 \\
+  \end{tabular}
+  \caption{Output from different sets}
+  \label{tab:combinedres}
+\end{table}
 
 TODO: 2.9.1 Reflection in Clemmensen has a lot of stuff about metrics.
 
