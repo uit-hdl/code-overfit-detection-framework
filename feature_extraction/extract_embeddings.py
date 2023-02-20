@@ -63,18 +63,17 @@ def get_embeddings_bagging(feature_extractor, subtype_model, data_set):
     # Embedding dict now has all tensors for each tiles with tumour, grouped by slide
     # Outcomes_dict has annotation info for all slides with tumorous tile, e.g.
     # ... {0: {'recurrence': 0, 'slide_id': ['TCGA-   ...
-    import ipdb; ipdb.set_trace()
     return embedding_dict, outcomes_dict
 
 def load_pretrained(net, model_dir):
 
     print(model_dir)
     checkpoint = torch.load(model_dir)
-    # model_state_dict = {k.replace("module.encoder_q.", ""): v for k, v in checkpoint['state_dict'].items() if
-                        # "encoder_q" in k}
-    # net.load_state_dict(model_state_dict)
+    model_state_dict = {k.replace("module.encoder_q.", ""): v for k, v in checkpoint['state_dict'].items() if
+                        "encoder_q" in k}
+    net.load_state_dict(model_state_dict)
     net.last_linear = nn.Identity()
-    net.load_state_dict(checkpoint)
+    # net.load_state_dict(checkpoint)
 
 parser = argparse.ArgumentParser(description='Extract embeddings ')
 

@@ -1,6 +1,10 @@
 import numpy as np
 import pandas as pd
 from sksurv.metrics import brier_score, concordance_index_censored, integrated_brier_score
+import pickle
+import os
+from collections import defaultdict
+from tqdm import tqdm
 
 
 def get_metics(train_df, test_df, est):
@@ -33,7 +37,7 @@ def preprocess_data(train_data, val_data, test_data):
     if 'tcga' not in train_data:
         train_df = pd.DataFrame(np.concatenate([train_data['cluster'], np.stack([train_data['recur_day'], train_data['followup_day'], train_data['outcome']]).T], axis=1),columns=['c_{}'.format(i) for i in range(50)] + ['recur', 'followup', 'outcome'])
     else:
-        train_df = pd.DataFrame(np.concatenate([train_data['cluster'], np.stack([train_data['recur_day'], train_data['followup_day'], train_data['outcome']]).T], axis=1),columns=['c_{}'.format(i) for i in range(50)] + ['recur', 'followup', 'outcome'])
+        train_df = pd.DataFrame(np.concatenate([train_data['cluster'], np.stack([train_data['recur_day'], train_data['followup_day'], train_data['outcome']]).T], axis=1),columns=['c_{}'.format(i) for i in range(train_data['cluster'].shape[1])] + ['recur', 'followup', 'outcome'])
     train_df = train_df[(train_df['recur'].notna() | train_df['followup'].notna())]
     train_df['day'] = train_df['recur']
     train_df.loc[train_df['recur'].isna(), 'day'] = train_df.loc[train_df['recur'].isna(), 'followup']
@@ -45,7 +49,7 @@ def preprocess_data(train_data, val_data, test_data):
         val_df = pd.DataFrame(np.concatenate([val_data['cluster'], np.stack([val_data['recur_day'], val_data['followup_day'], val_data['outcome']]).T], axis=1),
                            columns=['c_{}'.format(i) for i in range(50)] + ['recur', 'followup', 'outcome'])
     else:
-        val_df = pd.DataFrame(np.concatenate([val_data['cluster'], np.stack([val_data['recur_day'], val_data['followup_day'], val_data['outcome']]).T], axis=1),columns=['c_{}'.format(i) for i in range(50)] + ['recur', 'followup', 'outcome'])
+        val_df = pd.DataFrame(np.concatenate([val_data['cluster'], np.stack([val_data['recur_day'], val_data['followup_day'], val_data['outcome']]).T], axis=1),columns=['c_{}'.format(i) for i in range(val_data['cluster'].shape[1])] + ['recur', 'followup', 'outcome'])
     val_df = val_df[(val_df['recur'].notna() | val_df['followup'].notna())]
     val_df['day'] = val_df['recur']
     val_df.loc[val_df['recur'].isna(), 'day'] = val_df.loc[val_df['recur'].isna(), 'followup']
@@ -59,7 +63,7 @@ def preprocess_data(train_data, val_data, test_data):
                                columns=['c_{}'.format(i) for i in range(50)] + ['recur', 'followup', 'outcome'])
     else:
         test_df = pd.DataFrame(np.concatenate([test_data['cluster'], np.stack([test_data['recur_day'], test_data['followup_day'], test_data['outcome']]).T], axis=1),
-                               columns=['c_{}'.format(i) for i in range(50)] + ['recur', 'followup', 'outcome'])
+                               columns=['c_{}'.format(i) for i in range(test_data['cluster'].shape[1])] + ['recur', 'followup', 'outcome'])
 
     test_df['day'] = test_df['recur']
     test_df = test_df[(test_df['recur'].notna() | test_df['followup'].notna())]
@@ -90,13 +94,14 @@ def load_data(data_dir, cluster_dir, normalize='mean', cls=1):
         n_clusters = len(cluster.weights_)
     else:
         n_clusters = cluster.n_clusters
-    train_features = pickle.load(open(data_dir + 'train_embedding.pkl', 'rb'))
-    train_outcomes = pickle.load(open(data_dir + 'train_outcomes.pkl', 'rb'))
-    val_features = pickle.load(open(data_dir + 'val_embedding.pkl', 'rb'))
-    val_outcomes = pickle.load(open(data_dir + 'val_outcomes.pkl', 'rb'))
-    test_features = pickle.load(open(data_dir + 'test_embedding.pkl', 'rb'))
-    test_outcomes = pickle.load(open(data_dir + 'test_outcomes.pkl', 'rb'))
+    train_features = pickle.load(open(os.path.join(data_dir, 'train_embedding.pkl'), 'rb'))
+    train_outcomes = pickle.load(open(os.path.join(data_dir, 'train_outcomes.pkl'), 'rb'))
+    val_features = pickle.load(open(os.path.join(data_dir, 'val_embedding.pkl'), 'rb'))
+    val_outcomes = pickle.load(open(os.path.join(data_dir, 'val_outcomes.pkl'), 'rb'))
+    test_features = pickle.load(open(os.path.join(data_dir, 'test_embedding.pkl'), 'rb'))
+    test_outcomes = pickle.load(open(os.path.join(data_dir, 'test_outcomes.pkl'), 'rb'))
 
+    train_tcga_flag = np.array([])
     val_tcga_flag = np.array([])
     test_tcga_flag = np.array([])
     

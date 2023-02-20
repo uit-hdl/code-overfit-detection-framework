@@ -58,6 +58,5 @@ for slide_id in included_slides:
     annotation[case_id]['recurrence_free_days'] = pd.to_numeric(followupTable.new_tumor_event_dx_days_to, errors='coerce').loc[case_id]
     annotation[case_id]['followup_days'] = pd.to_numeric(followupTable.last_contact_days_to, errors='coerce').loc[case_id]
     annotation[case_id]['gender'] = clinicalTable['gender'].loc[case_id]
-    print("woop")
 pickle.dump(dict(annotation), open('./TCGA/recurrence_annotation.pkl', 'wb'))
 

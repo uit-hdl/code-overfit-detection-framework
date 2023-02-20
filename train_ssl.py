@@ -330,7 +330,6 @@ for epoch in range(args.start_epoch, args.epochs):
     adjust_learning_rate(optimizer, epoch, args)
 
     # train for one epoch
-    import ipdb; ipdb.set_trace()
     train(train_loader, model, criterion, optimizer, epoch, args)
 
     if not args.multiprocessing_distributed or (args.multiprocessing_distributed

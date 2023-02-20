@@ -16,9 +16,10 @@ class TCGA_CPTAC_Dataset(Dataset):
         # slide_list = [s for s in slide_list if "TCGA" in s]
         # TODO: temporary hack
         slide_list = [
-                'TCGA-39-5016-01A-01-BS1',
-                'TCGA-39-5016-01A-01-TS1',
-                'TCGA-39-5016-11A-01-TS1',
+                # 'TCGA-39-5016-01A-01-BS1',
+                # 'TCGA-39-5016-01A-01-TS1',
+                # 'TCGA-39-5016-11A-01-TS1',
+                'TCGA-21-A5DI-01A-03-TS3',
         ]
         self.slide2tiles = {}
         for slide_id in slide_list:

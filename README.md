@@ -11,6 +11,7 @@ survival_data_raw/clinical_PANCAN_patient_with_followup.csv --wsi_path TCGA/ --r
   * `ipython ./feature_extraction/extract_embeddings.py -- --feature_extractor_dir my_pretrained_weights/pretrained_inception.pth.tar --root_dir . --split_dir my_split_dir/ --out_dir my_embeddings_output --subtype_model_dir my_pretrained_weights/pretrained_inception.pth.tar`
   * `ipython ./preprocessing/process_tcga.py -- --followup_path TCGA/clinical_follow_up_v1.0_lusc.xlsx --clinical_table_path TCGA/nationwidechildrens.org_clinical_patient_lusc.txt --wsi_path TCGA/ --refer_img preprocessing/colorstandard.png`
   * `ipython ./feature_extraction/get_clusters.py -- --data_dir my_embeddings_output --cluster_type gmm --n_cluster 5 --out_dir my_cluster_output`
+  * `ipython ./survival_models/cox.py -- --data_dir . --cluster_name=gmm_5.pk --normalize mean`
 
 Relevant papers:  
 * https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7794818/
