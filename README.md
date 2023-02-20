@@ -1,7 +1,12 @@
 # Hello, world
 Fork of [https://github.com/NYUMedML/conditional_ssl_hist](https://github.com/NYUMedML/conditional_ssl_hist)  
 
+Real links for dataset:
+* https://portal.gdc.cancer.gov/legacy-archive/search/f?filters=%7B%22op%22:%22and%22,%22content%22:%5B%7B%22op%22:%22in%22,%22content%22:%7B%22field%22:%22cases.project.program.name%22,%22value%22:%5B%22TCGA%22%5D%7D%7D,%7B%22op%22:%22in%22,%22content%22:%7B%22field%22:%22files.data_category%22,%22value%22:%5B%22Clinical%22%5D%7D%7D,%7B%22op%22:%22in%22,%22content%22:%7B%22field%22:%22cases.project.primary_site%22,%22value%22:%5B%22Lung%22%5D%7D%7D,%7B%22op%22:%22in%22,%22content%22:%7B%22field%22:%22cases.project.project_id%22,%22value%22:%5B%22TCGA-LUSC%22%5D%7D%7D,%7B%22op%22:%22in%22,%22content%22:%7B%22field%22:%22cases.project.disease_type%22,%22value%22:%5B%22Lung%20Squamous%20Cell%20Carcinoma%22%5D%7D%7D,%7B%22op%22:%22in%22,%22content%22:%7B%22field%22:%22files.data_format%22,%22value%22:%5B%22Biotab%22%5D%7D%7D,%7B%22op%22:%22in%22,%22content%22:%7B%22field%22:%22files.data_type%22,%22value%22:%5B%22Clinical%20data%22%5D%7D%7D,%7B%22op%22:%22in%22,%22content%22:%7B%22field%22:%22files.access%22,%22value%22:%5B%22open%22%5D%7D%7D,%7B%22op%22:%22in%22,%22content%22:%7B%22field%22:%22files.platform%22,%22value%22:%5B%22Clinical%22%5D%7D%7D%5D%7D
+
 Command lines:  
+  * `ipython ./preprocessing/process_tcga.py -- --cherry survival_data_raw/cherry_picked.csv --followup_path survival_data_raw/An_Integrated_TCGA_Pan-Cancer_Clinical_Data_Resource_to_drive_high_quality_survival_outcome_analytics.xlsx --clinical_table_path`
+survival_data_raw/clinical_PANCAN_patient_with_followup.csv --wsi_path TCGA/ --refer_img preprocessing/colorstandard.png
   * `torchrun --standalone --nnodes=1 ./train_ssl.py  --data_dir . --split_dir my_split_dir/ --batch_slide_num 4 --cos --out_dir my_output/ --gpu 0 --epochs 1 --moco-dim 256`
   * `ipython ./feature_extraction/extract_embeddings.py -- --feature_extractor_dir my_pretrained_weights/pretrained_inception.pth.tar --root_dir . --split_dir my_split_dir/ --out_dir my_embeddings_output --subtype_model_dir my_pretrained_weights/pretrained_inception.pth.tar`
   * `ipython ./preprocessing/process_tcga.py -- --followup_path TCGA/clinical_follow_up_v1.0_lusc.xlsx --clinical_table_path TCGA/nationwidechildrens.org_clinical_patient_lusc.txt --wsi_path TCGA/ --refer_img preprocessing/colorstandard.png`
