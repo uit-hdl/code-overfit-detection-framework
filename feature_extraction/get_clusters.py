@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 from itertools import accumulate, combinations, product
 import operator
 from scipy.spatial.distance import directed_hausdorff, pdist
+from scipy.stats import entropy
 import pandas as pd
 
 
@@ -61,6 +62,7 @@ metrics_l = np.zeros((len(train_features.keys()), len(metrics)))
 for ((i,points), (j,metric)) in product(enumerate(slide_sets), enumerate(metrics)):
     metrics_l[i][j] = np.mean(pdist(points, metric))
 df = pd.DataFrame(metrics_l, columns=metrics)
+import ipdb; ipdb.set_trace()
 df.to_csv('out.csv', sep='\t', encoding='utf-8')
 # plt.show()
 # pickle.dump(cluster, open(args.out_dir + '/gmm_{}.pkl'.format(args.n_cluster), 'wb'))
