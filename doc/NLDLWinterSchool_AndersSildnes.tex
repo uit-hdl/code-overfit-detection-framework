@@ -134,9 +134,10 @@ But, how robust are the metioned explanations?~\cite{geometryToBlame} finds that
 
 Since explanations can be erroneous and frail, a tool to measure the quality of explanations seems called for. I discuss this more in detail in~\Cref{sec:quantifiable}.
 
-\begin{figure}\label{fig:arbitrary}
+\begin{figure}
   \includegraphics[scale=.4]{./manipulated_explanation_ai.png}
   \caption{Left side: original image with its explanation. Right side is a seemingly similar image, but it is modified in such a a way that the explanation output is completely different. The figure is taken from~\cite{geometryToBlame}}
+\label{fig:arbitrary}
 \end{figure}
 
 
@@ -179,20 +180,21 @@ Labelling data takes time and is tedious for annotators. We can try to use \text
 
 Another ideal is \textit{representation learning}, where the model is able to generalize features from training. One way to do so is the use of autoencoders. These neural networks are made to reconstruct input data after they have been compressed or distorted. This way, they should in theory be good at understanding the features of their data. However, it is crucial that data is not biased or noisy, otherwise the learned features may be incorrect.
 
-\begin{figure}\label{fig:simCLR}
+\begin{figure}
   \includegraphics[scale=.5]{simCLR.png}
   \caption{Figure taken from~\cite{simCLR}. Each number corresponds to a linear evaluation of the SimCLR model using different augmentations. In the diagonal (except in average column) each transformation is only done once. For other entries, there are two augmentations done together. Higher numbers represent more accurate results. Thus the combination of crop and color distortions stands out from the rest as most benefitial augmentations \textit{for ImageNet}}
+\label{fig:simCLR}
 \end{figure}
 
 % TODO: Also cite SSL section for "pulling"
-One way to make \gls{SSL} work is to use distorted inputs together with the original data, e.g. in image processing this could be by rotating or cropping the image, or occluding parts of the image. It should still be possible (at least for humans) to understand what the core feature/object of the image is, otherwise the model wouldn't learn any features. \Cref{fig:simCLR} SimCLR~\cite{simCLR} has a nice table to show which alterations/augmentations work better or worse than others for ImageNet. \textit{Constrastive learning} is a technique where you make a prediction on the original and modified image, and then making a loss function that can assimilate the output. Often siamese networks are used, i.e. two different models, where one model with handle the original photo and the other will handle the augmented photo. By pulling similar samples together and disjoint samples apart (by adjusting weights and biases), the model learns the important features of the image. One example of a loss function is using cosine similarity scores, where the output from each model is represented as a vector. The cosine similarity captures the angle between the vectors, and can thus be used as an indication of similarity. 
+One way to make \gls{SSL} work is to use distorted inputs together with the original data, e.g. in image processing this could be by rotating or cropping the image, or occluding parts of the image. It should still be possible (at least for humans) to understand what the core feature/object of the image is, otherwise the model wouldn't learn any features. SimCLR~\cite{simCLR} has a nice table (reproduced in \Cref{fig:simCLR}) to show which alterations/augmentations work better or worse than others for ImageNet. \textit{Constrastive learning} is a technique where you make a prediction on the original and modified image, and then making a loss function that can assimilate the output. Often siamese networks are used, i.e. two different models, where one model with handle the original photo and the other will handle the augmented photo. By pulling similar samples together and disjoint samples apart (by adjusting weights and biases), the model learns the important features of the image. One example of a loss function is using cosine similarity scores, where the output from each model is represented as a vector. The cosine similarity captures the angle between the vectors, and can thus be used as an indication of similarity. 
 
 The image alterations are also called \textit{human priors}, since they rely on keeping features that humans need to understand the object. While these human priors have gotten good results on natural images, there are some domains such as medicine where they are less efficient. Especially in histopathology where there are many small details in each section of an image that are all important to make a classification. ~\cite{dataPriors} suggests to instead use \textit{data prior} for Histopathological images. One such example is using different levels of zoom as an image alteration. By zooming out, you \textit{include} more data as input. The technique works nevertheless since you want the model to focus on an area of interest (such as a tumour) regardless of its surroundings.
 
 \section{Summary}\label{sec:summary}
-Several talks that have mentioned or used new \gls{NLP} services, such as \href{ChatGPT}{https://openai.com/blog/chatgpt/} and \href{you.com}{you.com}. This might be an indication that \gls{NLP} has been a field with significant improvement over the last years. For \gls{DL} techniques, \gls{SSL} is mentioned in several talks (during the conference days) and seems to be popular together with constrastive learning. ImageNet is also a frequently mentioned keyword, showing the importance of big, publicly available data in general, but especially in image processing.
+Several talks that have mentioned or used new \gls{NLP} services, such as \href{ChatGPT}{https://openai.com/blog/chatgpt/} and \href{https://you.com/}{https://you.com/}. This might be an indication that \gls{NLP} has been a field with significant improvement over the last years. For \gls{DL} techniques, \gls{SSL} is mentioned in several talks (during the conference days) and seems to be popular together with constrastive learning. ImageNet is also a frequently mentioned keyword, showing the importance of big, publicly available data in general, but especially in image processing.
 
-A common theme is that there are many pitfalls and unresolved problems in \gls{DL}. Several talks mentioned problems with lack of transferability and the generality of a model. \gls{SSL} (\Cref{sec:SSL,sec:cheese}) is dependent on its \textit{priors}. ~\Cref{sec:representative} discusses how difficult it is to find representative sample in general, and especially for training an \gls{AI}. \Cref{sec:xai} also brings up the need to ``sanity check existing sanity checks''.
+A common theme is that there are many pitfalls and unresolved problems in \gls{DL}. Several talks mentioned problems with lack of transferability and the generality of a model. \gls{SSL} (\Cref{sec:ssl,sec:cheese}) is dependent on its \textit{priors}. ~\Cref{sec:representative} discusses how difficult it is to find representative sample in general, and especially for training an \gls{AI}. \Cref{sec:xai} also brings up the need to ``sanity check existing sanity checks''.
 
 % Finally, it might be important to reflect on topics that are notsome things that are \textit{not} mentioned during a \gls{DL} school are 
 
