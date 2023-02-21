@@ -211,8 +211,34 @@ For the practical component, you are asked to find a project that is related to 
 \subsection{Background}
 \dots{}summary of the paper, chatGPT maybe.
 
+% TODO:  Check out the presentation with WSI and:
+% However, the contrastive loss, InfoNCE (van den Oord et al., 2018) is not tailored to
+% the special properties of WSIs. Robinson et al. (2021) show that contrastive loss tends to
+% learn “shortcuts” within the similar and dissimilar samples, which inadvertently suppress
+% important predictive features. I
 
-\cite{sslUMAP} uses self-supervised learning to learn morphological features of Lung Squamous Cell Carcinoma (LSCC). In training they use public TCGA and CPTAC datasets of H\&E-stained biopsy slides. They observe from previous work that other training algorithms cluster together tiles from the same slides, creating a batch effect where the algorithm learns features that are more slide specific than feature specific. This indicates that the network might do poorly on generalized input. They visualize this using 2D UMAP, shown in~\cref{fig:umap}.
+
+\gls{LSCC} is a type of cancer with high recurrence rate and likelyhood of metastasis. There aren't many publicly available datasets with annotations available. One popular data source is \gls{TCGA}, which has image, clinical and genomic data available. We will be looking at H\&E-stained biopsy slides, called \gls{WSI}.
+
+\cite{sslUMAP} uses \gls{SSL} to provide prognostic information of \gls{LSCC}. They observe from other studies such as \cite{contrastiveShortcut} that constrative learning tends to learn non-generalized features by using ``shortcuts''. One such shortcut might be to learn the background color of a an image to make a prediction rather than the features of each object. This can be prevalent in processing \gls{WSI} that are used in histopathology. One reason is the inputs for the constrastive loss function do not find \textit{negative pairs} from within the same slides. This means that the model embeds all tiles from a single slide similarly. Thus, the features learnt are not feature-specific, but rather overfitted to each slide. 
+
+that these images are too large to fit into a single \gls{GPU} and thus they are cropped into tiles.  
+
+Popular \gls{SSL} algorithms such as \gls{MOCO} and SimCLR~\cite{simCLR} have a loss function named InfoNCE. The info is short for information and NCE is short for Noise-Contrastive Estimation. This is an instance discrimination function that uses combinations of positive pairs (an image and its augmentation) and maximizes the difference between these by minimizing the difference to other images. 
+
+\subsection{Background}
+Each \gls{WSI} is large, up to several gigapixels in size. Because of this, each image is usually cropped up into tiles. Unfortunetaly, annotations for each tile is not common, so instead you rely on slide-level annotations. Usually, tile-level predictions are thus pooled together for each slide after processing to get a form of aggregate prediction which is used later. \cite{unsupervisedClustering} shows an alternative in their DeepCluster algorithm. They first use \textit{k-means} to assigns clusters for each data feature they extract from unsupervised learning methods. Each cluster represents a feature. They then use these features to update their models (convnet). 
+
+\cite{sslUMAP} which we base our self off uses a similar technique as \textit{k-means} except \gls{GMM} is used instead of k-means. \gls{GMM} has a probabilistic rather than ``hard'' assignment of points to clusters, and doesn't rely on spherical shapes for their cluster assignments. Each tile embedding is assigned to a cluster and in the end a mean of probabilities from each tile embedding belonging to which clusters is calculated. The output is a vector $v \in \mathbb{R}^{k}$, where k are the numbers of clusters. 
+%TODO this is fucky, see code? 
+In addition to giving labels for prediction, the clustering algorithm helps with interpretability since you can see how different tiles activate different clusters.
+
+Results from the \gls{SSL} are calculated based on a survival-analysis model. The vector $v_{j}$ (sum of probabilities of tiles from cluster from slide?) is compared with the slide-level ground truth $y_{j}$ of whether or not the tumour seen in the slide caused recurrence. If there is recurrence, they also use the number of days from observation until a follow-up oberservation $t_{j}$. If there was not recurrence, then length of followup-time is used? % TODO: WTF
+
+
+In training they use public TCGA and CPTAC datasets of H\&E-stained biopsy slides. They observe from previous work that other training algorithms cluster together tiles from the same slides, creating a batch effect where the algorithm learns features that are more slide specific than feature specific. This indicates that the network might do poorly on generalized input. They visualize this using 2D UMAP, shown in~\cref{fig:umap}.
+
+
 
 \subsection{Problem Introduction}
 \dots{}batches sometimes has a problem X
@@ -226,7 +252,7 @@ For the practical component, you are asked to find a project that is related to 
 
 \subsection{DataSet}
 
-\subsection{MoCo}
+\subsection{MoCo}\label{subsec:moco}
 \gls{MOCO}
 
 \subsection{InceptionV4}
@@ -257,6 +283,22 @@ A good scoring method can also average, though.
 Have to keep in mind that two photos can be disparate, e.g. 1 photo can have tumours, the other can be healthy, e.g.
 
 \subsection{Results}
+\subsection{SSL model}
+\begin{table}
+\centering
+  \begin{tabular}{l l l l l}
+    (n) & 4 & 16 & 32 & Random \\
+    \hline
+    C-Index & 1 & 2 & 3 & 4 \\
+    Brier (2 yrs) & $0.1 \pm 0.1$ & $0.2 \pm 0.3$ & $0.1 \pm 0.4$ & $0.1 \pm 0.4$  \\
+    \hline
+  \end{tabular}
+  \caption{Output from different sets}
+  \label{tab:combinedres}
+\end{table}
+
+
+\subsection{UMAP}
 \begin{table}
 \centering
   \begin{tabular}{l l l l}

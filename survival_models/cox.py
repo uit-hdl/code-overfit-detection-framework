@@ -30,7 +30,7 @@ if cluster_method == 'GaussianMixture':
 else:
     n_clusters = cluster.n_clusters
 
-train_data, val_data, test_data = utils.load_data(args.data_dir, 
+train_data, val_data, test_data = utils.oad_data(args.data_dir,
                 os.path.join(args.cluster_dir, args.cluster_name), normalize=args.normalize)
 
 train_df, val_df, test_df = utils.preprocess_data(train_data, val_data, test_data)
