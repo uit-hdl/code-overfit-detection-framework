@@ -187,9 +187,12 @@ Another ideal is \textit{representation learning}, where the model is able to ge
 \end{figure}
 
 % TODO: Also cite SSL section for "pulling"
-One way to make \gls{SSL} work is to use distorted inputs together with the original data, e.g. in image processing this could be by rotating or cropping the image, or occluding parts of the image. It should still be possible (at least for humans) to understand what the core feature/object of the image is, otherwise the model wouldn't learn any features. SimCLR~\cite{simCLR} has a nice table (reproduced in \Cref{fig:simCLR}) to show which alterations/augmentations work better or worse than others for ImageNet. \textit{Constrastive learning} is a technique where you make a prediction on the original and modified image, and then making a loss function that can assimilate the output. Often siamese networks are used, i.e. two different models, where one model with handle the original photo and the other will handle the augmented photo. By pulling similar samples together and disjoint samples apart (by adjusting weights and biases), the model learns the important features of the image. One example of a loss function is using cosine similarity scores, where the output from each model is represented as a vector. The cosine similarity captures the angle between the vectors, and can thus be used as an indication of similarity. 
+One way to make \gls{SSL} work is to use distorted inputs together with the original data, e.g. in image processing this could be by rotating or cropping the image, or occluding parts of the image. It should still be possible (at least for humans) to understand what the core feature/object of the image is, otherwise the model wouldn't learn any features. SimCLR~\cite{simCLR} has a nice table (reproduced in \Cref{fig:simCLR}) to show which alterations/augmentations work better or worse than others for their algorithm on ImageNet.
 
-The image alterations are also called \textit{human priors}, since they rely on keeping features that humans need to understand the object. While these human priors have gotten good results on natural images, there are some domains such as medicine where they are less efficient. Especially in histopathology where there are many small details in each section of an image that are all important to make a classification. ~\cite{dataPriors} suggests to instead use \textit{data prior} for Histopathological images. One such example is using different levels of zoom as an image alteration. By zooming out, you \textit{include} more data as input. The technique works nevertheless since you want the model to focus on an area of interest (such as a tumour) regardless of its surroundings.
+% TODO: can probably merge two below
+\textit{Contrastive learning} is a technique where you make a prediction both \textit{positive} and \textit{negative} versions on an input. The loss function will in effect try to shift the weights to assimilate the positive pair while pulling away the negative pairs inputs. One example of a loss function is using cosine similarity scores, where the output from each model is represented as a vector. The cosine similarity captures the angle between the vectors, and can thus be used as an indication of similarity. 
+
+The image alterations are based on \textit{human priors}, meaning they work well for features that humans depend on like sizes, shapes or separating foreground and background. Thus they work well on natural images. Though, for some domains such as medicine, they prove less efficient. E.g. in histopathology where there are many small details in each section of an image that are all important to make a classification. ~\cite{dataPriors} suggests to instead use \textit{data prior} for Histopathological images. One such example is using different levels of zoom as an image alteration. By zooming out, you \textit{include} more data as input. The technique works nevertheless since you want the model to focus on an area of interest (such as a tumour) regardless of its surroundings.
 
 \section{Summary}\label{sec:summary}
 Several talks that have mentioned or used new \gls{NLP} services, such as \href{ChatGPT}{https://openai.com/blog/chatgpt/} and \href{https://you.com/}{https://you.com/}. This might be an indication that \gls{NLP} has been a field with significant improvement over the last years. For \gls{DL} techniques, \gls{SSL} is mentioned in several talks (during the conference days) and seems to be popular together with constrastive learning. ImageNet is also a frequently mentioned keyword, showing the importance of big, publicly available data in general, but especially in image processing.
@@ -208,7 +211,27 @@ The report should include both a short summary of the material covered (approx. 
 
 For the practical component, you are asked to find a project that is related to one of the topics covered in the tutorials. This could for instance be self-supervised learning, where you try one of the self-supervised learning techniques on the data that you are working on in your PhD and analyse the results and or hyperparameters. Or you could take a method and evaluate its effect in new scenarios, for instance when faced with highly imbalanced data.
 \end{comment}
-\subsection{Background}
+\begin{comment}
+I wish to evaluate~\cite{sslUMAP} and quantify the quality of \textit{the explanation} using metrics inspired by Quantus~\cite{hedstrom2023quantus}. This means 1) finding relevant qualitative metrics for the given batch effect plots and 2) testing how the metrics change with model, batch and image adjustments. In particular, I am curious how well the metrics show batch/clustering effects for few (1-3) slides. This can be a useful indication early during a training process.
+\end{comment}
+
+\gls{LSCC} is a type of cancer with high recurrence rate and likelyhood of metastasis. There aren't many publicly available datasets with annotations available. One popular data source is \gls{TCGA}, which has image, clinical and genomic data available. We will be looking at H\&E-stained biopsy slides, called \gls{WSI}.
+
+\cite{sslUMAP} uses \gls{SSL} to provide prognostic information of \gls{LSCC}. They observe from other studies such as \cite{contrastiveShortcut} that constrative learning tends to learn non-generalized features by using ``shortcuts''. One such shortcut might be to learn the background color of a an image to make a prediction rather than the features of each object. This can be prevalent in processing \gls{WSI} that are used in histopathology. One reason is the inputs for the constrastive loss function do not find \textit{negative pairs} from within the same slide. Thus, the features learnt are not feature-specific, but rather overfitted to each slide. They defend this claim by showing a single \gls{UMAP} plot, reproduced here in ~\Cref{fig:umap}.
+
+% TODO: should I say I use SSL?
+Inspired by the talk by Anna Hedstr\"{o}m, I want to quantify the quality of the explanation mentioned in~\cite{sslUMAP}. \cite{miller} points out that explanations are always \textit{contextual}, i.e. that its quality will always depend on the what the reader wants to know and what the explanation agent has knowledge of. In my particular context, I am curious if the explanation could be useful at an early stage to indicate whether or not a model is overfitting or not. This is because I am currently writing a tool to help pathologists annotate datasets. In this case, there might be several annotations made in just for a few slidesIn this context, I want to provide continous feedback to the annotator to guide them. This can both decrease the time they need to annotate datasets and increase their trust in the model.
+
+There are several possible pitfalls with a 2D\gls{UMAP} map: you could adjust the sizes of the dots for each point to create an illusory feeling of more even distribution. Secondly, the figure uses the \textit{assertive claim} that ``the tiles from each slide are less clustered together''. However, the figure only shows output from 8 slides which may have been chosen in a non-representative fashion, and since \gls{UMAP} may be non-deterministic, the differences we see could be random, and without any metric axis on the plots, the ``less clustered''-effect could be illusory.
+
+Summarized: I've done the following work:
+\begin{itemize}
+  \item Reproduced (to an extent) the code from~\cite{sslUMAP}
+  \item Taken output from the \gls{MOCO} model into a 2D \gls{UMAP} plot and quantified the quality of the explanations
+\end{itemize}
+\Cref{sec:background} discusses the work and idea of~\Cref{sslUMAP}. \Cref{sec:methodology} discusses my work and how I've configued my pipeline. \Cref{sec:results} shows my output from my model and my explanation metrics. Finally, I discuss these results in \Cref{sec:discussion}.
+
+\subsection{Background}\label{sec:background}
 \dots{}summary of the paper, chatGPT maybe.
 
 % TODO:  Check out the presentation with WSI and:
@@ -217,10 +240,7 @@ For the practical component, you are asked to find a project that is related to 
 % learn “shortcuts” within the similar and dissimilar samples, which inadvertently suppress
 % important predictive features. I
 
-
-\gls{LSCC} is a type of cancer with high recurrence rate and likelyhood of metastasis. There aren't many publicly available datasets with annotations available. One popular data source is \gls{TCGA}, which has image, clinical and genomic data available. We will be looking at H\&E-stained biopsy slides, called \gls{WSI}.
-
-\cite{sslUMAP} uses \gls{SSL} to provide prognostic information of \gls{LSCC}. They observe from other studies such as \cite{contrastiveShortcut} that constrative learning tends to learn non-generalized features by using ``shortcuts''. One such shortcut might be to learn the background color of a an image to make a prediction rather than the features of each object. This can be prevalent in processing \gls{WSI} that are used in histopathology. One reason is the inputs for the constrastive loss function do not find \textit{negative pairs} from within the same slides. This means that the model embeds all tiles from a single slide similarly. Thus, the features learnt are not feature-specific, but rather overfitted to each slide. 
+% TODO: moco doesn't have the g(x, .. in its bottom part of the fraction? is this C-InfoNCE?
 
 $$ \mathcal{L}(x, x^{+}, x^{-}) = -\log{\frac{\exp(g(x,x^{+}))}{\exp(g(x,x^{+})) + \sum\limits_{x^{-}}{\exp(g(x,x^{-}}))}}$$
 
@@ -243,9 +263,13 @@ Results from the \gls{SSL} are calculated based on a survival-analysis model. Th
 In training they use public TCGA and CPTAC datasets of H\&E-stained biopsy slides. They observe from previous work that other training algorithms cluster together tiles from the same slides, creating a batch effect where the algorithm learns features that are more slide specific than feature specific. This indicates that the network might do poorly on generalized input. They visualize this using 2D \gls{UMAP}, shown in~\cref{fig:umap}.
 
 
-\section{Methodology}
+\section{Methodology}\label{sec:methodology}
+\subsection{Pipeline}
+I first pre-process slides into tiles, then train, then extract, then create plots. UMAP parameters and such.
+
 \subsection{Recreating Work}
-The first thing I did when re-creating the work was to get the code from their listed website \href{https://github.com/NYUMedML/conditional_ssl_hist}. I then ran into the following difficulties:
+The first thing I did when re-creating the work was to get the code from their listed website \href{https://github.com/NYUMedML/conditional_ssl_hist}. The code repository has listed commands for re-creating their work. However, I ran into several following difficulties outlined in this section.
+
 \subsubsection{Datasets}
 On their website they listed their sources for finding the images, but the listed sources did not have the annotations. For \gls{TCGA}-LUSC I tried both the official website~\cite{tcgaAnnotation} and the publicly listed ``\gls{TCGA}-Clinical Data Resource (CDR) Outcome'' from~\cite{pancan}. Neither dataset was compatible with the code as is, mismatching both on filename and certain columns. By combining different files from the former resource, I was, however, able to get the data that I was after. However, of the more than 500 patients that were in the image dataset, only 170 of those had a defined value in column \textit{new\_tumor\_event\_dx\_indicator}. 
 The code listed by~\cite{sslUMAP} only chooses these for training. So, either their annotation dataset was different than mine, or this is a recently (post-writing) introduced bug, or they might have gotten their own results on a much smaller dataset than what they claimed. As explained in~\Cref{subsubsec:code}, there is a high chance of this being a recently introduced bug.
@@ -264,12 +288,17 @@ There is no code to reproduce their plots and graphs. There is also no metioning
 % TODO: Maybe I am able to use their pretrained weights on my input, thus not limiting myself by having less data?
 
 \subsubsection{Misconceptions}\label{subsubsec:misconception}
-The training script listed in the code repository, ``\textit{train_ssl.py}'' (also referenced in the README documentation) trains a \gls{MOCO} model. The inference script ``\textit{extract_embeddings.py}'', however, only uses the encoding model from the training, an \textit{InceptionV4} model.  It seems deliberate as there is specific code written to extract the InceptionV4 from a pickled \gls{MOCO} model.
+The training script listed in the code repository, ``\textit{train\_ssl.py}'' (also referenced in the README documentation) trains a \gls{MOCO} model. The inference script ``\textit{extract\_embeddings.py}'', however, only uses the encoding model from the training, an \textit{InceptionV4} model.  It seems deliberate as there is specific code written to extract the InceptionV4 from a pickled \gls{MOCO} model.
 
 Two models are used for feature extraction in their scripts. An InceptionV4 model with two output neurons is used to identify cancer vs non-cancer in a tile. Then a second InceptionV4 with 1536 output neurons? Is used to.
 
 
 \subsection{MoCo}\label{subsec:moco}
+
+\dots{} how weight are updated (momentum update), ask chatgpt?
+\dots{} how they shuffle their data?! 
+
+
 \gls{MOCO}
 
 \subsection{InceptionV4}
@@ -277,6 +306,17 @@ Two models are used for feature extraction in their scripts. An InceptionV4 mode
 
 \subsection{Quantifyable explanations}\label{sec:quantifiable}
 \subsubsection{Quantus}
+
+Quantus~\cite{hedstrom2023quantus} defines metrics for 6 different dimensions of quantifying explanations:
+\begin{enumerate}
+  \item Faithfulness: to what extent does the explanation follow the model? e.g.: do two similar explanations have similar inputs?
+  \item Robustness: If you modify the input slighly, does the explanation remain the same?
+  \item Localisation: Does the explanation consider the entire input, or are there just core regions of interest that matters?
+  \item Complexity: can an explanation rely on only a few features, or is the entire input necessay?
+  \item Randomisation: If you modify the model hyperparameters, is the explanation accuracy impacted
+  \item Axiomatic: do explanations have axiomatic properties such as \textit{completeness}, \textit{non-sensitivity} and \textit{input invariance}?
+\end{enumerate}
+
 
 
 \begin{figure}
@@ -299,7 +339,7 @@ A good scoring method can indicate for each slide whether there is overlap with 
 A good scoring method can also average, though.
 Have to keep in mind that two photos can be disparate, e.g. 1 photo can have tumours, the other can be healthy, e.g.
 
-\subsection{Results}
+\subsection{Results}\label{sec:results}
 \subsection{SSL model}
 \begin{table}
 \centering
@@ -336,9 +376,8 @@ Have to keep in mind that two photos can be disparate, e.g. 1 photo can have tum
   \label{tab:combinedres}
 \end{table}
 
-TODO: 2.9.1 Reflection in Clemmensen has a lot of stuff about metrics.
-
-I wish to evaluate~\cite{sslUMAP} and quantify the quality of \textit{the explanation} using metrics inspired by Quantus~\cite{hedstrom2023quantus}. This means 1) finding relevant qualitative metrics for the given batch effect plots and 2) testing how the metrics change with model, batch and image adjustments. In particular, I am curious how well the metrics show batch/clustering effects for few (1-3) slides. This can be a useful indication early during a training process.
+\subsection{Discussion}\label{sec:discussion}
+discuss.
 
 %%%%%%%%% REFERENCES
 {\small
