@@ -18,14 +18,14 @@ def getGradientMagnitude(im):
     return mag
 
 
-def wsi_to_tiles(idx, wsi, refer_img, s):
+def wsi_to_tiles(idx, wsi, refer_img, s, tiles_dir):
     normalizer = staintools.StainNormalizer(method='vahadane')
     refer_img = staintools.read_image(refer_img)
     normalizer.fit(refer_img)
     count = 0
     sys.stdout.write('Start task %d: %s \n' % (idx, wsi))
     slide_id = wsi.rsplit('/', 1)[1].split('.')[0]
-    tile_path = os.path.join('./TCGA/tiles', slide_id)
+    tile_path = os.path.join(tiles_dir, slide_id)
     img = OpenSlide(os.path.join(wsi))
     if str(img.properties.values.__self__.get('tiff.ImageDescription')).split("|")[1] == "AppMag = 40":
         sz = 2048

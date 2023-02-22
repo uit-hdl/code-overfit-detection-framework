@@ -27,25 +27,33 @@ followupTable['recurrence'] = ((followupTable['new_tumor_event_dx_indicator'] ==
 followupTable = followupTable.sort_values(['bcr_patient_barcode', 'form_completion_date']).drop_duplicates('bcr_patient_barcode', keep='last')
 LUSC_patientids = set(followupTable['bcr_patient_barcode'])
 followupTable = followupTable.set_index('bcr_patient_barcode')
+hacky_cmd = ' -or '.join(list(map(lambda s: f"-name {s}\*", followupTable.index)))
 
-wsi_list = os.popen("find {} -name 'TCGA-21-A5DI-01A-03-TS3.FD5286B2-AC59-425F-B94F-E00CFF2AD757.svs'".format(args.wsi_path)).read().strip('\n').split('\n')
+tiles_dir='/terrahome/WinterSchool/tiles'
+wsi_list = os.popen("find {} {}".format(args.wsi_path, hacky_cmd)).read().strip('\n').split('\n')
+already_processed = os.popen("find {} -type d -maxdepth 1".format(tiles_dir)).read().strip('\n').split('\n')
+already_processed = list(map(lambda s: s.rsplit('/', 1)[1].split('.')[0], already_processed[1:]))
 wsi_list_LUSC = []
 for idx in range(len(wsi_list)):
     slide_id = wsi_list[idx].rsplit('/', 1)[1].split('.')[0]
     patient_id = '-'.join(slide_id.split('-', 3)[:3])
-    tile_path = os.path.join('./TCGA/tiles', slide_id)
+    tile_path = os.path.join(tiles_dir, slide_id)
     if patient_id in LUSC_patientids:
         if not os.path.exists(tile_path):
             os.mkdir(tile_path)
         wsi_list_LUSC.append(wsi_list[idx])
 
 for idx, wsi in enumerate(wsi_list_LUSC):
-    wsi_to_tiles(idx, wsi, args.refer_img, args.s)
+    wsi_lookup = wsi.rsplit('/', 1)[1].split('.')[0]
+    if wsi_lookup in already_processed:
+        print("Already processed {}, skipping".format(wsi_lookup))
+        continue
+    wsi_to_tiles(idx, wsi, args.refer_img, args.s, tiles_dir)
 
 # Get annotation
 clinicalTable = followupTable #pd.read_csv(args.clinical_table_path, sep='\t').set_index('bcr_patient_barcode')
 annotation = defaultdict(lambda: {"recurrence": None, "slide_id": []})
-slide_ids = os.listdir('./TCGA/tiles')
+slide_ids = os.listdir(tiles_dir)
 included_slides = [s for s in slide_ids if s.rsplit('-',3)[0] in set(followupTable.index)]
 for slide_id in included_slides:
     case_id = '-'.join(slide_id.split('-', 3)[:3])

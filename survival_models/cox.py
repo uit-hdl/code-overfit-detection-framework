@@ -48,8 +48,13 @@ y_test = np.array([tuple((bool(row[0]), row[1])) for row in zip(test_df['outcome
 alpha_list = [10**i for i in np.linspace(-3,0,10)]
 alpha = alpha_list[0]
 val_results = []
+
+# TODO: temporary hack
+y_train[0] = (True, y_train[0][1])
+
 for i, alpha in enumerate(alpha_list):
     # TODO: won't work until I include both outcome True and False
+    import ipdb; ipdb.set_trace()
     est = CoxPHSurvivalAnalysis(alpha=alpha).fit(train_df.drop(columns=['outcome','day']), y_train)
     val_metrics = utils.get_metics(train_df, val_df, est)
     val_results.append(val_metrics['C-index'])

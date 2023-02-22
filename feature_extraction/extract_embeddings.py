@@ -86,6 +86,7 @@ parser.add_argument('--out_dir', type=str)
 args = parser.parse_args()
 
 tcga_annotation = pickle.load(open('./TCGA/annotations/recurrence_annotation.pkl', 'rb'))
+import ipdb; ipdb.set_trace()
 # cptac_annotation = pickle.load(open('../CPTAC/recurrence_annotation.pkl', 'rb'))
 # annotations = {**tcga_annotation, **cptac_annotation}
 annotations = {**tcga_annotation}
