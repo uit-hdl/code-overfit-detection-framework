@@ -222,9 +222,13 @@ For the practical component, you are asked to find a project that is related to 
 
 \cite{sslUMAP} uses \gls{SSL} to provide prognostic information of \gls{LSCC}. They observe from other studies such as \cite{contrastiveShortcut} that constrative learning tends to learn non-generalized features by using ``shortcuts''. One such shortcut might be to learn the background color of a an image to make a prediction rather than the features of each object. This can be prevalent in processing \gls{WSI} that are used in histopathology. One reason is the inputs for the constrastive loss function do not find \textit{negative pairs} from within the same slides. This means that the model embeds all tiles from a single slide similarly. Thus, the features learnt are not feature-specific, but rather overfitted to each slide. 
 
+$$ \mathcal{L}(x, x^{+}, x^{-}) = -\log{\frac{\exp(g(x,x^{+}))}{\exp(g(x,x^{+})) + \sum\limits_{x^{-}}{\exp(g(x,x^{-}}))}}$$
+
 that these images are too large to fit into a single \gls{GPU} and thus they are cropped into tiles.  
 
-Popular \gls{SSL} algorithms such as \gls{MOCO} and SimCLR~\cite{simCLR} have a loss function named InfoNCE. The info is short for information and NCE is short for Noise-Contrastive Estimation. This is an instance discrimination function that uses combinations of positive pairs (an image and its augmentation) and maximizes the difference between these by minimizing the difference to other images. 
+Popular \gls{SSL} algorithms such as \gls{MOCO} and SimCLR~\cite{simCLR} have a loss function named \gls{InfoNCE}. This is an instance discrimination function that uses combinations of positive pairs, an image $x$ and its augmentation $x^{+}$, and minimizes the difference between these while maximizing the difference between the image and other tiles $x^{-}$. However, the images $x^{-}$ are sampled from the same batch that the image $x$ is in. The problem that can arise is that there may not be formed negative pairs between tiles from the same slide. Thus the model learns to discriminate on features that may be slide-specific rather than feature-specific for the tumour. This is referred to by~\cite{sslUMAP} as \textit{slide-level batch effects}.
+
+\cite{sslUMAP} notes, citing~\cite{contrastiveShortcut} that you can tweak the loss function by choosing samples using a given condition. However, this can be difficult to do without introducing bias or \textit{feature suppression}, that optimizing for one feature comes at the cost of another. For experimental evaluation, they compare their own model with a batch sampler that selects opposing tiles $x^{-}$ from the same slide. They find that their own solution performs slightly better, with a \textit{C-index}\footnote{concordance index: ratio of predicted risk and actual recurrence time} of $0.646 \pm 0.055$ versus $0.631 \pm 0.052$. Random sampling gets a C-index of $0.0601 \pm 0.069$.
 
 \subsection{Background}
 Each \gls{WSI} is large, up to several gigapixels in size. Because of this, each image is usually cropped up into tiles. Unfortunetaly, annotations for each tile is not common, so instead you rely on slide-level annotations. Usually, tile-level predictions are thus pooled together for each slide after processing to get a form of aggregate prediction which is used later. \cite{unsupervisedClustering} shows an alternative in their DeepCluster algorithm. They first use \textit{k-means} to assigns clusters for each data feature they extract from unsupervised learning methods. Each cluster represents a feature. They then use these features to update their models (convnet). 
@@ -236,21 +240,34 @@ In addition to giving labels for prediction, the clustering algorithm helps with
 Results from the \gls{SSL} are calculated based on a survival-analysis model. The vector $v_{j}$ (sum of probabilities of tiles from cluster from slide?) is compared with the slide-level ground truth $y_{j}$ of whether or not the tumour seen in the slide caused recurrence. If there is recurrence, they also use the number of days from observation until a follow-up oberservation $t_{j}$. If there was not recurrence, then length of followup-time is used? % TODO: WTF
 
 
-In training they use public TCGA and CPTAC datasets of H\&E-stained biopsy slides. They observe from previous work that other training algorithms cluster together tiles from the same slides, creating a batch effect where the algorithm learns features that are more slide specific than feature specific. This indicates that the network might do poorly on generalized input. They visualize this using 2D UMAP, shown in~\cref{fig:umap}.
+In training they use public TCGA and CPTAC datasets of H\&E-stained biopsy slides. They observe from previous work that other training algorithms cluster together tiles from the same slides, creating a batch effect where the algorithm learns features that are more slide specific than feature specific. This indicates that the network might do poorly on generalized input. They visualize this using 2D \gls{UMAP}, shown in~\cref{fig:umap}.
 
-
-
-\subsection{Problem Introduction}
-\dots{}batches sometimes has a problem X
-\dots{} They claim to have fixed the problem, but to what extent?
 
 \section{Methodology}
 \subsection{Recreating Work}
-\dots{}difficult to get the code to run
-\dots{}difficult to find the dataset with annotations
-\dots{}difficult to find the dataset with annotations
+The first thing I did when re-creating the work was to get the code from their listed website \href{https://github.com/NYUMedML/conditional_ssl_hist}. I then ran into the following difficulties:
+\subsubsection{Datasets}
+On their website they listed their sources for finding the images, but the listed sources did not have the annotations. For \gls{TCGA}-LUSC I tried both the official website~\cite{tcgaAnnotation} and the publicly listed ``\gls{TCGA}-Clinical Data Resource (CDR) Outcome'' from~\cite{pancan}. Neither dataset was compatible with the code as is, mismatching both on filename and certain columns. By combining different files from the former resource, I was, however, able to get the data that I was after. However, of the more than 500 patients that were in the image dataset, only 170 of those had a defined value in column \textit{new\_tumor\_event\_dx\_indicator}. 
+The code listed by~\cite{sslUMAP} only chooses these for training. So, either their annotation dataset was different than mine, or this is a recently (post-writing) introduced bug, or they might have gotten their own results on a much smaller dataset than what they claimed. As explained in~\Cref{subsubsec:code}, there is a high chance of this being a recently introduced bug.
+% TODO: try to get a number on how many patients were supposed to have annotations so I don't look like an ass
+% TODO: CPTAC, maybe I could find annotations there now that I am old and wise?
 
-\subsection{DataSet}
+Since my primary interest was not recreating their work, I chose to use only \gls{TCGA}
+
+The authors offer a pretrained network. This network is an InceptionV4 model that can be used an encoder in \gls{MOCO}. However, they do not specify explicitly what the model is trained on - assumably it would be the data used in their paper.
+
+\subsubsection{Code}\label{subsubsec:code}
+Much of the code did not work out the box. The kind of errors I ran into were missing imports, file and directory names that were mangled (trying to access files in a directory and subsequently looking for the same files in a different directory) and other errors such as API mismatch when trying to load \textit{pickled}\footnote{serialized Python objects, written to file for later use, see \href{https://docs.python.org/3/library/pickle.html}{https://docs.python.org/3/library/pickle.html}} files directly into Pytorch. The pretrained weights they provided was also not compatible? Missing imports might stem from having written code in an environment with hidden files, the file mangling might be because they had duplicate files scattered in their directories and the API errors might arise from using different versions of third-party tools. Another possibility is that the code that is published is not tested or used after it has been modified at some point.
+
+There is no code to reproduce their plots and graphs. There is also no metioning in the code or the paper of what hyperparameters were used for \gls{UMAP}. 
+
+% TODO: Maybe I am able to use their pretrained weights on my input, thus not limiting myself by having less data?
+
+\subsubsection{Misconceptions}\label{subsubsec:misconception}
+The training script listed in the code repository, ``\textit{train_ssl.py}'' (also referenced in the README documentation) trains a \gls{MOCO} model. The inference script ``\textit{extract_embeddings.py}'', however, only uses the encoding model from the training, an \textit{InceptionV4} model.  It seems deliberate as there is specific code written to extract the InceptionV4 from a pickled \gls{MOCO} model.
+
+Two models are used for feature extraction in their scripts. An InceptionV4 model with two output neurons is used to identify cancer vs non-cancer in a tile. Then a second InceptionV4 with 1536 output neurons? Is used to.
+
 
 \subsection{MoCo}\label{subsec:moco}
 \gls{MOCO}
@@ -264,7 +281,7 @@ In training they use public TCGA and CPTAC datasets of H\&E-stained biopsy slide
 
 \begin{figure}
   \includegraphics[scale=.17]{./umap.png}
-  \caption{Figure taken entirely from~\cite{sslUMAP}. Both pictures show a 2D UMAP projection of tile representations. On the left a training algorithm with randomly sampled tiles from slides, showing that features learned in the same slide cluster together. Using a different sampling algorithm, the picture on the right shows a more even distribution w.r.t slides}
+  \caption{Figure taken entirely from~\cite{sslUMAP}. Both pictures show a 2D \gls{UMAP} projection of tile representations. On the left a training algorithm with randomly sampled tiles from slides, showing that features learned in the same slide cluster together. Using a different sampling algorithm, the picture on the right shows a more even distribution w.r.t slides}
   \label{fig:umap}
 \end{figure}
 

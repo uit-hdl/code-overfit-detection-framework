@@ -24,6 +24,10 @@ class MoCo(nn.Module):
 
         # create the encoders
         # num_classes is the output fc dimension
+        # q: query encoder. Used for inputs
+        # k: key encoder:
+        ''' More- over, as the dictionary keys come from the preceding several mini-batches, a slowly progressing key encoder, implemented as a momentum-based moving average of the query encoder, is proposed to maintain consistency
+        '''
         self.encoder_q = base_encoder(num_classes=dim)
         self.encoder_k = base_encoder(num_classes=dim)
         
