@@ -250,8 +250,6 @@ parser.add_argument('--condition', default=True, type=bool)
 
 args = parser.parse_args()
 
-print(args.out_dir)
-
 if args.seed is not None:
     random.seed(args.seed)
     torch.manual_seed(args.seed)
@@ -280,8 +278,8 @@ model = condssl.builder.MoCo(
     encoder, args.moco_dim, args.moco_k, args.moco_m, args.moco_t, args.mlp, condition=args.condition)
 
 model = model.cuda()
-# torch.distributed.init_process_group('nccl')
-# model = torch.nn.parallel.DistributedDataParallel(model)
+torch.distributed.init_process_group('nccl')
+model = torch.nn.parallel.DistributedDataParallel(model)
 
 print('Model builder Done.')
 criterion = nn.CrossEntropyLoss().cuda(args.gpu)
@@ -313,7 +311,6 @@ train_dataset = TCGA_CPTAC_Dataset(cptac_dir=args.data_dir + "/CPTAC/tiles/",
 
 
 print("Dataset Created ...")
-print(args.batch_slide_num)
 
 if args.distributed:
     train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
@@ -336,7 +333,7 @@ for epoch in range(args.start_epoch, args.epochs):
             and args.rank % ngpus_per_node == 0):
         if 0 == 0:
         #TODO: fixup
-        # if (epoch + 1) % 50 == 0:
+        # if (epoch + 1) % 25 == 0:
             save_checkpoint({
                 'epoch': epoch + 1,
                 'arch': 'x64',

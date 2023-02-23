@@ -20,7 +20,6 @@ parser.add_argument('--s', default=0.9, type=float, help='The proportion of tiss
 args = parser.parse_args()
 extra_info_cherry = pd.read_csv(args.cherry, sep=',').set_index('bcr_patient_barcode')
 
-# tiles_dir='/terrahome/WinterSchool/data_dir/TCGA/tiles/'
 # wsi_to_tiles(0, '/terrahome/WinterSchool/eb8003bb-d5fd-4745-829c-6c5a3a43d969/TCGA-85-8287-01A-01-BS1.730a979f-7e48-4af4-8191-aa49a13054b7.svs', args.refer_img, args.s, tiles_dir)
 # sys.exit(0)
 
@@ -34,7 +33,7 @@ LUSC_patientids = set(followupTable['bcr_patient_barcode'])
 followupTable = followupTable.set_index('bcr_patient_barcode')
 hacky_cmd = ' -or '.join(list(map(lambda s: f"-name {s}\*", followupTable.index)))
 
-tiles_dir='/terrahome/WinterSchool/data_dir/TCGA/tiles/'
+tiles_dir='/Data/winter_school/data_dir/TCGA/tiles/'
 wsi_list = os.popen("find {} {}".format(args.wsi_path, hacky_cmd)).read().strip('\n').split('\n')
 already_processed = os.popen("find {} -maxdepth 1 -type d ".format(tiles_dir)).read().strip('\n').split('\n')
 already_processed = list(map(lambda s: s.rsplit('/', 1)[1].split('.')[0], already_processed[1:]))

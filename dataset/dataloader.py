@@ -1,4 +1,5 @@
 import os
+import math
 import pickle
 import torch
 from PIL import Image
@@ -14,14 +15,19 @@ class TCGA_CPTAC_Dataset(Dataset):
 
         #slide_list = pickle.load(open(split_dir + '/case_split.pkl', 'rb'))[mode + "_id"]
         # slide_list = [s for s in slide_list if "TCGA" in s]
-        # TODO: temporary hack
-        import ipdb; ipdb.set_trace()
-        slide_list = [
-                # 'TCGA-39-5016-01A-01-BS1',
-                # 'TCGA-39-5016-01A-01-TS1',
-                # 'TCGA-39-5016-11A-01-TS1',
-                'TCGA-21-A5DI-01A-03-TS3',
-        ]
+        slide_list = os.popen("find {} -maxdepth 1 -type d ".format(tcga_dir)).read().strip('\n').split('\n')[1:]
+        slide_list = list(map(lambda s: s.rsplit('/', 1)[1].split('.')[0], slide_list))
+        keep_train = math.floor(len(slide_list) * 0.7)
+        keep_val = keep_train + math.floor(len(slide_list) * 0.1)
+        keep_test = keep_val + math.floor(len(slide_list) * 0.2)
+        if mode == 'train':
+            slide_list = slide_list[:keep_train]
+        elif mode == 'val':
+            slide_list = slide_list[keep_train:keep_val]
+        elif mode == 'val':
+            slide_list = slide_list[keep_val:]
+
+        # slide_list = [ 'TCGA-21-A5DI-01A-03-TS3', ]
         self.slide2tiles = {}
         for slide_id in slide_list:
             if "TCGA" in slide_id:
@@ -44,7 +50,13 @@ class TCGA_CPTAC_Dataset(Dataset):
         tile_names += selected_tiles
         for i in range(self.batch_slide_num - 1):
             slide_id = self.idx2slide[np.random.randint(len(self.idx2slide))]
-            tile_names += [slide_id + '/' + t for t in np.random.choice(self.slide2tiles[slide_id], self.batch_size // self.batch_slide_num)]
+            try:
+                tile_names += [slide_id + '/' + t for t in np.random.choice(self.slide2tiles[slide_id], self.batch_size // self.batch_slide_num)]
+            except Exception as e:
+                print (slide_id, self.slide2tiles[slide_id], self.batch_size, self.batch_slide_num)
+                print (slide_id, self.slide2tiles[slide_id], self.batch_size, self.batch_slide_num)
+                print (slide_id, self.slide2tiles[slide_id], self.batch_size, self.batch_slide_num)
+                raise e
         indices = []
         imgs = []
         for tile_name in tile_names:
@@ -66,11 +78,20 @@ class TCGA_CPTAC_Bag_Dataset(Dataset):
     def __init__(self, data_dir, split_dir, mode='train'):
         self.data_dir = data_dir
         # slide_list = pickle.load(open(os.path.join(split_dir, 'case_split_2yr.pkl'), 'rb'))[mode + '_id']
-        slide_list = os.popen("find {}/TCGA/tiles/ -maxdepth 1 -type d ".format(data_dir)).read().strip('\n').split('\n')[1:]
-        slide_list = list(map(lambda s: s.rsplit('/', 1)[1].split('.')[0], slide_list))
         # slide_list = [
         #         'TCGA-39-5016-01A-01-BS1',
         # ]
+        slide_list = os.popen("find {}/TCGA/tiles/ -maxdepth 1 -type d ".format(data_dir)).read().strip('\n').split('\n')[1:]
+        slide_list = list(map(lambda s: s.rsplit('/', 1)[1].split('.')[0], slide_list))
+        keep_train = math.floor(len(slide_list) * 0.7)
+        keep_val = keep_train + math.floor(len(slide_list) * 0.1)
+        keep_test = keep_val + math.floor(len(slide_list) * 0.2)
+        if mode == 'train':
+            slide_list = slide_list[:keep_train]
+        elif mode == 'val':
+            slide_list = slide_list[keep_train:keep_val]
+        elif mode == 'val':
+            slide_list = slide_list[keep_val:]
         self.slide2tiles = {}
         for slide_id in slide_list:
             if "TCGA" in slide_id:
@@ -107,6 +128,4 @@ class TCGA_CPTAC_Bag_Dataset(Dataset):
     
     def __len__(self):
         return len(self.idx2tiles)
-
-
 
