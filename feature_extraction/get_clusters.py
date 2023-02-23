@@ -29,38 +29,48 @@ parser.add_argument('--out_dir', default='./', type=str)
 args = parser.parse_args()
 
 train_features = pickle.load(open(args.data_dir + '/train_embedding.pkl', 'rb'))
+retain_number = 8
+len_dict = len(train_features.keys())
+i = 0
+keys = []
+for x in train_features.keys():
+    if i >= len_dict - retain_number:
+        break
+    i += 1
+    keys.append(x)
+for x in keys:
+    del train_features[x]
 train_features_flattened = np.concatenate(list(train_features.values()), axis=0)
-# if args.cluster_type == "kmeans":
-#     print('kmeans')
-#     cluster = KMeans(n_clusters=n_cluster).fit(train_features)
-#     pickle.dump(cluster, open(args.out_dir + '/kmeans_{}.pkl'.format(args.n_cluster), 'wb'))
-# else:
-print('gmm')
-# cluster = GaussianMixture(n_components=args.n_cluster).fit(train_features_flattened)
+cluster = GaussianMixture(n_components=args.n_cluster).fit(train_features_flattened)
 umap_projection = reducer.fit_transform(train_features_flattened)
 slices = list(accumulate([0] + [len(y) for y in train_features.values()], operator.add))
 fig, ax = plt.subplots()
 slide_sets = [[]] * len(train_features.keys())
 # [i]nterval_[s]tart, [e]nd
 for slide_number,(i_s,i_e) in enumerate(zip(slices, slices[1:])):
-    ax.scatter(umap_projection[i_s:i_e, 0], umap_projection[i_s:i_e, 1], label = f"Slide {slide_number}", alpha=.5)
+    ax.scatter(umap_projection[i_s:i_e, 0], umap_projection[i_s:i_e, 1], label = f"Slide {slide_number+1}", alpha=.5)
     slide_sets[slide_number] = umap_projection[i_s:i_e]
 ax.legend()
 ax.get_xaxis().set_visible(False)
 ax.get_yaxis().set_visible(False)
-plt.title('UMAP projection of tile representations', fontsize=20)
-plt.savefig(os.path.join('doc', 'comparison_slides_umap.png'))
+plt.show()
+plt.savefig(os.path.join('.', 'umap_output.png'))
 
 hausdorf_l = np.zeros((len(train_features.keys()), len(train_features.keys())))
+np.fill_diagonal(hausdorf_l, np.nan)
 frechet_l = np.zeros((len(train_features.keys()), len(train_features.keys())))
+np.fill_diagonal(frechet_l, np.nan)
 # from Data Representativity for Machine Learning and AI Systems
 wasserstein_l = np.zeros((len(train_features.keys()), len(train_features.keys())))
+np.fill_diagonal(wasserstein_l, np.nan)
 # TODO: shannon coverage? look at all other values and measure coverage of those
 for ((i,left),(j, right)) in combinations(enumerate(slide_sets), 2):
     haus_d = max(directed_hausdorff(left, right)[0], directed_hausdorff(right, left)[0])
     hausdorf_l[i][j] = haus_d
     hausdorf_l[j][i] = haus_d
 
+
+# TODO: frechet
     l_s = left.shape[0]
     r_s = right.shape[0]
 
@@ -87,15 +97,19 @@ for ((i,left),(j, right)) in combinations(enumerate(slide_sets), 2):
     wasserstein_l[j][i] = wd
 
 
-mean_hausdorf = np.mean(hausdorf_l)
-print(hausdorf_l)
-print(mean_hausdorf)
-mean_frechet = np.mean(frechet_l)
-print(frechet_l)
-print(mean_frechet)
-mean_wd = np.mean(wasserstein_l)
-print(wasserstein_l)
-print(mean_wd)
+labels = list(map(lambda l: 'Slide %d', range(hausdorf_l.shape[0]))) + ['mean']
+mean_hausdorf = np.nanmean(hausdorf_l)
+hausdorf_l = np.pad(hausdorf_l, ((0,0),(0,1)), mode='constant', constant_values=mean_hausdorf)
+hdf = pd.DataFrame(hausdorf_l, columns=labels).to_csv(os.path.join(args.out_dir, 'hausdorf.csv'))
+print(hdf)
+mean_frechet = np.nanmean(frechet_l)
+frechet_l = np.pad(frechet_l, ((0,0),(0,1)), mode='constant', constant_values=mean_frechet)
+hdf = pd.DataFrame(frechet_l, columns=labels).to_csv(os.path.join(args.out_dir, 'frechet.csv'))
+print(hdf)
+mean_wd = np.nanmean(wasserstein_l)
+wasserstein_l = np.pad(wasserstein_l, ((0,0),(0,1)), mode='constant', constant_values=mean_wd)
+hdf = pd.DataFrame(wasserstein_l, columns=labels).to_csv(os.path.join(args.out_dir, 'wasserstein.csv'))
+print(hdf)
 
 metrics = ['braycurtis', 'canberra', 'chebyshev', 'cityblock', 'correlation', 'cosine', 'dice', 'euclidean', 'hamming', 'jaccard', 'jensenshannon', 'kulczynski1', 'mahalanobis', 'matching', 'minkowski', 'rogerstanimoto', 'russellrao', 'seuclidean', 'sokalmichener', 'sokalsneath', 'sqeuclidean', 'yule']
 # metrics_l = np.zeros((len(train_features.keys())), len(metrics))
@@ -103,12 +117,10 @@ metrics_l = np.zeros((len(train_features.keys()), len(metrics)))
 for ((i,points), (j,metric)) in product(enumerate(slide_sets), enumerate(metrics)):
     metrics_l[i][j] = np.mean(pdist(points, metric))
 
-
-# TODO: frechet
-import ipdb; ipdb.set_trace();
 df = pd.DataFrame(metrics_l, columns=metrics)
-df.to_csv('out.csv', sep='\t', encoding='utf-8')
+df.to_csv(os.path.join(args.out_dir, 'out.csv'), sep='\t', encoding='utf-8')
+print(df)
 # plt.show()
-# pickle.dump(cluster, open(args.out_dir + '/gmm_{}.pkl'.format(args.n_cluster), 'wb'))
+pickle.dump(cluster, open(args.out_dir + '/gmm_{}.pkl'.format(args.n_cluster), 'wb'))
 
 
