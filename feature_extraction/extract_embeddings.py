@@ -35,9 +35,7 @@ def get_embeddings_bagging(feature_extractor, subtype_model, data_set):
             img_batch, _, bag_idx = batch
             # feat = feature_extractor(img_batch.to(device)).cpu()
 
-            # for each image, 1536 output neurons. This is Inception-C model from original moco paper
-            # TODO: isn't it 256?
-            import ipdb; ipdb.set_trace()
+            # for each image (256 in each batch), 1536 output neurons. This is Inception-C model from original moco paper
             feat_out = feature_extractor(img_batch.to(device)) 
             subtype_model.eval()
             subtype_prob = subtype_model(img_batch)
@@ -69,15 +67,21 @@ def get_embeddings_bagging(feature_extractor, subtype_model, data_set):
 
 def load_pretrained(net, model_dir):
 
-    print(model_dir)
-    checkpoint = torch.load(model_dir)
-    model_state_dict = {k.replace("module.encoder_q.", ""): v for k, v in checkpoint['state_dict'].items() if
-                        "encoder_q" in k}
-    net.load_state_dict(model_state_dict)
-    net.last_linear = nn.Identity() # the linear layer removes our dependency/link to the key encoder
+    # original
+    # checkpoint = torch.load(model_dir)
+    # model_state_dict = {k.replace("module.encoder_q.", ""): v for k, v in checkpoint['state_dict'].items() if
+    #                     "encoder_q" in k}
+    # net.load_state_dict(model_state_dict)
+    # net.last_linear = nn.Identity() # the linear layer removes our dependency/link to the key encoder
     # TODO: verify if this is the query or key encoder
     # i.e. we can write net(input) instead of net.encoder_q(input)
-    # net.load_state_dict(checkpoint)
+
+    # new 
+
+    # loading in a pretrained compatible format
+    checkpoint = torch.load(model_dir)
+    net.last_linear = nn.Identity() # the linear layer removes our dependency/link to the key encoder
+    net.load_state_dict(checkpoint)
 
 parser = argparse.ArgumentParser(description='Extract embeddings ')
 
@@ -89,8 +93,7 @@ parser.add_argument('--out_dir', type=str)
 
 args = parser.parse_args()
 
-tcga_annotation = pickle.load(open('./TCGA/annotations/recurrence_annotation.pkl', 'rb'))
-import ipdb; ipdb.set_trace()
+tcga_annotation = pickle.load(open('./TCGA/recurrence_annotation.pkl', 'rb'))
 # cptac_annotation = pickle.load(open('../CPTAC/recurrence_annotation.pkl', 'rb'))
 # annotations = {**tcga_annotation, **cptac_annotation}
 annotations = {**tcga_annotation}
@@ -111,7 +114,6 @@ subtype_model = nn.DataParallel(subtype_model, device_ids=device_ids)
 train_dataset = TCGA_CPTAC_Bag_Dataset(args.root_dir, args.split_dir, 'train')
 val_dataset = TCGA_CPTAC_Bag_Dataset(args.root_dir, args.split_dir, 'val')
 test_dataset = TCGA_CPTAC_Bag_Dataset(args.root_dir, args.split_dir, 'test')
-
 
 with torch.no_grad():
     names = ['train', 'val', 'test']

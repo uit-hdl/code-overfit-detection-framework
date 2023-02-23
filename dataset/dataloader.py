@@ -15,6 +15,7 @@ class TCGA_CPTAC_Dataset(Dataset):
         #slide_list = pickle.load(open(split_dir + '/case_split.pkl', 'rb'))[mode + "_id"]
         # slide_list = [s for s in slide_list if "TCGA" in s]
         # TODO: temporary hack
+        import ipdb; ipdb.set_trace()
         slide_list = [
                 # 'TCGA-39-5016-01A-01-BS1',
                 # 'TCGA-39-5016-01A-01-TS1',
@@ -65,11 +66,11 @@ class TCGA_CPTAC_Bag_Dataset(Dataset):
     def __init__(self, data_dir, split_dir, mode='train'):
         self.data_dir = data_dir
         # slide_list = pickle.load(open(os.path.join(split_dir, 'case_split_2yr.pkl'), 'rb'))[mode + '_id']
-        slide_list = [
-                'TCGA-39-5016-01A-01-BS1',
-                'TCGA-39-5016-01A-01-TS1',
-                'TCGA-39-5016-11A-01-TS1',
-        ]
+        slide_list = os.popen("find {}/TCGA/tiles/ -maxdepth 1 -type d ".format(data_dir)).read().strip('\n').split('\n')[1:]
+        slide_list = list(map(lambda s: s.rsplit('/', 1)[1].split('.')[0], slide_list))
+        # slide_list = [
+        #         'TCGA-39-5016-01A-01-BS1',
+        # ]
         self.slide2tiles = {}
         for slide_id in slide_list:
             if "TCGA" in slide_id:
@@ -94,6 +95,12 @@ class TCGA_CPTAC_Bag_Dataset(Dataset):
         else:
             prefix = self.data_dir + '/CPTAC/tiles/'
         image = cv2.imread(os.path.join(prefix, tile_path))
+        
+        if image is None:
+            print (os.path.join(prefix, tile_path))
+            print (os.path.join(prefix, tile_path))
+            print (os.path.join(prefix, tile_path))
+            print (os.path.join(prefix, tile_path))
         image = Image.fromarray(image)
         image_tensor = self.transform(image)
         return image_tensor, tile_idx, slide_idx
