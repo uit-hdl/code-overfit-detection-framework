@@ -320,6 +320,12 @@ train_loader = torch.utils.data.DataLoader(
         train_dataset, batch_size=args.batch_size, shuffle=(train_sampler is None),
         num_workers=args.workers, pin_memory=True, sampler=train_sampler, drop_last=True, collate_fn=collate_fn_moco)
 
+if args.resume:
+    print ("Loading checkpoint. Make sure start_epoch is set correctly")
+    checkpoint = torch.load(args.resume)
+    model.load_state_dict(checkpoint['state_dict'])
+    optimizer.load_state_dict(checkpoint['optimizer'])
+
 
 for epoch in range(args.start_epoch, args.epochs):
     if args.distributed:
