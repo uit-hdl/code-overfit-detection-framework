@@ -68,20 +68,19 @@ def get_embeddings_bagging(feature_extractor, subtype_model, data_set):
 def load_pretrained(net, model_dir):
 
     # original
-    # checkpoint = torch.load(model_dir)
-    # model_state_dict = {k.replace("module.encoder_q.", ""): v for k, v in checkpoint['state_dict'].items() if
-    #                     "encoder_q" in k}
-    # net.load_state_dict(model_state_dict)
-    # net.last_linear = nn.Identity() # the linear layer removes our dependency/link to the key encoder
-    # TODO: verify if this is the query or key encoder
+    checkpoint = torch.load(model_dir)
+    model_state_dict = {k.replace("module.encoder_q.", ""): v for k, v in checkpoint['state_dict'].items() if
+                        "encoder_q" in k}
+    net.load_state_dict(model_state_dict)
+    net.last_linear = nn.Identity() # the linear layer removes our dependency/link to the key encoder
     # i.e. we can write net(input) instead of net.encoder_q(input)
 
     # new 
 
     # loading in a pretrained compatible format
-    checkpoint = torch.load(model_dir)
-    net.last_linear = nn.Identity() # the linear layer removes our dependency/link to the key encoder
-    net.load_state_dict(checkpoint)
+    # checkpoint = torch.load(model_dir)
+    # net.last_linear = nn.Identity() # the linear layer removes our dependency/link to the key encoder
+    # net.load_state_dict(checkpoint)
 
 parser = argparse.ArgumentParser(description='Extract embeddings ')
 
@@ -97,7 +96,7 @@ tcga_annotation = pickle.load(open('./TCGA/recurrence_annotation.pkl', 'rb'))
 # cptac_annotation = pickle.load(open('../CPTAC/recurrence_annotation.pkl', 'rb'))
 # annotations = {**tcga_annotation, **cptac_annotation}
 annotations = {**tcga_annotation}
-feature_extractor = InceptionV4(num_classes=256)
+feature_extractor = InceptionV4(num_classes=128)
 load_pretrained(feature_extractor, args.feature_extractor_dir)
 feature_extractor.to('cuda')
 device_ids = [0]

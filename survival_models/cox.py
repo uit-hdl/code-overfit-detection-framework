@@ -30,7 +30,7 @@ if cluster_method == 'GaussianMixture':
 else:
     n_clusters = cluster.n_clusters
 
-train_data, val_data, test_data = utils.oad_data(args.data_dir,
+train_data, val_data, test_data = utils.load_data(args.data_dir,
                 os.path.join(args.cluster_dir, args.cluster_name), normalize=args.normalize)
 
 train_df, val_df, test_df = utils.preprocess_data(train_data, val_data, test_data)
@@ -49,20 +49,17 @@ alpha_list = [10**i for i in np.linspace(-3,0,10)]
 alpha = alpha_list[0]
 val_results = []
 
-# TODO: temporary hack
-y_train[0] = (True, y_train[0][1])
-
 for i, alpha in enumerate(alpha_list):
-    # TODO: won't work until I include both outcome True and False
-    import ipdb; ipdb.set_trace()
     est = CoxPHSurvivalAnalysis(alpha=alpha).fit(train_df.drop(columns=['outcome','day']), y_train)
+    # val_metrics = utils.get_metics(train_df, val_df, est)
     val_metrics = utils.get_metics(train_df, val_df, est)
     val_results.append(val_metrics['C-index'])
 
 alpha = alpha_list[np.argmax(val_results)]
 est = CoxPHSurvivalAnalysis(alpha=alpha).fit(train_df.drop(columns=['outcome','day']), y_train)
 test_metrics = utils.get_metics(train_df, test_df, est)
+print(test_metrics)
 
 pickle.dump({"setting": os.path.join(args.data_dir, args.cluster_name),
             "test_results": test_metrics},
-            open(os.path.join(args.data_dir, "test_results.p", 'wb')))
+            open(os.path.join(args.data_dir, "test_results.p"), 'wb'))

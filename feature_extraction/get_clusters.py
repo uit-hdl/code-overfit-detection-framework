@@ -28,7 +28,13 @@ parser.add_argument('--out_dir', default='./', type=str)
 
 args = parser.parse_args()
 
-train_features = pickle.load(open(args.data_dir + '/train_embedding.pkl', 'rb'))
+train_features = pickle.load(open(args.data_dir + '/test_embedding.pkl', 'rb'))
+train_features_flattened = np.concatenate(list(train_features.values()), axis=0)
+cluster = GaussianMixture(n_components=args.n_cluster).fit(train_features_flattened)
+pickle.dump(cluster, open(args.out_dir + '/gmm_{}.pkl'.format(args.n_cluster), 'wb'))
+print ("exiting without UMAP")
+sys.exit(1)
+
 retain_number = 8
 len_dict = len(train_features.keys())
 i = 0
@@ -41,7 +47,6 @@ for x in train_features.keys():
 for x in keys:
     del train_features[x]
 train_features_flattened = np.concatenate(list(train_features.values()), axis=0)
-cluster = GaussianMixture(n_components=args.n_cluster).fit(train_features_flattened)
 umap_projection = reducer.fit_transform(train_features_flattened)
 slices = list(accumulate([0] + [len(y) for y in train_features.values()], operator.add))
 fig, ax = plt.subplots()
@@ -53,8 +58,8 @@ for slide_number,(i_s,i_e) in enumerate(zip(slices, slices[1:])):
 ax.legend()
 ax.get_xaxis().set_visible(False)
 ax.get_yaxis().set_visible(False)
-plt.show()
-plt.savefig(os.path.join('.', 'umap_output.png'))
+# plt.show()
+# plt.savefig(os.path.join('.', 'umap_output.png'))
 
 hausdorf_l = np.zeros((len(train_features.keys()), len(train_features.keys())))
 np.fill_diagonal(hausdorf_l, np.nan)
@@ -121,6 +126,5 @@ df = pd.DataFrame(metrics_l, columns=metrics)
 df.to_csv(os.path.join(args.out_dir, 'out.csv'), sep='\t', encoding='utf-8')
 print(df)
 # plt.show()
-pickle.dump(cluster, open(args.out_dir + '/gmm_{}.pkl'.format(args.n_cluster), 'wb'))
 
 

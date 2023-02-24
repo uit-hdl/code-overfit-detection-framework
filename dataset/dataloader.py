@@ -19,12 +19,12 @@ class TCGA_CPTAC_Dataset(Dataset):
         slide_list = list(map(lambda s: s.rsplit('/', 1)[1].split('.')[0], slide_list))
         keep_train = math.floor(len(slide_list) * 0.7)
         keep_val = keep_train + math.floor(len(slide_list) * 0.1)
-        keep_test = keep_val + math.floor(len(slide_list) * 0.2)
+        # keep_test = keep_val + math.floor(len(slide_list) * 0.2)
         if mode == 'train':
             slide_list = slide_list[:keep_train]
         elif mode == 'val':
             slide_list = slide_list[keep_train:keep_val]
-        elif mode == 'val':
+        elif mode == 'test':
             slide_list = slide_list[keep_val:]
 
         # slide_list = [ 'TCGA-21-A5DI-01A-03-TS3', ]
@@ -85,12 +85,12 @@ class TCGA_CPTAC_Bag_Dataset(Dataset):
         slide_list = list(map(lambda s: s.rsplit('/', 1)[1].split('.')[0], slide_list))
         keep_train = math.floor(len(slide_list) * 0.7)
         keep_val = keep_train + math.floor(len(slide_list) * 0.1)
-        keep_test = keep_val + math.floor(len(slide_list) * 0.2)
+        #keep_test = keep_val + math.floor(len(slide_list) * 0.2)
         if mode == 'train':
             slide_list = slide_list[:keep_train]
         elif mode == 'val':
             slide_list = slide_list[keep_train:keep_val]
-        elif mode == 'val':
+        elif mode == 'test':
             slide_list = slide_list[keep_val:]
         self.slide2tiles = {}
         for slide_id in slide_list:

@@ -29,7 +29,9 @@ def get_metics(train_df, test_df, est):
     except:
         print('no five year records')
     preds = est.predict(test_df.drop(columns=['outcome','day']))
-    metrics['C-index'] = concordance_index_censored(y_train, y_test, preds)[0]
+    # TODO: wtf? how was the line below ever supposed to make sense?
+    # metrics['C-index'] = concordance_index_censored(y_train, y_test, preds)[0]
+    metrics['C-index'] = concordance_index_censored([x[0] for x in y_test], [x[1] for x in y_test], preds)[0]
     return metrics
 
 
