@@ -371,21 +371,21 @@ Have to keep in mind that two photos can be disparate, e.g. 1 photo can have tum
       ylabel = y,
       ticks=none
     ]
-    \addplot+ [blue,only marks,mark options={scale=.5}] table [col sep=comma] {./umap_proj_default/slide0.csv};
+    \addplot [blue,only marks,mark options={scale=.5}, fill opacity=.5, draw opacity=0.5] table [col sep=comma] {./umap_proj_default/slide0.csv};
     \addlegendentry{Slide 1}
-    \addplot+ [red,only marks,mark options={scale=.5}] table [col sep=comma] {./umap_proj_default/slide1.csv};
+    \addplot [red,only marks,mark options={scale=.5}, fill opacity=.5, draw opacity=0.5] table [col sep=comma] {./umap_proj_default/slide1.csv};
     \addlegendentry{Slide 2}
-    \addplot+ [yellow,only marks,mark options={scale=.5}] table [col sep=comma] {./umap_proj_default/slide2.csv};
+    \addplot [violet,only marks,mark options={scale=.5}, fill opacity=.5, draw opacity=0.5] table [col sep=comma] {./umap_proj_default/slide2.csv};
     \addlegendentry{Slide 3}
-    \addplot+ [black,only marks,mark options={scale=.5}] table [col sep=comma] {./umap_proj_default/slide3.csv};
+    \addplot [black,only marks,mark options={scale=.5}, fill opacity=.5, draw opacity=0.5] table [col sep=comma] {./umap_proj_default/slide3.csv};
     \addlegendentry{Slide 4}
-    \addplot+ [purple,only marks,mark options={scale=.5}] table [col sep=comma] {./umap_proj_default/slide4.csv};
+    \addplot [purple,only marks,mark options={scale=.5}, fill opacity=.5, draw opacity=0.5] table [col sep=comma] {./umap_proj_default/slide4.csv};
     \addlegendentry{Slide 5}
-    \addplot+ [orange,only marks,mark options={scale=.5}] table [col sep=comma] {./umap_proj_default/slide5.csv};
+    \addplot [orange,only marks,mark options={scale=.5}, fill opacity=.5, draw opacity=0.5] table [col sep=comma] {./umap_proj_default/slide5.csv};
     \addlegendentry{Slide 6}
-    \addplot+ [green,only marks,mark options={scale=.5}] table [col sep=comma] {./umap_proj_default/slide6.csv};
+    \addplot [green,only marks,mark options={scale=.5}, fill opacity=.5, draw opacity=0.5] table [col sep=comma] {./umap_proj_default/slide6.csv};
     \addlegendentry{Slide 7}
-    \addplot+ [pink,only marks,mark options={scale=.5}] table [col sep=comma] {./umap_proj_default/slide7.csv};
+    \addplot [teal,only marks,mark options={scale=.5}, fill opacity=.5, draw opacity=0.5] table [col sep=comma] {./umap_proj_default/slide7.csv};
     \addlegendentry{Slide 8}
   \end{axis}
 \end{tikzpicture}
@@ -416,6 +416,15 @@ Have to keep in mind that two photos can be disparate, e.g. 1 photo can have tum
 
 
 \subsection{UMAP}
+Do you/they run all the points in the reducer and then select 8 slides, or do they only use points from the 8 slides as training?
+
+% TODO: lets get best and worst from each model:
+% normal
+% normal without augmentations
+% only trained on 3 photos
+% normal without augmentations condition=False
+% then I talk about metrics, comparing best and worst for 3-5 most relevant interset metrics, presented in a table
+% then I present mean set metrics for two of the photos, least biased and most biased, and maybe some intersets
 \begin{table}
 \centering
   \begin{tabular}{l l l l}
