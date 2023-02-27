@@ -9,6 +9,7 @@ import argparse
 import frechetdist
 import matplotlib.pyplot as plt
 import numpy as np
+from numpy import savetxt
 import operator
 import pandas as pd
 import pickle
@@ -29,11 +30,9 @@ parser.add_argument('--out_dir', default='./', type=str)
 args = parser.parse_args()
 
 train_features = pickle.load(open(args.data_dir + '/test_embedding.pkl', 'rb'))
-train_features_flattened = np.concatenate(list(train_features.values()), axis=0)
-cluster = GaussianMixture(n_components=args.n_cluster).fit(train_features_flattened)
-pickle.dump(cluster, open(args.out_dir + '/gmm_{}.pkl'.format(args.n_cluster), 'wb'))
-print ("exiting without UMAP")
-sys.exit(1)
+# train_features_flattened = np.concatenate(list(train_features.values()), axis=0)
+# cluster = GaussianMixture(n_components=args.n_cluster).fit(train_features_flattened)
+# pickle.dump(cluster, open(args.out_dir + '/gmm_{}.pkl'.format(args.n_cluster), 'wb'))
 
 retain_number = 8
 len_dict = len(train_features.keys())
@@ -55,10 +54,13 @@ slide_sets = [[]] * len(train_features.keys())
 for slide_number,(i_s,i_e) in enumerate(zip(slices, slices[1:])):
     ax.scatter(umap_projection[i_s:i_e, 0], umap_projection[i_s:i_e, 1], label = f"Slide {slide_number+1}", alpha=.5)
     slide_sets[slide_number] = umap_projection[i_s:i_e]
+for i,ss in enumerate(slide_sets):
+    savetxt(os.path.join(args.out_dir, 'slide%d.csv' % i), ss, delimiter=',')
 ax.legend()
 ax.get_xaxis().set_visible(False)
 ax.get_yaxis().set_visible(False)
-# plt.show()
+# only one of the below, not both
+plt.show()
 # plt.savefig(os.path.join('.', 'umap_output.png'))
 
 hausdorf_l = np.zeros((len(train_features.keys()), len(train_features.keys())))

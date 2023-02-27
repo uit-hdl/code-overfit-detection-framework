@@ -4,6 +4,11 @@
 \usepackage[pagenumbers]{cvpr} % To force page numbers, e.g. for an arXiv version
 
 % Include other packages here, before hyperref.
+\usepackage{
+  pgfplots,
+  pgfplotstable,
+  tikz
+}
 \usepackage{graphicx}
 \usepackage{comment}
 \usepackage{amsmath}
@@ -18,6 +23,7 @@
 \Crefname{section}{Section}{Sections}
 \Crefname{table}{Table}{Tables}
 \crefname{table}{Tab.}{Tabs.}
+
 
 \def\cvprPaperID{*****}
 \def\confName{NLDL}
@@ -287,15 +293,11 @@ Much of the code did not work out the box. The kind of errors I ran into were mi
 
 There is no code to reproduce their plots and graphs. There is also no metioning in the code or the paper of what hyperparameters were used for \gls{UMAP}. 
 
-The cox regression has a line ``val_metrics = utils.get\_metics(train\_df, val\_df, est)''? Isn't it supposed to be using the test set??
 
 % TODO: Maybe I am able to use their pretrained weights on my input, thus not limiting myself by having less data?
 
 \subsubsection{Structure}\label{subsubsec:misconception}
 they used different test/train splits.. meh
-
-{'Brier_2yr': 0.16114370132033523, 'Brier_5yr': 0.2346287646170816
-3, 'C-index': 0.5327102803738317}
 
 \subsection{MoCo}\label{subsec:moco}
 \gls{MOCO}\cite{moco} is a contrastive learner (also discussed in~\Cref{sec:contrastiveLearning}. It uses two underlying models, one \textit{key encoder} which converts an input image to latent space and a \textit{query encoder} which translates negative or opposite pairings to latent space. A core feature of \gls{MOCO} is that it manages to keep a long \textit{dictionary}, which in layman's terms means it can have many comparison images for its loss functions. In~\cite{sslUMAP} InceptionV4\cite{inceptionV4} is used for both encoders. This model has shown good peformance on ImageNet, but other papers on \gls{LSCC} have also used it, e.g.~\cite{otherInception}.
@@ -348,6 +350,50 @@ A good scoring method can also average, though.
 Have to keep in mind that two photos can be disparate, e.g. 1 photo can have tumours, the other can be healthy, e.g.
 
 \subsection{Results}\label{sec:results}
+\begin{figure}\label{fig:loss}
+\begin{tikzpicture}
+  \begin{axis}[
+      xlabel = epoch,
+      ylabel = loss,
+    ]
+    \addplot [mark=none] table [x=epoch, y=loss, col sep=comma] {./loss_v2.csv};
+  \end{axis}
+\end{tikzpicture}
+\caption{Loss from training model}
+%TODO: train with 300 epochs???
+\end{figure}
+
+\begin{figure}\label{fig:loss}
+\begin{tikzpicture}
+  \begin{axis}[
+      legend pos = outer north east,
+      xlabel = x,
+      ylabel = y,
+      ticks=none
+    ]
+    \addplot+ [blue,only marks,mark options={scale=.5}] table [col sep=comma] {./umap_proj_default/slide0.csv};
+    \addlegendentry{Slide 1}
+    \addplot+ [red,only marks,mark options={scale=.5}] table [col sep=comma] {./umap_proj_default/slide1.csv};
+    \addlegendentry{Slide 2}
+    \addplot+ [yellow,only marks,mark options={scale=.5}] table [col sep=comma] {./umap_proj_default/slide2.csv};
+    \addlegendentry{Slide 3}
+    \addplot+ [black,only marks,mark options={scale=.5}] table [col sep=comma] {./umap_proj_default/slide3.csv};
+    \addlegendentry{Slide 4}
+    \addplot+ [purple,only marks,mark options={scale=.5}] table [col sep=comma] {./umap_proj_default/slide4.csv};
+    \addlegendentry{Slide 5}
+    \addplot+ [orange,only marks,mark options={scale=.5}] table [col sep=comma] {./umap_proj_default/slide5.csv};
+    \addlegendentry{Slide 6}
+    \addplot+ [green,only marks,mark options={scale=.5}] table [col sep=comma] {./umap_proj_default/slide6.csv};
+    \addlegendentry{Slide 7}
+    \addplot+ [pink,only marks,mark options={scale=.5}] table [col sep=comma] {./umap_proj_default/slide7.csv};
+    \addlegendentry{Slide 8}
+  \end{axis}
+\end{tikzpicture}
+\caption{Loss from training model}
+%TODO: train with 300 epochs???
+\end{figure}
+
+
 \subsection{SSL model}
 \begin{table}
 \centering
@@ -360,6 +406,12 @@ Have to keep in mind that two photos can be disparate, e.g. 1 photo can have tum
   \end{tabular}
   \caption{Output from different sets}
   \label{tab:combinedres}
+% Standard, default model
+% {'Brier_2yr': 0.16114370132033523, 'Brier_5yr': 0.2346287646170816
+% 3, 'C-index': 0.5327102803738317}
+
+
+
 \end{table}
 
 
