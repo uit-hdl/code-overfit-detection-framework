@@ -29,46 +29,20 @@
 \Crefname{table}{Table}{Tables}
 \crefname{table}{Tab.}{Tabs.}
 
-\newcommand{\umapPlot}[3]{
-\begin{figure}\label{#1}
-\begin{tikzpicture}
-  \begin{axis}[
-      % legend pos = outer north east,
-      % xlabel = x,
-      % ylabel = y,
-      ticks=none
-    ]
-    \pgfplotsforeachungrouped \foridx/\forcol in {1/red,2/violet,3/black,4/purple,5/orange,6/green,7/teal,8/blue} {
-      \ifnum\foridx<#3
-      \expandafter\addplot\expandafter[\forcol,only marks,mark options={scale=.5}, fill opacity=.5, draw opacity=0.5] table [col sep=comma] {#2/slide\foridx.csv};
-      % \expandafter\addlegendentry{Slide \foridx};
-      % \addlegendentrySI[]{Slide}{\foridx};
-      \fi
-      }
-  \end{axis}
-\end{tikzpicture}
-\caption{UMAP projection}
-\end{figure}
-}
-
-\newcommand{\umapSubPlot}[3]{
+\newcommand{\umapSubPlot}[4]{
   \begin{tikzpicture}
   \begin{axis}[
-      % legend pos = outer north east,
-      % xlabel = x,
-      % ylabel = y,
-      height=6cm,
+      height=5.5cm,
       ticks=none
     ]
     \pgfplotsforeachungrouped \foridx/\forcol in {1/red,2/violet,3/black,4/purple,5/orange,6/green,7/teal,8/blue} {
       \ifnum\foridx<#3
       \expandafter\addplot\expandafter[\forcol,only marks,mark options={scale=.5}, fill opacity=.5, draw opacity=0.5] table [col sep=comma] {#2/slide\foridx.csv};
-      % \addlegendentrySI[]{Slide}{\foridx};
       \fi
       }
   \end{axis}
 \end{tikzpicture}
-% \subcaption{teehee}
+\caption{Model #4}
 }
 
 
@@ -111,55 +85,6 @@ Postboks 6050 Langnes\\
 }
 \maketitle
 Computational pathology is study of disease using methods such as artificial intelligence. For building models, there are three main hindrances: 1) lack of publicly available data, 2) large image-size and high number of details d 3) lack of ground truth data due to expert disagreeance. Consequently, developers have to compromise when building a model. To know if models are accurate enough, explainable AI can help. But, are the explanations good enough that a pathologist can trust a model used to evaluate patient diagnosis and/or prognosis? 
-
-\begin{figure*}
-  \begin{subfigure}{.45\textwidth}
-    \umapSubPlot{fig:umapDefaultGood}{umapProjDefault}{9}
-  \end{subfigure}
-  \begin{subfigure}{.45\textwidth}
-    \umapSubPlot{fig:umapOnly3Good}{only3Good}{9}
-  \end{subfigure}
-  \begin{subfigure}{.45\textwidth}
-    \umapSubPlot{fig:umap2augDefaultGood}{2augDefaultsGood}{9}
-  \end{subfigure}
-  \begin{subfigure}{.45\textwidth}
-    \umapSubPlot{fig:biasedUmap}{heavilyBiasedUmap}{4}
-  \end{subfigure}
-  \begin{subfigure}{.45\textwidth}
-    \umapSubPlot{fig:conditionFalse}{conditionFalse}{9}
-  \end{subfigure}
-  \begin{subfigure}{.45\textwidth}
-  \begin{tikzpicture}
-    \begin{axis}[
-        hide axis,
-        legend style={draw=white!15!black,legend cell align=left},
-        xmin=10,
-        xmax=90,
-        ymin=0,
-        ymax=100,
-        only marks,
-        legend entries = {{Slide 1}, {Slide 2}, {Slide 3}, {Slide 4}, {Slide 5}, {Slide 6}, {Slide 7}, {Slide 8}},
-        ticks=none]
-      \addlegendimage{red};
-      \addlegendimage{violet};
-      \addlegendimage{black};
-      \addlegendimage{purple};
-      \addlegendimage{orange};
-      \addlegendimage{green};
-      \addlegendimage{teal};
-      \addlegendimage{blue};
-    % \pgfplotsforeachungrouped \foridx/\forcol in {1/red,2/violet,3/black,4/purple,5/orange,6/green,7/teal,8/blue} {
-      % \ifnum\foridx<9
-      % \expandafter\addplot\expandafter[\forcol,only marks,mark options={scale=.5}, fill opacity=.5, draw opacity=0.5] table [col sep=comma] {#2/slide\foridx.csv};
-      % \addlegendimage{color=\forcol,mark=circle*};
-      % \addlegendentrySI[]{Slide}{\foridx};
-      % \fi
-    \end{axis}
-    \end{tikzpicture}
-  \end{subfigure}
-
-\end{figure*}
-
 
 % \section{Introduction} \label{sec:intro}
 % This is a report from the 2023 Northern Lights Deep Learning (NLDL) conference. The first four pages contains a summary from each of the topics covered Monday 9th of January and Friday 13th January. I have primarily used the presentations as a source, but supplemented a little with papers I have found online. Citations to these sources are given. 
@@ -468,37 +393,104 @@ Computational pathology is study of disease using methods such as artificial int
 % \umapPlot{fig:conditionFalse}{conditionFalse}{9}
 % 
 % \subsection{SSL model}
-% \begin{table}
-% \centering
-%   \begin{tabular}{l l l l l}
-%     % model type & Standard options & Trained on only 3 photos & Only 2 Augmentations & Uncoditional-\gls{SSL} \\
-%     model type & m1 & m2 & m3 & m4 \\
-%     \hline
-%     C-Index & 0.53 & 0.40 & 0.35 & 0.32 \\
-%     Brier (2 yrs) & $0.16$ & $0.18$ & $0.21$ & $0.16$  \\
-%     Brier (5 yrs) & $0.23$ & $0.29$ & $0.34$ & $0.25$  \\
-%     \hline
-%   \end{tabular}
-%   \caption{Output from different sets}
-%   \label{tab:combinedres}
-% \end{table}
 % % only 3 photos as input?!
 % % FIXME: no, I forgot to update the gmm cluster. Re-run
 % % 
 % % Do you/they run all the points in the reducer and then select 8 slides, or do they only use points from the 8 slides as training?
-% \begin{table}
-% \centering
-%   \begin{tabular}{l l l l l l}
-%     % model type & Standard options & Trained on only 3 photos & Only 2 Augmentations & Uncoditional-\gls{SSL} & 1-epoch \\
-%     model type & m1 & m2 & m3 & m4 & m5\\
-%     Hausdorf & 1 & 2 & 3 & 3.57 & 12.98 \\
-%     Frechet & 1 & 2 & 3 & 4.88 & 17.84 \\
-%     Wasserstein & 1 & 2 & 3 & 2.75 & 11.74 \\
-%   \end{tabular}
-%   \caption{Output from different sets}
-%   \label{tab:singleres}
-% \end{table}
-% 
+
+\begin{figure*}
+  \centering
+  \begin{subfigure}[b]{.25\textwidth}
+    \centering
+    \umapSubPlot{fig:umapDefaultGood}{umapProjDefault}{9}{$\alpha$}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{.25\textwidth}
+    \centering
+    \umapSubPlot{fig:umapOnly3Good}{only3Good}{9}{$\beta$}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{.25\textwidth}
+    \centering
+    \umapSubPlot{fig:umap2augDefaultGood}{2augDefaultsGood}{9}{$\gamma$}
+  \end{subfigure}
+  %TODO: why is there so much space?
+  \\
+  \vspace{-1.0cm}
+  \begin{subfigure}{.25\textwidth}
+    \centering
+    \umapSubPlot{fig:conditionFalse}{conditionFalse}{9}{$\delta$}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}{.25\textwidth}
+    \centering
+    \umapSubPlot{fig:biasedUmap}{heavilyBiasedUmap}{4}{$\epsilon$}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}{.25\textwidth}
+    \centering
+  \begin{tikzpicture}
+    \begin{axis}[
+        hide axis,
+        legend style={draw=white!15!black,legend cell align=left},
+        xmin=10,
+        xmax=90,
+        ymin=0,
+        ymax=30,
+        only marks,
+        legend style = {at={(0.20,0.40)}, anchor=west},
+        legend entries = {{Slide 1}, {Slide 2}, {Slide 3}, {Slide 4}, {Slide 5}, {Slide 6}, {Slide 7}, {Slide 8}},
+        ticks=none]
+      \addlegendimage{red};
+      \addlegendimage{violet};
+      \addlegendimage{black};
+      \addlegendimage{purple};
+      \addlegendimage{orange};
+      \addlegendimage{green};
+      \addlegendimage{teal};
+      \addlegendimage{blue};
+    \end{axis}
+    \end{tikzpicture}
+  \end{subfigure}
+  \caption{UMAP plots from 8 randomly selected tiles from the validation set used in model training. The samples are the same for all graphs}
+  \label{fig:umaps}
+\end{figure*}
+
+Model $\alpha$ is standard, $\beta$ is a model trained on only 3 photos, $\gamma$ is a model similar to $\alpha$ except it has only used crop and color distortions as image augmentations (similar as in the recommended section from~\cite{simCLR}), $\delta$ is a model trained using unconditional \gls{SSL}, i.e. random sampling of slides and $\epsilon$ is a model similar to $\alpha$, except it's only trained for one epoch. This is done to create some obviously biased photos for~\Cref{fig:umaps}.
+
+\begin{table*}
+\centering
+  \begin{tabular}{l l l l l l}
+    % model type & Standard options & Trained on only 3 photos & Only 2 Augmentations & Uncoditional-\gls{SSL} & 1-epoch \\
+    model type & $\alpha$ & $\beta$ & $\gamma$ & $\delta$ & $\epsilon$ \\
+    \hline \\
+    Hausdorf & 1 & 2 & 3 & 3.57 & 12.98 \\
+    Frechet & 1 & 2 & 3 & 4.88 & 17.84 \\
+    Wasserstein & 1 & 2 & 3 & 2.75 & 11.74 \\
+    \hline \\
+    Euclidean & 1 & 2 & 3 & 2.36 & 2.12  \\
+    Shannon & 1 & 2 & 3 & 0.07 & 1 \\
+    Cosine & 1 & 2 & 3 & 0.02 & 0.029  \\
+  \end{tabular}
+  \caption{Quantitative measures/means from the \gls{UMAP} figures in~\Cref{fig:umaps}}
+  \label{tab:quantitativeres}
+\end{table*}
+
+\begin{table}
+\centering
+  \begin{tabular}{l l l l l}
+    % model type & Standard options & Trained on only 3 photos & Only 2 Augmentations & Uncoditional-\gls{SSL} \\
+    model type & $\alpha$ & $\beta$ & $\gamma$ & $\delta$ \\
+    \hline
+    C-Index & 0.53 & 0.40 & 0.35 & 0.32 \\
+    Brier (2 yrs) & $0.16$ & $0.18$ & $0.21$ & $0.16$  \\
+    Brier (5 yrs) & $0.23$ & $0.29$ & $0.34$ & $0.25$  \\
+    \hline
+  \end{tabular}
+  \caption{Brier and C-index scores from the validation set}
+  \label{tab:combinedres}
+\end{table}
+
 % \begin{table}
 % \centering
 %   \begin{tabular}{l l l l l l}
