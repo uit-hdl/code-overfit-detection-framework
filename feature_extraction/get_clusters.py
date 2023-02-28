@@ -125,6 +125,8 @@ def umap_slice(slide_ids):
     for ((i,points), (j,metric)) in product(enumerate(slide_sets), enumerate(metrics)):
         metrics_l[i][j] = np.mean(pdist(points, metric))
 
+    import ipdb; ipdb.set_trace();
+    # TODO: extract mean
     df = pd.DataFrame(metrics_l, columns=metrics)
     df.to_csv(os.path.join(args.out_dir, 'out.csv'), sep='\t', encoding='utf-8')
     print(df)
