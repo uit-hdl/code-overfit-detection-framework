@@ -86,317 +86,307 @@ Postboks 6050 Langnes\\
 \maketitle
 Computational pathology is study of disease using methods such as artificial intelligence. For building models, there are three main hindrances: 1) lack of publicly available data, 2) large image-size and high number of details d 3) lack of ground truth data due to expert disagreeance. Consequently, developers have to compromise when building a model. To know if models are accurate enough, explainable AI can help. But, are the explanations good enough that a pathologist can trust a model used to evaluate patient diagnosis and/or prognosis? 
 
-% \section{Introduction} \label{sec:intro}
-% This is a report from the 2023 Northern Lights Deep Learning (NLDL) conference. The first four pages contains a summary from each of the topics covered Monday 9th of January and Friday 13th January. I have primarily used the presentations as a source, but supplemented a little with papers I have found online. Citations to these sources are given. 
-% I have omitted some content from all the presentations to adhere to the length requirements. A detailed programme can be found on the website: \href{https://www.nldl.org/winter-school}{https://www.nldl.org/winter-school}. 
-% % To make the first four pages I have followed each of the presentation slides and supplemented with extra information found in other sources, which of course are cited.
-% % if need be, summarize my findings here
-% 
-% \section{Deep Reinforcement Learning}\label{sec:drl}
-% \begin{comment}
-%   \gls{RL} has emerged as a powerful technique in modern machine learning, allowing a system to learn through trial and error. We will introduce some fundamental principles upon which this family of methods is based. In the first part, we give a summary of classical reinforcement learning and thus provide the essentials for understanding Deep Reinforcement Learning (DRL). In the second part, we shift the focus onto DRL and look at how deep learning enhances classical reinforcement learning, leading to powerful new algorithms. These algorithms include DQN playing Atari games at a superhuman level, PPO solving robot locomotion problems, and Alpha Zero learning to play GO, Chess, and Shogi. In the limited time of such a mini-tutorial, we can of course only sketch the main characteristics, but we intend to motivate to look deeper into this fascinating family of methods.
-% \end{comment}
-% \gls{RL} is a branch of AI. One or more agents interact with a given environment and teach themselves 
-% behaviours that maximize a goal-function. Often this relies a great number of iterations; e.g. AlphaGo Zero played 4.9 million rounds of Go with itself before being released~\cite{goWithoutHumans}. This got news coverage all over the world as Go had long been considered to be a game too complicated for computers.
-% 
-% \gls{RL} agents operates in discrete time. At each timestep $t$ the agent observes its environment. Each observation $O_{t}$ modifies the agent state $s_{t}$, a processed representation to the history of events. Based on $s_{t}$ the agent chooses it's action $A_{t}$. The choice is made by choosing the action thought to maximize the reward $R_{t}$ of the agent in the future (next state). The expected return from the eyes of an agent is measured by it's goal function $G_{t}$, being the sum $G_{t} = \sum_{k=t+1}^{\inf{}}{R_{k}}$.
-% A problem with this goal function is that the agent can get stuck. E.g. in a dead end of a labyrinth; refusing to take a step back to find another path to the goal. A discount factor, noted $\gamma{}$, ensures that rewards less valuable over time, typically modelled as $G_{t} = \sum_{k=t+1}^{\inf{}}\gamma^{k}{R_{k}}$ (which can also be expressed a recursive $R_{t+1} + \gamma{G_{t+1}}$). Hence, if you stick in a dead end for too long, it doesn't pay off, and any other path that penultimately gets to another reward faster is better. The use of discount factors in reward functions is referred to as \textit{\gls{TD} learning}.
-% 
-% But how is the reward chosen? Each state is given a \textit{value function}. This is the expected value from being in a state $s$: $V_{\pi} = \mathbb{E}_{\pi} [ G_{t} | s = s_{t}]$. $\pi$ is here defined as the policy for what action to choose. Usually we cannot know exactly what the outcome of an action is, therefore we model actions by stochastic policies $\pi{}(a | s)$ which gives likelyhood of future actions. An example is a robot taking a step forward, but sliding on a banana peel and consequently falling. This lesson means that re-visiting the same state later in the future should not yield the same action, even if the policy is the same. The same does not apply to e.g. chess, where we can set a deterministic policy since we know exact outcomes from actions (moving pieces). 
-% Analogous to the value function is the action value: $q_{\pi{}} = \mathbb{E} [ G_{t} \vert{} S_{t} = s \cap A_{t} = a]$. This function (as given here) is strict to the policy $\pi$, i.e., in order to predict the future value of actions, you have to stay with the same $\pi$. The \textit{q} is often referred to as \textit{quality}. 
-% 
-% 
-% % To resolve which future state that is desirable, the Bellman equation~\cite{bellman} is often used.
-% % It sums over all possible state successor states $s'$ and evaluates their estimated values given policy $\pi{}$ and probabilistic expection $p(s', r \vert{} s, a)$. It's full formal notation is given in~\Cref{eq:bellman}:
-% % \begin{equation}\label{eq:bellman}
-% %   V_{\pi}(s) = \sum_{a}{\pi(a\vert{}s})\sum_{s'}\sum_{r}{p(s', r \vert{} s, a) * [r + \gamma * v_{\pi{}}(s')]}
-% % \end{equation}
-% 
-% Keeping a mapping between states and their expected values can be exhaustive for computer memory. Finding the right policy can also be difficult. If we think of neural network for what they are, \textit{function approximators}, it seems intuitive to use them for approximating the value function and/or action policy. This helps us resolve the problem of finite available space in action-value mappings. Hence, the field of \textbf{\gls{DRL}} emerges. There are several examples already of popular tools/models built with \gls{DRL}, such as AlphaTensor~\cite{alphaTensor} for matrix multiplication, DeepNash~\cite{stratego} for the game of Stratego, etc. 
-% 
-% The neural nets in \gls{DRL} (a.k.a \gls{DQN}) lacks ground truth, but rather rely on rewards for optimization. The problem is that these rewards may come at delayed moments or at the influence of unknown variables. This is essentially noise in the learning loop. Therefore, there are several techniques used in conjuction with the neural nets to improve their accuracy. One such trick is experience replay: steps are recorded with $(s_{t}, a_{t}, s_{t+1}, r_{t})$ in a replay buffer. Now, whenever we perform an action, we can learn not only from the change in environment, but we may use extra samples from past events.
-% 
-% % Talk more about policy gradients?
-% 
-% So far in this summary the \gls{RL} approaches have been \textit{model-free}: to learn of the world, actions are performed and evaluated. The alternative is \textit{model-based} \gls{RL}, wherein the agent can plan ahead by making predictions about how actions affect the world: $p(s_{t+1} \vert{} s_{t}, a_{t})$. The advantage of model-based \gls{RL} is primarily it's sample efficiency since we can prune away more actions during the learning phase. This is the case of Alpha Zero~\cite{alphaZero}. There have, however, been other strides in e.g. MuZero~\cite{muZero}, which can also train its own model to be used by \gls{RL} to predict future actions.
-% 
-% % The bellman equation is commonly used to asses a state value.
-% 
-% % This is often a greedy process where short-term benefits are prioritized over long-term benefits, similar to laws of finance, future gains are discounted. 
-% 
-% 
-% % \gls{RL} is sequential, i.e. future actions depend on previous ones. Unlike 
-% 
-% 
-% % TODO: Ai gyms?
-% 
-% \section{Self Supervised Learning}\label{sec:ssl}
-% \begin{comment}
-% Humans learn much under supervision but even more without. Such will apply to machines. Self-supervised learning is paving the way by leveraging unlabeled data which is vastly available. In this emerging learning paradigm, deep representation models are trained by supervised learning with supervisory signals (i.e., training targets) derived automatically from unlabeled data itself. It is abundantly clear that such a learnt representation can be useful for a broad spectrum of downstream tasks with the need of significantly less supervised data.
-% 
-% As in supervised learning, key considerations in devising self-supervised learning methods include training targets and loss functions. The difference is that training targets for self-supervised learning are not pre-defined and greatly dependent on the choice of pretext tasks. This leads to a variety of novel training targets and their corresponding loss functions. This tutorial aims to provide an overview of training targets and loss functions developed in the domains of speech, vision and text. Further, we will discuss some open questions, e.g., transferability, and under-explored problems, e.g., learning across modalities. For example, the pretext tasks, and thus the training targets, can be drastically distant from the downstream tasks. This raises the questions like how transferrable the learnt representations are, how to choose training targets and how to explore representations. We will also discuss the link between semi-supervised and self-supervised learning.
-% \end{comment}
-% There are now four different training paradigms in machine learning. 1) is supervised learning, in which an annotator labels data to be used by a machine learning model. 2) is semi-supervised, which can combine unlabeled data and labelled data together. 3) is then unsupervised learning and then 4) self-supervised, in which the model is able to make labels on its own. Approach 1 and 2 both depend on annotations which may be costly (and tedious) to aquire and approach 3 is fast but has limited learning capacity. \gls{SSL} is intending to resolve the headaches from the former 3. The labels have to be introduced \textit{at some point}, but \gls{SSL} can be used as a \textit{pretext} task. \gls{SSL} has made big advancements in \gls{NLP}, for example in the most recent ChatGPT (made by OpenAI~\cite{openAI}) (albeit its underlying model based on GPT-3 also uses other techniques~\cite{gpt3}).
-% 
-% For speech and text, one technique to make \gls{SSL} efficient is \gls{APC}~\cite{chung2020generative}. This technique relies on encoding context in the form of past elements into a latent space (a model's interpretation) in order to predict future elements. This prediction is made using a softmax-layer which effectively calculates the probability of future tokens (referred to as frames). The loss function of the model also uses the probability of past and future frames as an optimizer. The difficulty of this approach is having enough computer memory to store all the past tokens. To aid this it is helpful to use \textit{transformers}, which have attention-based learning and may compress some of past frames. This could e.g. be elimiting noise in audio sounds.
-% 
-% Since \gls{SSL} only defines \textit{pretext} tasks, it does mean that results from \gls{SSL} may not be transferrable to other domains or objects. For example, data2vec (CITE), another \gls{SSL} technique for \gls{NLP}, relies on having contextualized training targets to learn the embedding of words and documents. I.e. by calculating a \gls{tf-idf} from carefully selected documents it is able to calculate a good word embedding to be used in later analysis. For non-related domains the \gls{tf-idf} would be off, however. 
-% % TODO: compare program's description of talks vs what I have written
-% 
-% 
-% 
-% \section{Unverfiability in eXplainable AI Evaluation}\label{sec:xai}
-% \begin{comment}
-%   In recent years, the interest in \gls{XAI} techniques has undoubtedly exploded and countless methods and toolboxes are now at the disposal of \gls{XAI} researchers, ML practitioners and data scientists alike. Despite my shared enthusiasm for this productive development, until recently, the topic of \gls{XAI} evaluation was grossly understudied — and caused confusion about which explanation methods work and under what conditions. In this tutorial, we will take an in-depth look at some of the most recent developments in \gls{XAI} evaluation and review the solutions that the community has put forward to circumvent the fundamental problem of \gls{XAI} — the lack of ground-truth explanations. In addition to this, we will discuss The Challenge of Unverfiability — why evaluation is so difficult to get right (and what we can do about it). At the end of the tutorial, a brief yet hands-on introduction to Quantus will be given, which is an open-source library intended for \gls{XAI} researchers to evaluate local neural network explanations.
-% \end{comment}
-% \gls{DL} depends on several hidden layers that can have millions of billions of neurons. These neural nets are therefore often regarded as a ``black box'' because it is difficult to get an overview of how they make their predictions. Understanding how a model works may be important, especially if the model is going to be used in critical settings such as medicine or any kind of hazard detection. 
-% 
-% \gls{XAI} aims to resolve these issues. \gls{XAI} not only increases our trust in how \gls{AI} models work, they can unravel biases and generate new insights. If you for example want an \gls{AI} to separate dogs and wolves, it might be that the \gls{AI} is learning to recognize the background setting, which for wolves will more often be outside in the woods. It might also be that a model picks up artifacts in photos not seen or known to humans that are nevertheless relevant. 
-% 
-% A technique for \textit{explainability} is to occlude parts of inputs. If the model is still able to accurately predict the classification, that means that the relevant features are still in the photo. You can repeat this process to retain only the features that the model depends on. A technique for \textit{comprehension} is mapping model outputs to a three-dimensional or two-dimensional space (covered in TODO CREF later) to visualize how a model maps different features. If two (theoretically) similar inputs don't end up close to each other, this could then be an \gls{XAI} relevant insight.
-% 
-% Methods like data occlusion is \textit{model agnostic}: even if you modify or change the model the method would still operate in the same way. There is another family of techniques that are \textit{model aware}. One such method is saliency mapping~\cite{simonyan2014deep}, a gradient-based method. Somewhat similar to data occlusion, input to a machine learning model is modified. This time, however, the output from the model is tracked to determine its gradient with each change. By tracking what regions impact the gradients the most, the most relevant regions are established. The downside with model-aware methods is that their dependency of the model, and if the model is unstable, the explanations may be unstable, too.
-% 
-% But, how robust are the metioned explanations?~\cite{geometryToBlame} finds that it is possible to modify input images in a way that is (barely) unoticable to humans but nevertheless dramatically modifies the output explanations. One such pertubation is shown in~\Cref{fig:arbitrary}.
-% 
-% Since explanations can be erroneous and frail, a tool to measure the quality of explanations seems called for. I discuss this more in detail in~\Cref{sec:quantifiable}.
-% 
-% \begin{figure}
-%   \includegraphics[scale=.4]{./manipulated_explanation_ai.png}
-%   \caption{Left side: original image with its explanation. Right side is a seemingly similar image, but it is modified in such a a way that the explanation output is completely different. The figure is taken from~\cite{geometryToBlame}}
-% \label{fig:arbitrary}
-% \end{figure}
-% 
-% 
-% % can write about local vs global methods, or just include that
-% 
-% \section{Data representativity and low-resource in Deep Learning}\label{sec:representative}
-% \begin{comment}
-% This tutorial first introduces data representativity in artificial intelligence and machine learning, in particular how to measure data representativity and construct datasets that are fair and unbiased in contrast to datasets that work best on average. Secondly, we look at semi-supervised learning and transfer learning for low-resource applications, including a variational autoencoder for speech. The two parts consider robustness towards distribution shifts from a data and a modelling perspective.
-% \end{comment}
-% \gls{DL} depends on many iterations with data to improve its accuracy. If there are biases in the training data, this will also affect the inference results. We are therefore quite keen on getting \textit{representative samples} for our model training. But the term representative is ambigious and that in this ambiguity there are many research projects that fallaciously claim that their model is general. As a sidenote, it is also important to remember that we sometimes do not want our model to only work well in general cases. A medical scanner should work just as well for a representative user as any other user. E.g. most hearth disease occurs in elderly, but scanners should work well on children, too, unless you build another machine for non-specific usecases.
-% 
-% According to~\cite{krusk1,krusk2} there are 6 notions that are used to claim representativity.
-% The first is \textbf{assertive claims}, which state that they have general or all-covering data without explaining why. One might say that since ImageNet~\cite{imageNet} has many photos, it is general, but this has been found to not be the case~\cite{biasedImagenet}.
-% Second, there is \textbf{``the miniature''}, wherein sub-populations might be over- or undersampled. These miniature models may suffer from a poor choice of stratifying attributes, either from misconceptions or subjective biases of the sampling author.
-% Third, there is \textbf{absence or presence of selective forces}. A survey will never measure non-responsders for example (``selection force'') and a random sample may not be representative if e.g. the sampling phase is chosen poorly (``absence of selective forces'').
-% Forth, there is the \textbf{Typical/Ideal} sample, wherein samples used are supposedly averages of their subgroup. One example is choosing cluster centers from Gaussian Mixture Models.
-% Fifth, there is \textbf{Coverage Claims}. In a ``Noah's Ark-esque'' fashion, subgroups of data are sampled in equal numbers so as to avoid the potential of other biases. There are pitfalls here too, however, such as not covering the entire data span. To do full coverage, it is often common to see both random and non-random sampling used together: selecting groups deliberately, but samples from that group randomly.
-% Sixth, there is a the deferral of defining representativity, giving instead a \textbf{reference to sampling methods}. The notion is carried by the idea that all datasets will \textit{always} be only a minitature model and subject to bias, so rather than claiming a \textit{definitive} data representativity, you leave it to the reader. 
-% 
-% \Cref{datarepresentativity} additionally defines two other notions particlarly relevant for \gls{AI}. The seventh notion is \textbf{the copycat}, where synthetic data is used to claim representativeness. Finally, the last notion is the simplest one: you do not talk about representativity at all. 
-% 
-% Assertive and ``no-notion''-claims are to be avoided in science. The rest may, however, be viable based on the context.
-% 
-% Talk about semi-supervised tranfser? ugh
-% 
-% \section{High Performance Computing for Deep Learning}\label{sec:hpc}
-% The \gls{NRIS} (formerly ``the Metacenter'') is a collaboration of multiple organisations in Norway to share experience and offer services and resources for research. One of these services are Sigma2, which offers a \gls{HPC} environment. The computers are stored both at NTNU and UiT.
-% 
-% \gls{HPC} are comprised of a large number of storage and processing units, allowing programmers to solve problems that are too big for consumer-level computers. Unlike another option, cloud environments, \gls{HPC} store all their resources in the same location and usually have shared file drives. This makes it fast to launch distributed workloads. There are two paradigm shifts according to~\cite{sigma2GPU} that you need to overcome when using \gls{HPC}; 1) working with \gls{CLI} and 2) working with multiple computers. Additionaly, \gls{HPC} clusters are often in high demand, resulting in the need of job schedulers. 
-% 
-% In \gls{DL}, an immediate advantage of \gls{HPC} is the higher number of \gls{GPU} available, potentially removing the need for batch-processing. However, working with multiple \gls{GPU} introduces some challenges: how and when do we communicate between nodes? There's two primary modes: synchronous and asynchronous. Synchronous processing is often faster~\cite{distributedDL}, but may be bottlenecked by slower or interrupted machines. Furthermore, synchronization points may be costly (slow), leaving nodes idling. Asynchronous processing mitigates these problems, but have other costs. Many asynchronous frameworks will e.g. have smaller workloads per kernel, giving extra overhead to load balancers that have to distribute remaining work~\cite{pan2017synchronous}.
-% 
-% 
-% \section{Representation learning and learning with few data}\label{sec:cheese}
-% \begin{comment}
-% Deep Neural Networks are data hungry, they require millions of labelled data in order to work! --- Really? --- The last decade has shown useful approaches to work with less labelled data, either by having a lot of data from a similar domain or by letting the network learn meaningful representations without explicit supervision. On Monday, you learned already about self-supervised learning. This tutorial first brings it in to general perspective of learning with few data, covering typical transfer learning  and auto-encoder approaches or perceptual loss. Furthermore, the tutorial will investigate some typical (mis-) conceptions of these methods and suggests some practical tips on how to learn with few data. By participating in this tutorial, you will get deep insights in representation learning and learning with few data, as well as practical tools to start working on data in your own domain.
-% \end{comment}
-% 
-% Labelling data takes time and is tedious for annotators. We can try to use \textit{transfer learning}, other's labels, to improve our own results. But this approach has been shown to only help for low-level features, thus still leaving a need for labelling of your own datasets. This even in transfer learning from big datasets such as ImageNet~\cite{imageNet}. Models trained on this network has e.g. been shown to be biased for textures rather than shapes. Furthermore, the images mostly take on natural scenes and may therefore perform poorly on domain-specific tasks such as histopathology.
-% 
-% Another ideal is \textit{representation learning}, where the model is able to generalize features from training. One way to do so is the use of autoencoders. These neural networks are made to reconstruct input data after they have been compressed or distorted. This way, they should in theory be good at understanding the features of their data. However, it is crucial that data is not biased or noisy, otherwise the learned features may be incorrect.
-% 
-% \begin{figure}
-%   \includegraphics[scale=.5]{simCLR.png}
-%   \caption{Figure taken from~\cite{simCLR}. Each number corresponds to a linear evaluation of the SimCLR model using different augmentations. In the diagonal (except in average column) each transformation is only done once. For other entries, there are two augmentations done together. Higher numbers represent more accurate results. Thus the combination of crop and color distortions stands out from the rest as most benefitial augmentations \textit{for ImageNet}}
-% \label{fig:simCLR}
-% \end{figure}
-% 
-% % TODO: Also cite SSL section for "pulling"
-% One way to make \gls{SSL} work is to use distorted inputs together with the original data, e.g. in image processing this could be by rotating or cropping the image, or occluding parts of the image. It should still be possible (at least for humans) to understand what the core feature/object of the image is, otherwise the model wouldn't learn any features. SimCLR~\cite{simCLR} has a nice table (reproduced in \Cref{fig:simCLR}) to show which alterations/augmentations work better or worse than others for their algorithm on ImageNet.
-% 
-% % TODO: can probably merge two below
-% \label{sec:contrastiveLearning}
-% \textit{Contrastive learning} is a technique where you make a prediction both \textit{positive} and \textit{negative} versions on an input. The loss function will in effect try to shift the weights to assimilate the positive pair while pulling away the negative pairs inputs. One example of a loss function is using cosine similarity scores, where the output from each model is represented as a vector. The cosine similarity captures the angle between the vectors, and can thus be used as an indication of similarity. 
-% 
-% The image alterations are based on \textit{human priors}, meaning they work well for features that humans depend on like sizes, shapes or separating foreground and background. Thus they work well on natural images. Though, for some domains such as medicine, they prove less efficient. E.g. in histopathology where there are many small details in each section of an image that are all important to make a classification. ~\cite{dataPriors} suggests to instead use \textit{data prior} for Histopathological images. One such example is using different levels of zoom as an image alteration. By zooming out, you \textit{include} more data as input. The technique works nevertheless since you want the model to focus on an area of interest (such as a tumour) regardless of its surroundings.
-% 
-% \section{Summary}\label{sec:summary}
-% Several talks that have mentioned or used new \gls{NLP} services, such as \href{ChatGPT}{https://openai.com/blog/chatgpt/} and \href{https://you.com/}{https://you.com/}. This might be an indication that \gls{NLP} has been a field with significant improvement over the last years. For \gls{DL} techniques, \gls{SSL} is mentioned in several talks (during the conference days) and seems to be popular together with constrastive learning. ImageNet is also a frequently mentioned keyword, showing the importance of big, publicly available data in general, but especially in image processing.
-% 
-% A common theme is that there are many pitfalls and unresolved problems in \gls{DL}. Several talks mentioned problems with lack of transferability and the generality of a model. \gls{SSL} (\Cref{sec:ssl,sec:cheese}) is dependent on its \textit{priors}. ~\Cref{sec:representative} discusses how difficult it is to find representative sample in general, and especially for training an \gls{AI}. \Cref{sec:xai} also brings up the need to ``sanity check existing sanity checks''.
-% 
-% % Finally, it might be important to reflect on topics that are notsome things that are \textit{not} mentioned during a \gls{DL} school are 
-% 
-% Finally\dots{}
-% 
-% \newpage
-% 
-% \section{Practical Project - Introduction}
-% \begin{comment}
-% The report should include both a short summary of the material covered (approx. 4 pages) and a description of the solution to a practical component.
-% 
-% For the practical component, you are asked to find a project that is related to one of the topics covered in the tutorials. This could for instance be self-supervised learning, where you try one of the self-supervised learning techniques on the data that you are working on in your PhD and analyse the results and or hyperparameters. Or you could take a method and evaluate its effect in new scenarios, for instance when faced with highly imbalanced data.
-% \end{comment}
-% \begin{comment}
-% I wish to evaluate~\cite{sslUMAP} and quantify the quality of \textit{the explanation} using metrics inspired by Quantus~\cite{hedstrom2023quantus}. This means 1) finding relevant qualitative metrics for the given batch effect plots and 2) testing how the metrics change with model, batch and image adjustments. In particular, I am curious how well the metrics show batch/clustering effects for few (1-3) slides. This can be a useful indication early during a training process.
-% \end{comment}
-% 
-% \gls{LSCC} is a type of cancer with high recurrence rate and likelyhood of metastasis. There aren't many publicly available datasets with annotations available. One popular data source is \gls{TCGA}, which has image, clinical and genomic data available. We will be looking at H\&E-stained biopsy slides, called \gls{WSI}.
-% 
-% \cite{sslUMAP} uses \gls{SSL} to provide prognostic information of \gls{LSCC}. They observe from other studies such as \cite{contrastiveShortcut} that constrative learning tends to learn non-generalized features by using ``shortcuts''. One such shortcut might be to learn the background color of a an image to make a prediction rather than the features of each object. This can be prevalent in processing \gls{WSI} that are used in histopathology. One reason is the inputs for the constrastive loss function do not find \textit{negative pairs} from within the same slide. Thus, the features learnt are not feature-specific, but rather overfitted to each slide. They defend this claim by showing a single \gls{UMAP} plot, reproduced here in ~\Cref{fig:umap}.
-% 
-% % TODO: should I say I use SSL?
-% Inspired by the talk by Anna Hedstr\"{o}m, I want to quantify the quality of the explanation mentioned in~\cite{sslUMAP}. \cite{miller} points out that explanations are always \textit{contextual}, i.e. that its quality will always depend on the what the reader wants to know and what the explanation agent has knowledge of. In my particular context, I am curious if the explanation could be useful at an early stage to indicate whether or not a model is overfitting or not. This is because I am currently writing a tool to help pathologists annotate datasets. In this case, there might be several annotations made in just for a few slidesIn this context, I want to provide continous feedback to the annotator to guide them. This can both decrease the time they need to annotate datasets and increase their trust in the model.
-% 
-% There are several possible pitfalls with a 2D\gls{UMAP} map: you could adjust the sizes of the dots for each point to create an illusory feeling of more even distribution. Secondly, the figure uses the \textit{assertive claim} that ``the tiles from each slide are less clustered together''. However, the figure only shows output from 8 slides which may have been chosen in a non-representative fashion, and since \gls{UMAP} may be non-deterministic, the differences we see could be random, and without any metric axis on the plots, the ``less clustered''-effect could be illusory.
-% 
-% Summarized: I've done the following work:
-% \begin{itemize}
-%   \item Reproduced (to an extent) the code from~\cite{sslUMAP}
-%   \item Taken output from the \gls{MOCO} model into a 2D \gls{UMAP} plot and quantified the quality of the explanations
-% \end{itemize}
-% \Cref{sec:background} discusses the work and idea of~\Cref{sslUMAP}. \Cref{sec:methodology} discusses my work and how I've configued my pipeline. \Cref{sec:results} shows my output from my model and my explanation metrics. Finally, I discuss these results in \Cref{sec:discussion}.
-% 
-% \subsection{Background}\label{sec:background}
-% \dots{}summary of the paper, chatGPT maybe.
-% 
-% % TODO:  Check out the presentation with WSI and:
-% % However, the contrastive loss, InfoNCE (van den Oord et al., 2018) is not tailored to
-% % the special properties of WSIs. Robinson et al. (2021) show that contrastive loss tends to
-% % learn “shortcuts” within the similar and dissimilar samples, which inadvertently suppress
-% % important predictive features. I
-% 
-% % TODO: moco doesn't have the g(x, .. in its bottom part of the fraction? is this C-InfoNCE?
-% 
-% $$ \mathcal{L}(x, x^{+}, x^{-}) = -\log{\frac{\exp(g(x,x^{+}))}{\exp(g(x,x^{+})) + \sum\limits_{x^{-}}{\exp(g(x,x^{-}}))}}$$
-% 
-% that these images are too large to fit into a single \gls{GPU} and thus they are cropped into tiles.  
-% 
-% Popular \gls{SSL} algorithms such as \gls{MOCO} and SimCLR~\cite{simCLR} have a loss function named \gls{InfoNCE}. This is an instance discrimination function that uses combinations of positive pairs, an image $x$ and its augmentation $x^{+}$, and minimizes the difference between these while maximizing the difference between the image and other tiles $x^{-}$. However, the images $x^{-}$ are sampled from the same batch that the image $x$ is in. The problem that can arise is that there may not be formed negative pairs between tiles from the same slide. Thus the model learns to discriminate on features that may be slide-specific rather than feature-specific for the tumour. This is referred to by~\cite{sslUMAP} as \textit{slide-level batch effects}.
-% 
-% \cite{sslUMAP} notes, citing~\cite{contrastiveShortcut} that you can tweak the loss function by choosing samples using a given condition. However, this can be difficult to do without introducing bias or \textit{feature suppression}, that optimizing for one feature comes at the cost of another. For experimental evaluation, they compare their own model with a batch sampler that selects opposing tiles $x^{-}$ from the same slide. They find that their own solution performs slightly better, with a \textit{C-index}\footnote{concordance index: ratio of predicted risk and actual recurrence time} of $0.646 \pm 0.055$ versus $0.631 \pm 0.052$. Random sampling gets a C-index of $0.0601 \pm 0.069$.
-% 
-% \subsection{Background}
-% Each \gls{WSI} is large, up to several gigapixels in size. Because of this, each image is usually cropped up into tiles. Unfortunetaly, annotations for each tile is not common, so instead you rely on slide-level annotations. Usually, tile-level predictions are thus pooled together for each slide after processing to get a form of aggregate prediction which is used later. \cite{unsupervisedClustering} shows an alternative in their DeepCluster algorithm. They first use \textit{k-means} to assigns clusters for each data feature they extract from unsupervised learning methods. Each cluster represents a feature. They then use these features to update their models (convnet). 
-% 
-% \cite{sslUMAP} which we base our self off uses a similar technique as \textit{k-means} except \gls{GMM} is used instead of k-means. \gls{GMM} has a probabilistic rather than ``hard'' assignment of points to clusters, and doesn't rely on spherical shapes for their cluster assignments. Each tile embedding is assigned to a cluster and in the end a mean of probabilities from each tile embedding belonging to which clusters is calculated. The output is a vector $v \in \mathbb{R}^{k}$, where k are the numbers of clusters. 
-% %TODO this is fucky, see code? 
-% In addition to giving labels for prediction, the clustering algorithm helps with interpretability since you can see how different tiles activate different clusters.
-% 
-% Results from the \gls{SSL} are calculated based on a survival-analysis model. The vector $v_{j}$ (sum of probabilities of tiles from cluster from slide?) is compared with the slide-level ground truth $y_{j}$ of whether or not the tumour seen in the slide caused recurrence. If there is recurrence, they also use the number of days from observation until a follow-up oberservation $t_{j}$. If there was not recurrence, then length of followup-time is used? % TODO: WTF
-% 
-% 
-% In training they use public TCGA and CPTAC datasets of H\&E-stained biopsy slides. They observe from previous work that other training algorithms cluster together tiles from the same slides, creating a batch effect where the algorithm learns features that are more slide specific than feature specific. This indicates that the network might do poorly on generalized input. They visualize this using 2D \gls{UMAP}, shown in~\cref{fig:umap}.
-% 
-% 
-% \section{Methodology}\label{sec:methodology}
-% \subsection{Pipeline}
-% I first pre-process slides into tiles, then train, then extract, then create plots. UMAP parameters and such.
-% 
-% \subsection{Recreating Work}
-% The first thing I did when re-creating the work was to get the code from their listed website \href{https://github.com/NYUMedML/conditional_ssl_hist}. The code repository has listed commands for re-creating their work. However, I ran into several following difficulties outlined in this section.
-% 
-% \subsubsection{Datasets}
-% On their website they listed their sources for finding the images, but the listed sources did not have the annotations. For \gls{TCGA}-LUSC I tried both the official website~\cite{tcgaAnnotation} and the publicly listed ``\gls{TCGA}-Clinical Data Resource (CDR) Outcome'' from~\cite{pancan}. Neither dataset was compatible with the code as is, mismatching both on filename and certain columns. By combining different files from the former resource, I was, however, able to get the data that I was after. However, of the more than 500 patients that were in the image dataset, only 170 of those had a defined value in column \textit{new\_tumor\_event\_dx\_indicator}. 
-% The code listed by~\cite{sslUMAP} only chooses these for training. So, either their annotation dataset was different than mine, or this is a recently (post-writing) introduced bug, or they might have gotten their own results on a much smaller dataset than what they claimed. As explained in~\Cref{subsubsec:code}, there is a high chance of this being a recently introduced bug.
-% % TODO: try to get a number on how many patients were supposed to have annotations so I don't look like an ass
-% % TODO: CPTAC, maybe I could find annotations there now that I am old and wise?
-% 
-% Since my primary interest was not recreating their work, I chose to use only \gls{TCGA}
-% 
-% The authors offer a pretrained network. This network is an InceptionV4 model that can be used an encoder in \gls{MOCO}. However, they do not specify explicitly what the model is trained on nor what hyperparameters they used - assumably it would be the data used in their paper. It does however fit the description in their Appendix A.2: ``To only analyze the cancerous parts of WSIs, all the tiles in the tumor slides without any tumor cells were excluded based on a separate Inception-v4 trained with full supervision to distinguish tumor and normal
-% cells (AUC at 98\%)''. For the model they cite~\cite{coudray2018classification}. That paper, however, claims to use Inception-v3, which is without the \textit{residual connections} of its successor.
-% 
-% \subsubsection{Code}\label{subsubsec:code}
-% Much of the code did not work out the box. The kind of errors I ran into were missing imports, file and directory names that were mangled (trying to access files in a directory and subsequently looking for the same files in a different directory) and other errors such as API mismatch when trying to load \textit{pickled}\footnote{serialized Python objects, written to file for later use, see \href{https://docs.python.org/3/library/pickle.html}{https://docs.python.org/3/library/pickle.html}} files directly into Pytorch. Missing imports might stem from having written code in an environment with hidden files, the file mangling might be because they had duplicate files scattered in their directories and the API errors might arise from using different versions of third-party tools. Another possibility is that the code that is published is not tested or used after it has been modified at some point. 
-% 
-% There is no code to reproduce their plots and graphs. There is also no metioning in the code or the paper of what hyperparameters were used for \gls{UMAP}. 
-% 
-% 
-% % TODO: Maybe I am able to use their pretrained weights on my input, thus not limiting myself by having less data?
-% 
-% \subsubsection{Structure}\label{subsubsec:misconception}
-% they used different test/train splits.. meh
-% 
-% \subsection{MoCo}\label{subsec:moco}
-% \gls{MOCO}\cite{moco} is a contrastive learner (also discussed in~\Cref{sec:contrastiveLearning}. It uses two underlying models, one \textit{key encoder} which converts an input image to latent space and a \textit{query encoder} which translates negative or opposite pairings to latent space. A core feature of \gls{MOCO} is that it manages to keep a long \textit{dictionary}, which in layman's terms means it can have many comparison images for its loss functions. In~\cite{sslUMAP} InceptionV4\cite{inceptionV4} is used for both encoders. This model has shown good peformance on ImageNet, but other papers on \gls{LSCC} have also used it, e.g.~\cite{otherInception}.
-% 
-% I follow suite of the original paper (and~\cite{moco}) and use 128 embedding dimensions, number of keys from negative pairs $K$ as 65536, temperature as 0.07 and encoder momentum as 0.999. For batch size, however, I ran into several issues. Setting batch size = 1 occupied around 27 GB of main memory on my computer, with 32 GB total. When writing the model to disk, it occupied a few additional GB - grinding my computer down to a halt. I tried another machine with 128 GB available, but then the \gls{GPU} ran out of memory. This led me to reduce the floating point precision from XX to XX % TODO
-% 
-% \gls{MOCO} 
-% 
-% \dots{} how weight are updated (momentum update), ask chatgpt?
-% \dots{} how they shuffle their data?! 
-% 
-% \gls{MOCO}
-% 
-% \subsection{InceptionV4}
-% \dots{}
-% 
-% \subsection{Quantifyable explanations}\label{sec:quantifiable}
-% \subsubsection{Quantus}
-% 
-% Quantus~\cite{hedstrom2023quantus} defines metrics for 6 different dimensions of quantifying explanations:
-% \begin{enumerate}
-%   \item Faithfulness: to what extent does the explanation follow the model? e.g.: do two similar explanations have similar inputs?
-%   \item Robustness: If you modify the input slighly, does the explanation remain the same?
-%   \item Localisation: Does the explanation consider the entire input, or are there just core regions of interest that matters?
-%   \item Complexity: can an explanation rely on only a few features, or is the entire input necessay?
-%   \item Randomisation: If you modify the model hyperparameters, is the explanation accuracy impacted
-%   \item Axiomatic: do explanations have axiomatic properties such as \textit{completeness}, \textit{non-sensitivity} and \textit{input invariance}?
-% \end{enumerate}
-% 
-% 
-% 
-% \begin{figure}
-%   \includegraphics[scale=.17]{./umap.png}
-%   \caption{Figure taken entirely from~\cite{sslUMAP}. Both pictures show a 2D \gls{UMAP} projection of tile representations. On the left a training algorithm with randomly sampled tiles from slides, showing that features learned in the same slide cluster together. Using a different sampling algorithm, the picture on the right shows a more even distribution w.r.t slides}
-%   \label{fig:umap}
-% \end{figure}
-% 
-% \subsection{UMAP}
-%  The algorithm is founded on three assumptions about the data
-%  \begin{enumerate}
-%    \item The data is uniformly distributed on Riemannian manifold;
-%    \item The Riemannian metric is locally constant (or can be approximated as such);
-%    \item The manifold is locally connected.
-%  \end{enumerate}
-% 
-% lack of ground truth in the data; I cannot say that two neighbors should be similar, since a model may model two samples differently even if the samples themselves are similar.
-% 
-% A good scoring method can indicate for each slide whether there is overlap with others; this slides is probably overfitted
-% A good scoring method can also average, though.
-% Have to keep in mind that two photos can be disparate, e.g. 1 photo can have tumours, the other can be healthy, e.g.
-% 
-% \subsection{Results}\label{sec:results}
-% \begin{figure}\label{fig:loss}
-% \begin{tikzpicture}
-%   \begin{axis}[
-%       xlabel = epoch,
-%       ylabel = loss,
-%     ]
-%     \addplot [mark=none] table [x=epoch, y=loss, col sep=comma] {./loss_v2.csv};
-%   \end{axis}
-% \end{tikzpicture}
-% \caption{Loss from training model}
-% %TODO: train with 300 epochs???
-% \end{figure}
-% 
-% 
-% % TODO: fuck, they should all use the same slides. Maybe even just stick to 8?
-% \umapPlot{fig:umapDefaultGood}{umapProjDefault}{9}
-% \umapPlot{fig:umapOnly3Good}{only3Good}{9}
-% \umapPlot{fig:umap2augDefaultGood}{2augDefaultsGood}{9}
-% \umapPlot{fig:biasedUmap}{heavilyBiasedUmap}{4}
-% \umapPlot{fig:conditionFalse}{conditionFalse}{9}
-% 
-% \subsection{SSL model}
-% % only 3 photos as input?!
-% % FIXME: no, I forgot to update the gmm cluster. Re-run
-% % 
-% % Do you/they run all the points in the reducer and then select 8 slides, or do they only use points from the 8 slides as training?
+\section{Introduction} \label{sec:intro}
+This is a report from the 2023 Northern Lights Deep Learning (NLDL) conference. The first four pages contains a summary from each of the topics covered Monday 9th of January and Friday 13th January. I have primarily used the presentations as a source, but supplemented a little with papers I have found online. Citations to these sources are given. 
+I have omitted some content from all the presentations to adhere to the length requirements. A detailed programme can be found on the website: \href{https://www.nldl.org/winter-school}{https://www.nldl.org/winter-school}. 
+% To make the first four pages I have followed each of the presentation slides and supplemented with extra information found in other sources, which of course are cited.
+% if need be, summarize my findings here
+
+\section{Deep Reinforcement Learning}\label{sec:drl}
+\begin{comment}
+  \gls{RL} has emerged as a powerful technique in modern machine learning, allowing a system to learn through trial and error. We will introduce some fundamental principles upon which this family of methods is based. In the first part, we give a summary of classical reinforcement learning and thus provide the essentials for understanding Deep Reinforcement Learning (DRL). In the second part, we shift the focus onto DRL and look at how deep learning enhances classical reinforcement learning, leading to powerful new algorithms. These algorithms include DQN playing Atari games at a superhuman level, PPO solving robot locomotion problems, and Alpha Zero learning to play GO, Chess, and Shogi. In the limited time of such a mini-tutorial, we can of course only sketch the main characteristics, but we intend to motivate to look deeper into this fascinating family of methods.
+\end{comment}
+\gls{RL} is a branch of AI. One or more agents interact with a given environment and teach themselves 
+behaviours that maximize a goal-function. Often this relies a great number of iterations; e.g. AlphaGo Zero played 4.9 million rounds of Go with itself before being released~\cite{goWithoutHumans}. This got news coverage all over the world as Go had long been considered to be a game too complicated for computers.
+
+\gls{RL} agents operates in discrete time. At each timestep $t$ the agent observes its environment. Each observation $O_{t}$ modifies the agent state $s_{t}$, a processed representation to the history of events. Based on $s_{t}$ the agent chooses it's action $A_{t}$. The choice is made by choosing the action thought to maximize the reward $R_{t}$ of the agent in the future (next state). The expected return from the eyes of an agent is measured by it's goal function $G_{t}$, being the sum $G_{t} = \sum_{k=t+1}^{\inf{}}{R_{k}}$.
+A problem with this goal function is that the agent can get stuck. E.g. in a dead end of a labyrinth; refusing to take a step back to find another path to the goal. A discount factor, noted $\gamma{}$, ensures that rewards less valuable over time, typically modelled as $G_{t} = \sum_{k=t+1}^{\inf{}}\gamma^{k}{R_{k}}$ (which can also be expressed a recursive $R_{t+1} + \gamma{G_{t+1}}$). Hence, if you stick in a dead end for too long, it doesn't pay off, and any other path that penultimately gets to another reward faster is better. The use of discount factors in reward functions is referred to as \textit{\gls{TD} learning}.
+
+But how is the reward chosen? Each state is given a \textit{value function}. This is the expected value from being in a state $s$: $V_{\pi} = \mathbb{E}_{\pi} [ G_{t} | s = s_{t}]$. $\pi$ is here defined as the policy for what action to choose. Usually we cannot know exactly what the outcome of an action is, therefore we model actions by stochastic policies $\pi{}(a | s)$ which gives likelyhood of future actions. An example is a robot taking a step forward, but sliding on a banana peel and consequently falling. This lesson means that re-visiting the same state later in the future should not yield the same action, even if the policy is the same. The same does not apply to e.g. chess, where we can set a deterministic policy since we know exact outcomes from actions (moving pieces). 
+Analogous to the value function is the action value: $q_{\pi{}} = \mathbb{E} [ G_{t} \vert{} S_{t} = s \cap A_{t} = a]$. This function (as given here) is strict to the policy $\pi$, i.e., in order to predict the future value of actions, you have to stay with the same $\pi$. The \textit{q} is often referred to as \textit{quality}. 
+
+
+% To resolve which future state that is desirable, the Bellman equation~\cite{bellman} is often used.
+% It sums over all possible state successor states $s'$ and evaluates their estimated values given policy $\pi{}$ and probabilistic expection $p(s', r \vert{} s, a)$. It's full formal notation is given in~\Cref{eq:bellman}:
+% \begin{equation}\label{eq:bellman}
+%   V_{\pi}(s) = \sum_{a}{\pi(a\vert{}s})\sum_{s'}\sum_{r}{p(s', r \vert{} s, a) * [r + \gamma * v_{\pi{}}(s')]}
+% \end{equation}
+
+Keeping a mapping between states and their expected values can be exhaustive for computer memory. Finding the right policy can also be difficult. If we think of neural network for what they are, \textit{function approximators}, it seems intuitive to use them for approximating the value function and/or action policy. This helps us resolve the problem of finite available space in action-value mappings. Hence, the field of \textbf{\gls{DRL}} emerges. There are several examples already of popular tools/models built with \gls{DRL}, such as AlphaTensor~\cite{alphaTensor} for matrix multiplication, DeepNash~\cite{stratego} for the game of Stratego, etc. 
+
+The neural nets in \gls{DRL} (a.k.a \gls{DQN}) lacks ground truth, but rather rely on rewards for optimization. The problem is that these rewards may come at delayed moments or at the influence of unknown variables. This is essentially noise in the learning loop. Therefore, there are several techniques used in conjuction with the neural nets to improve their accuracy. One such trick is experience replay: steps are recorded with $(s_{t}, a_{t}, s_{t+1}, r_{t})$ in a replay buffer. Now, whenever we perform an action, we can learn not only from the change in environment, but we may use extra samples from past events.
+
+% Talk more about policy gradients?
+
+So far in this summary the \gls{RL} approaches have been \textit{model-free}: to learn of the world, actions are performed and evaluated. The alternative is \textit{model-based} \gls{RL}, wherein the agent can plan ahead by making predictions about how actions affect the world: $p(s_{t+1} \vert{} s_{t}, a_{t})$. The advantage of model-based \gls{RL} is primarily it's sample efficiency since we can prune away more actions during the learning phase. This is the case of Alpha Zero~\cite{alphaZero}. There have, however, been other strides in e.g. MuZero~\cite{muZero}, which can also train its own model to be used by \gls{RL} to predict future actions.
+
+% The bellman equation is commonly used to asses a state value.
+
+% This is often a greedy process where short-term benefits are prioritized over long-term benefits, similar to laws of finance, future gains are discounted. 
+
+
+% \gls{RL} is sequential, i.e. future actions depend on previous ones. Unlike 
+
+
+% TODO: Ai gyms?
+
+\section{Self Supervised Learning}\label{sec:ssl}
+\begin{comment}
+Humans learn much under supervision but even more without. Such will apply to machines. Self-supervised learning is paving the way by leveraging unlabeled data which is vastly available. In this emerging learning paradigm, deep representation models are trained by supervised learning with supervisory signals (i.e., training targets) derived automatically from unlabeled data itself. It is abundantly clear that such a learnt representation can be useful for a broad spectrum of downstream tasks with the need of significantly less supervised data.
+
+As in supervised learning, key considerations in devising self-supervised learning methods include training targets and loss functions. The difference is that training targets for self-supervised learning are not pre-defined and greatly dependent on the choice of pretext tasks. This leads to a variety of novel training targets and their corresponding loss functions. This tutorial aims to provide an overview of training targets and loss functions developed in the domains of speech, vision and text. Further, we will discuss some open questions, e.g., transferability, and under-explored problems, e.g., learning across modalities. For example, the pretext tasks, and thus the training targets, can be drastically distant from the downstream tasks. This raises the questions like how transferrable the learnt representations are, how to choose training targets and how to explore representations. We will also discuss the link between semi-supervised and self-supervised learning.
+\end{comment}
+There are now four different training paradigms in machine learning. 1) is supervised learning, in which an annotator labels data to be used by a machine learning model. 2) is semi-supervised, which can combine unlabeled data and labelled data together. 3) is then unsupervised learning and then 4) self-supervised, in which the model is able to make labels on its own. Approach 1 and 2 both depend on annotations which may be costly (and tedious) to aquire and approach 3 is fast but has limited learning capacity. \gls{SSL} is intending to resolve the headaches from the former 3. The labels have to be introduced \textit{at some point}, but \gls{SSL} can be used as a \textit{pretext} task. \gls{SSL} has made big advancements in \gls{NLP}, for example in the most recent ChatGPT (made by OpenAI~\cite{openAI}) (albeit its underlying model based on GPT-3 also uses other techniques~\cite{gpt3}).
+
+For speech and text, one technique to make \gls{SSL} efficient is \gls{APC}~\cite{chung2020generative}. This technique relies on encoding context in the form of past elements into a latent space (a model's interpretation) in order to predict future elements. This prediction is made using a softmax-layer which effectively calculates the probability of future tokens (referred to as frames). The loss function of the model also uses the probability of past and future frames as an optimizer. The difficulty of this approach is having enough computer memory to store all the past tokens. To aid this it is helpful to use \textit{transformers}, which have attention-based learning and may compress some of past frames. This could e.g. be elimiting noise in audio sounds.
+
+Since \gls{SSL} only defines \textit{pretext} tasks, it does mean that results from \gls{SSL} may not be transferrable to other domains or objects. For example, data2vec (CITE), another \gls{SSL} technique for \gls{NLP}, relies on having contextualized training targets to learn the embedding of words and documents. I.e. by calculating a \gls{tf-idf} from carefully selected documents it is able to calculate a good word embedding to be used in later analysis. For non-related domains the \gls{tf-idf} would be off, however. 
+% TODO: compare program's description of talks vs what I have written
+
+
+
+\section{Unverfiability in eXplainable AI Evaluation}\label{sec:xai}
+\begin{comment}
+  In recent years, the interest in \gls{XAI} techniques has undoubtedly exploded and countless methods and toolboxes are now at the disposal of \gls{XAI} researchers, ML practitioners and data scientists alike. Despite my shared enthusiasm for this productive development, until recently, the topic of \gls{XAI} evaluation was grossly understudied — and caused confusion about which explanation methods work and under what conditions. In this tutorial, we will take an in-depth look at some of the most recent developments in \gls{XAI} evaluation and review the solutions that the community has put forward to circumvent the fundamental problem of \gls{XAI} — the lack of ground-truth explanations. In addition to this, we will discuss The Challenge of Unverfiability — why evaluation is so difficult to get right (and what we can do about it). At the end of the tutorial, a brief yet hands-on introduction to Quantus will be given, which is an open-source library intended for \gls{XAI} researchers to evaluate local neural network explanations.
+\end{comment}
+\gls{DL} depends on several hidden layers that can have millions of billions of neurons. These neural nets are therefore often regarded as a ``black box'' because it is difficult to get an overview of how they make their predictions. Understanding how a model works may be important, especially if the model is going to be used in critical settings such as medicine or any kind of hazard detection. 
+
+\gls{XAI} aims to resolve these issues. \gls{XAI} not only increases our trust in how \gls{AI} models work, they can unravel biases and generate new insights. If you for example want an \gls{AI} to separate dogs and wolves, it might be that the \gls{AI} is learning to recognize the background setting, which for wolves will more often be outside in the woods. It might also be that a model picks up artifacts in photos not seen or known to humans that are nevertheless relevant. 
+
+A technique for \textit{explainability} is to occlude parts of inputs. If the model is still able to accurately predict the classification, that means that the relevant features are still in the photo. You can repeat this process to retain only the features that the model depends on. A technique for \textit{comprehension} is mapping model outputs to a three-dimensional or two-dimensional space (covered in TODO CREF later) to visualize how a model maps different features. If two (theoretically) similar inputs don't end up close to each other, this could then be an \gls{XAI} relevant insight.
+
+Methods like data occlusion is \textit{model agnostic}: even if you modify or change the model the method would still operate in the same way. There is another family of techniques that are \textit{model aware}. One such method is saliency mapping~\cite{simonyan2014deep}, a gradient-based method. Somewhat similar to data occlusion, input to a machine learning model is modified. This time, however, the output from the model is tracked to determine its gradient with each change. By tracking what regions impact the gradients the most, the most relevant regions are established. The downside with model-aware methods is that their dependency of the model, and if the model is unstable, the explanations may be unstable, too.
+
+But, how robust are the metioned explanations?~\cite{geometryToBlame} finds that it is possible to modify input images in a way that is (barely) unoticable to humans but nevertheless dramatically modifies the output explanations. One such pertubation is shown in~\Cref{fig:arbitrary}.
+
+Since explanations can be erroneous and frail, a tool to measure the quality of explanations seems called for. I discuss this more in detail in~\Cref{sec:quantifiable}.
+
+\begin{figure}
+  \includegraphics[scale=.4]{./manipulated_explanation_ai.png}
+  \caption{Left side: original image with its explanation. Right side is a seemingly similar image, but it is modified in such a a way that the explanation output is completely different. The figure is taken from~\cite{geometryToBlame}}
+\label{fig:arbitrary}
+\end{figure}
+
+
+% can write about local vs global methods, or just include that
+
+\section{Data representativity and low-resource in Deep Learning}\label{sec:representative}
+\begin{comment}
+This tutorial first introduces data representativity in artificial intelligence and machine learning, in particular how to measure data representativity and construct datasets that are fair and unbiased in contrast to datasets that work best on average. Secondly, we look at semi-supervised learning and transfer learning for low-resource applications, including a variational autoencoder for speech. The two parts consider robustness towards distribution shifts from a data and a modelling perspective.
+\end{comment}
+\gls{DL} depends on many iterations with data to improve its accuracy. If there are biases in the training data, this will also affect the inference results. We are therefore quite keen on getting \textit{representative samples} for our model training. But the term representative is ambigious and that in this ambiguity there are many research projects that fallaciously claim that their model is general. As a sidenote, it is also important to remember that we sometimes do not want our model to only work well in general cases. A medical scanner should work just as well for a representative user as any other user. E.g. most hearth disease occurs in elderly, but scanners should work well on children, too, unless you build another machine for non-specific usecases.
+
+According to~\cite{krusk1,krusk2} there are 6 notions that are used to claim representativity.
+The first is \textbf{assertive claims}, which state that they have general or all-covering data without explaining why. One might say that since ImageNet~\cite{imageNet} has many photos, it is general, but this has been found to not be the case~\cite{biasedImagenet}.
+Second, there is \textbf{``the miniature''}, wherein sub-populations might be over- or undersampled. These miniature models may suffer from a poor choice of stratifying attributes, either from misconceptions or subjective biases of the sampling author.
+Third, there is \textbf{absence or presence of selective forces}. A survey will never measure non-responsders for example (``selection force'') and a random sample may not be representative if e.g. the sampling phase is chosen poorly (``absence of selective forces'').
+Forth, there is the \textbf{Typical/Ideal} sample, wherein samples used are supposedly averages of their subgroup. One example is choosing cluster centers from Gaussian Mixture Models.
+Fifth, there is \textbf{Coverage Claims}. In a ``Noah's Ark-esque'' fashion, subgroups of data are sampled in equal numbers so as to avoid the potential of other biases. There are pitfalls here too, however, such as not covering the entire data span. To do full coverage, it is often common to see both random and non-random sampling used together: selecting groups deliberately, but samples from that group randomly.
+Sixth, there is a the deferral of defining representativity, giving instead a \textbf{reference to sampling methods}. The notion is carried by the idea that all datasets will \textit{always} be only a minitature model and subject to bias, so rather than claiming a \textit{definitive} data representativity, you leave it to the reader. 
+
+\Cref{datarepresentativity} additionally defines two other notions particlarly relevant for \gls{AI}. The seventh notion is \textbf{the copycat}, where synthetic data is used to claim representativeness. Finally, the last notion is the simplest one: you do not talk about representativity at all. 
+
+Assertive and ``no-notion''-claims are to be avoided in science. The rest may, however, be viable based on the context.
+
+Talk about semi-supervised tranfser? ugh
+
+\section{High Performance Computing for Deep Learning}\label{sec:hpc}
+The \gls{NRIS} (formerly ``the Metacenter'') is a collaboration of multiple organisations in Norway to share experience and offer services and resources for research. One of these services are Sigma2, which offers a \gls{HPC} environment. The computers are stored both at NTNU and UiT.
+
+\gls{HPC} are comprised of a large number of storage and processing units, allowing programmers to solve problems that are too big for consumer-level computers. Unlike another option, cloud environments, \gls{HPC} store all their resources in the same location and usually have shared file drives. This makes it fast to launch distributed workloads. There are two paradigm shifts according to~\cite{sigma2GPU} that you need to overcome when using \gls{HPC}; 1) working with \gls{CLI} and 2) working with multiple computers. Additionaly, \gls{HPC} clusters are often in high demand, resulting in the need of job schedulers. 
+
+In \gls{DL}, an immediate advantage of \gls{HPC} is the higher number of \gls{GPU} available, potentially removing the need for batch-processing. However, working with multiple \gls{GPU} introduces some challenges: how and when do we communicate between nodes? There's two primary modes: synchronous and asynchronous. Synchronous processing is often faster~\cite{distributedDL}, but may be bottlenecked by slower or interrupted machines. Furthermore, synchronization points may be costly (slow), leaving nodes idling. Asynchronous processing mitigates these problems, but have other costs. Many asynchronous frameworks will e.g. have smaller workloads per kernel, giving extra overhead to load balancers that have to distribute remaining work~\cite{pan2017synchronous}.
+
+
+\section{Representation learning and learning with few data}\label{sec:cheese}
+\begin{comment}
+Deep Neural Networks are data hungry, they require millions of labelled data in order to work! --- Really? --- The last decade has shown useful approaches to work with less labelled data, either by having a lot of data from a similar domain or by letting the network learn meaningful representations without explicit supervision. On Monday, you learned already about self-supervised learning. This tutorial first brings it in to general perspective of learning with few data, covering typical transfer learning  and auto-encoder approaches or perceptual loss. Furthermore, the tutorial will investigate some typical (mis-) conceptions of these methods and suggests some practical tips on how to learn with few data. By participating in this tutorial, you will get deep insights in representation learning and learning with few data, as well as practical tools to start working on data in your own domain.
+\end{comment}
+
+Labelling data takes time and is tedious for annotators. We can try to use \textit{transfer learning}, other's labels, to improve our own results. But this approach has been shown to only help for low-level features, thus still leaving a need for labelling of your own datasets. This even in transfer learning from big datasets such as ImageNet~\cite{imageNet}. Models trained on this network has e.g. been shown to be biased for textures rather than shapes. Furthermore, the images mostly take on natural scenes and may therefore perform poorly on domain-specific tasks such as histopathology.
+
+Another ideal is \textit{representation learning}, where the model is able to generalize features from training. One way to do so is the use of autoencoders. These neural networks are made to reconstruct input data after they have been compressed or distorted. This way, they should in theory be good at understanding the features of their data. However, it is crucial that data is not biased or noisy, otherwise the learned features may be incorrect.
+
+\begin{figure}
+  \includegraphics[scale=.5]{simCLR.png}
+  \caption{Figure taken from~\cite{simCLR}. Each number corresponds to a linear evaluation of the SimCLR model using different augmentations. In the diagonal (except in average column) each transformation is only done once. For other entries, there are two augmentations done together. Higher numbers represent more accurate results. Thus the combination of crop and color distortions stands out from the rest as most benefitial augmentations \textit{for ImageNet}}
+\label{fig:simCLR}
+\end{figure}
+
+% TODO: Also cite SSL section for "pulling"
+One way to make \gls{SSL} work is to use distorted inputs together with the original data, e.g. in image processing this could be by rotating or cropping the image, or occluding parts of the image. It should still be possible (at least for humans) to understand what the core feature/object of the image is, otherwise the model wouldn't learn any features. SimCLR~\cite{simCLR} has a nice table (reproduced in \Cref{fig:simCLR}) to show which alterations/augmentations work better or worse than others for their algorithm on ImageNet.
+
+% TODO: can probably merge two below
+\label{sec:contrastiveLearning}
+\textit{Contrastive learning} is a technique where you make a prediction both \textit{positive} and \textit{negative} versions on an input. The loss function will in effect try to shift the weights to assimilate the positive pair while pulling away the negative pairs inputs. One example of a loss function is using cosine similarity scores, where the output from each model is represented as a vector. The cosine similarity captures the angle between the vectors, and can thus be used as an indication of similarity. 
+
+The image alterations are based on \textit{human priors}, meaning they work well for features that humans depend on like sizes, shapes or separating foreground and background. Thus they work well on natural images. Though, for some domains such as medicine, they prove less efficient. E.g. in histopathology where there are many small details in each section of an image that are all important to make a classification. ~\cite{dataPriors} suggests to instead use \textit{data prior} for Histopathological images. One such example is using different levels of zoom as an image alteration. By zooming out, you \textit{include} more data as input. The technique works nevertheless since you want the model to focus on an area of interest (such as a tumour) regardless of its surroundings.
+
+\section{Summary}\label{sec:summary}
+Several talks that have mentioned or used new \gls{NLP} services, such as \href{ChatGPT}{https://openai.com/blog/chatgpt/} and \href{https://you.com/}{https://you.com/}. This might be an indication that \gls{NLP} has been a field with significant improvement over the last years. For \gls{DL} techniques, \gls{SSL} is mentioned in several talks (during the conference days) and seems to be popular together with constrastive learning. ImageNet is also a frequently mentioned keyword, showing the importance of big, publicly available data in general, but especially in image processing.
+
+A common theme is that there are many pitfalls and unresolved problems in \gls{DL}. Several talks mentioned problems with lack of transferability and the generality of a model. \gls{SSL} (\Cref{sec:ssl,sec:cheese}) is dependent on its \textit{priors}. ~\Cref{sec:representative} discusses how difficult it is to find representative sample in general, and especially for training an \gls{AI}. \Cref{sec:xai} also brings up the need to ``sanity check existing sanity checks''.
+
+% Finally, it might be important to reflect on topics that are notsome things that are \textit{not} mentioned during a \gls{DL} school are 
+
+Finally\dots{}
+
+\newpage
+
+\section{Practical Project - Introduction}
+\begin{comment}
+The report should include both a short summary of the material covered (approx. 4 pages) and a description of the solution to a practical component.
+
+For the practical component, you are asked to find a project that is related to one of the topics covered in the tutorials. This could for instance be self-supervised learning, where you try one of the self-supervised learning techniques on the data that you are working on in your PhD and analyse the results and or hyperparameters. Or you could take a method and evaluate its effect in new scenarios, for instance when faced with highly imbalanced data.
+\end{comment}
+\begin{comment}
+I wish to evaluate~\cite{sslUMAP} and quantify the quality of \textit{the explanation} using metrics inspired by Quantus~\cite{hedstrom2023quantus}. This means 1) finding relevant qualitative metrics for the given batch effect plots and 2) testing how the metrics change with model, batch and image adjustments. In particular, I am curious how well the metrics show batch/clustering effects for few (1-3) slides. This can be a useful indication early during a training process.
+\end{comment}
+
+\gls{LSCC} is a type of cancer with high recurrence rate and likelyhood of metastasis. There aren't many publicly available datasets with annotations available. One popular data source is \gls{TCGA}, which has image, clinical and genomic data available. We will be looking at H\&E-stained biopsy slides, called \gls{WSI}.
+
+\cite{sslUMAP} uses \gls{SSL} to provide prognostic information of \gls{LSCC}. They observe from other studies such as \cite{contrastiveShortcut} that constrative learning tends to learn non-generalized features by using ``shortcuts''. One such shortcut might be to learn the background color of a an image to make a prediction rather than the features of each object. This can be prevalent in processing \gls{WSI} that are used in histopathology. One reason is the inputs for the constrastive loss function do not find \textit{negative pairs} from within the same slide. Thus, the features learnt are not feature-specific, but rather overfitted to each slide. They defend this claim by showing a single \gls{UMAP} plot, reproduced here in ~\Cref{fig:umap}.
+
+% TODO: should I say I use SSL?
+Inspired by the talk by Anna Hedstr\"{o}m, I want to quantify the quality of the explanation mentioned in~\cite{sslUMAP}. \cite{miller} points out that explanations are always \textit{contextual}, i.e. that its quality will always depend on the what the reader wants to know and what the explanation agent has knowledge of. In my particular context, I am curious if the explanation could be useful at an early stage to indicate whether or not a model is overfitting or not. This is because I am currently writing a tool to help pathologists annotate datasets. In this case, there might be several annotations made in just for a few slidesIn this context, I want to provide continous feedback to the annotator to guide them. This can both decrease the time they need to annotate datasets and increase their trust in the model.
+
+There are several possible pitfalls with a 2D\gls{UMAP} map: you could adjust the sizes of the dots for each point to create an illusory feeling of more even distribution. Secondly, the figure uses the \textit{assertive claim} that ``the tiles from each slide are less clustered together''. However, the figure only shows output from 8 slides which may have been chosen in a non-representative fashion, and since \gls{UMAP} may be non-deterministic, the differences we see could be random, and without any metric axis on the plots, the ``less clustered''-effect could be illusory.
+
+Summarized: I've done the following work:
+\begin{itemize}
+  \item Reproduced (to an extent) the code from~\cite{sslUMAP}
+  \item Taken output from the \gls{MOCO} model into a 2D \gls{UMAP} plot and quantified the quality of the explanations
+\end{itemize}
+\Cref{sec:background} discusses the work and idea of~\Cref{sslUMAP}. \Cref{sec:methodology} discusses my work and how I've configued my pipeline. \Cref{sec:results} shows my output from my model and my explanation metrics. Finally, I discuss these results in \Cref{sec:discussion}.
+
+\subsection{Background}\label{sec:background}
+\dots{}summary of the paper, chatGPT maybe.
+
+% TODO:  Check out the presentation with WSI and:
+% However, the contrastive loss, InfoNCE (van den Oord et al., 2018) is not tailored to
+% the special properties of WSIs. Robinson et al. (2021) show that contrastive loss tends to
+% learn “shortcuts” within the similar and dissimilar samples, which inadvertently suppress
+% important predictive features. I
+
+% TODO: moco doesn't have the g(x, .. in its bottom part of the fraction? is this C-InfoNCE?
+
+$$ \mathcal{L}(x, x^{+}, x^{-}) = -\log{\frac{\exp(g(x,x^{+}))}{\exp(g(x,x^{+})) + \sum\limits_{x^{-}}{\exp(g(x,x^{-}}))}}$$
+
+that these images are too large to fit into a single \gls{GPU} and thus they are cropped into tiles.  
+
+Popular \gls{SSL} algorithms such as \gls{MOCO} and SimCLR~\cite{simCLR} have a loss function named \gls{InfoNCE}. This is an instance discrimination function that uses combinations of positive pairs, an image $x$ and its augmentation $x^{+}$, and minimizes the difference between these while maximizing the difference between the image and other tiles $x^{-}$. However, the images $x^{-}$ are sampled from the same batch that the image $x$ is in. The problem that can arise is that there may not be formed negative pairs between tiles from the same slide. Thus the model learns to discriminate on features that may be slide-specific rather than feature-specific for the tumour. This is referred to by~\cite{sslUMAP} as \textit{slide-level batch effects}.
+
+\cite{sslUMAP} notes, citing~\cite{contrastiveShortcut} that you can tweak the loss function by choosing samples using a given condition. However, this can be difficult to do without introducing bias or \textit{feature suppression}, that optimizing for one feature comes at the cost of another. For experimental evaluation, they compare their own model with a batch sampler that selects opposing tiles $x^{-}$ from the same slide. They find that their own solution performs slightly better, with a \textit{C-index}\footnote{concordance index: ratio of predicted risk and actual recurrence time} of $0.646 \pm 0.055$ versus $0.631 \pm 0.052$. Random sampling gets a C-index of $0.0601 \pm 0.069$.
+
+\subsection{Background}
+Each \gls{WSI} is large, up to several gigapixels in size. Because of this, each image is usually cropped up into tiles. Unfortunetaly, annotations for each tile is not common, so instead you rely on slide-level annotations. Usually, tile-level predictions are thus pooled together for each slide after processing to get a form of aggregate prediction which is used later. \cite{unsupervisedClustering} shows an alternative in their DeepCluster algorithm. They first use \textit{k-means} to assigns clusters for each data feature they extract from unsupervised learning methods. Each cluster represents a feature. They then use these features to update their models (convnet). 
+
+\cite{sslUMAP} which we base our self off uses a similar technique as \textit{k-means} except \gls{GMM} is used instead of k-means. \gls{GMM} has a probabilistic rather than ``hard'' assignment of points to clusters, and doesn't rely on spherical shapes for their cluster assignments. Each tile embedding is assigned to a cluster and in the end a mean of probabilities from each tile embedding belonging to which clusters is calculated. The output is a vector $v \in \mathbb{R}^{k}$, where k are the numbers of clusters. 
+%TODO this is fucky, see code? 
+In addition to giving labels for prediction, the clustering algorithm helps with interpretability since you can see how different tiles activate different clusters.
+
+Results from the \gls{SSL} are calculated based on a survival-analysis model. The vector $v_{j}$ (sum of probabilities of tiles from cluster from slide?) is compared with the slide-level ground truth $y_{j}$ of whether or not the tumour seen in the slide caused recurrence. If there is recurrence, they also use the number of days from observation until a follow-up oberservation $t_{j}$. If there was not recurrence, then length of followup-time is used? % TODO: WTF
+
+
+In training they use public TCGA and CPTAC datasets of H\&E-stained biopsy slides. They observe from previous work that other training algorithms cluster together tiles from the same slides, creating a batch effect where the algorithm learns features that are more slide specific than feature specific. This indicates that the network might do poorly on generalized input. They visualize this using 2D \gls{UMAP}, shown in~\cref{fig:umap}.
+
+
+\section{Methodology}\label{sec:methodology}
+\subsection{Pipeline}
+I first pre-process slides into tiles, then train, then extract, then create plots. UMAP parameters and such.
+
+\subsection{Recreating Work}
+The first thing I did when re-creating the work was to get the code from their listed website \href{https://github.com/NYUMedML/conditional_ssl_hist}. The code repository has listed commands for re-creating their work. However, I ran into several following difficulties outlined in this section.
+
+\subsubsection{Datasets}
+On their website they listed their sources for finding the images, but the listed sources did not have the annotations. For \gls{TCGA}-LUSC I tried both the official website~\cite{tcgaAnnotation} and the publicly listed ``\gls{TCGA}-Clinical Data Resource (CDR) Outcome'' from~\cite{pancan}. Neither dataset was compatible with the code as is, mismatching both on filename and certain columns. By combining different files from the former resource, I was, however, able to get the data that I was after. However, of the more than 500 patients that were in the image dataset, only 170 of those had a defined value in column \textit{new\_tumor\_event\_dx\_indicator}. 
+The code listed by~\cite{sslUMAP} only chooses these for training. So, either their annotation dataset was different than mine, or this is a recently (post-writing) introduced bug, or they might have gotten their own results on a much smaller dataset than what they claimed. As explained in~\Cref{subsubsec:code}, there is a high chance of this being a recently introduced bug.
+% TODO: try to get a number on how many patients were supposed to have annotations so I don't look like an ass
+% TODO: CPTAC, maybe I could find annotations there now that I am old and wise?
+
+Since my primary interest was not recreating their work, I chose to use only \gls{TCGA}
+
+The authors offer a pretrained network. This network is an InceptionV4 model that can be used an encoder in \gls{MOCO}. However, they do not specify explicitly what the model is trained on nor what hyperparameters they used - assumably it would be the data used in their paper. It does however fit the description in their Appendix A.2: ``To only analyze the cancerous parts of WSIs, all the tiles in the tumor slides without any tumor cells were excluded based on a separate Inception-v4 trained with full supervision to distinguish tumor and normal
+cells (AUC at 98\%)''. For the model they cite~\cite{coudray2018classification}. That paper, however, claims to use Inception-v3, which is without the \textit{residual connections} of its successor.
+
+\subsubsection{Code}\label{subsubsec:code}
+Much of the code did not work out the box. The kind of errors I ran into were missing imports, file and directory names that were mangled (trying to access files in a directory and subsequently looking for the same files in a different directory) and other errors such as API mismatch when trying to load \textit{pickled}\footnote{serialized Python objects, written to file for later use, see \href{https://docs.python.org/3/library/pickle.html}{https://docs.python.org/3/library/pickle.html}} files directly into Pytorch. Missing imports might stem from having written code in an environment with hidden files, the file mangling might be because they had duplicate files scattered in their directories and the API errors might arise from using different versions of third-party tools. Another possibility is that the code that is published is not tested or used after it has been modified at some point. 
+
+There is no code to reproduce their plots and graphs. There is also no metioning in the code or the paper of what hyperparameters were used for \gls{UMAP}. 
+
+I use their pretrained inception for cancer detection.
+
+
+\subsubsection{Structure}\label{subsubsec:misconception}
+they used different test/train splits.. meh
+
+\subsection{MoCo}\label{subsec:moco}
+\gls{MOCO}\cite{moco} is a contrastive learner (also discussed in~\Cref{sec:contrastiveLearning}. It uses two underlying models, one \textit{key encoder} which converts an input image to latent space and a \textit{query encoder} which translates negative or opposite pairings to latent space. A core feature of \gls{MOCO} is that it manages to keep a long \textit{dictionary}, which in layman's terms means it can have many comparison images for its loss functions. In~\cite{sslUMAP} InceptionV4\cite{inceptionV4} is used for both encoders. This model has shown good peformance on ImageNet, but other papers on \gls{LSCC} have also used it, e.g.~\cite{otherInception}.
+
+I follow suite of the original paper (and~\cite{moco}) and use 128 embedding dimensions, number of keys from negative pairs $K$ as 65536, temperature as 0.07 and encoder momentum as 0.999. For batch size, however, I ran into several issues. Setting batch size = 1 occupied around 27 GB of main memory on my computer, with 32 GB total. When writing the model to disk, it occupied a few additional GB - grinding my computer down to a halt. I tried another machine with 128 GB available, but then the \gls{GPU} ran out of memory. This led me to reduce the floating point precision from XX to XX % TODO
+
+\gls{MOCO} 
+
+\dots{} how weight are updated (momentum update), ask chatgpt?
+\dots{} how they shuffle their data?! 
+
+\gls{MOCO}
+
+\subsection{InceptionV4}
+\dots{}
+
+\subsection{Quantifyable explanations}\label{sec:quantifiable}
+\subsubsection{Quantus}
+
+Quantus~\cite{hedstrom2023quantus} defines metrics for 6 different dimensions of quantifying explanations:
+\begin{enumerate}
+  \item Faithfulness: to what extent does the explanation follow the model? e.g.: do two similar explanations have similar inputs?
+  \item Robustness: If you modify the input slighly, does the explanation remain the same?
+  \item Localisation: Does the explanation consider the entire input, or are there just core regions of interest that matters?
+  \item Complexity: can an explanation rely on only a few features, or is the entire input necessay?
+  \item Randomisation: If you modify the model hyperparameters, is the explanation accuracy impacted
+  \item Axiomatic: do explanations have axiomatic properties such as \textit{completeness}, \textit{non-sensitivity} and \textit{input invariance}?
+\end{enumerate}
+
+
+
+\begin{figure}
+  \includegraphics[scale=.17]{./umap.png}
+  \caption{Figure taken entirely from~\cite{sslUMAP}. Both pictures show a 2D \gls{UMAP} projection of tile representations. On the left a training algorithm with randomly sampled tiles from slides, showing that features learned in the same slide cluster together. Using a different sampling algorithm, the picture on the right shows a more even distribution w.r.t slides}
+  \label{fig:umap}
+\end{figure}
+
+\subsection{UMAP}
+ The algorithm is founded on three assumptions about the data
+ \begin{enumerate}
+   \item The data is uniformly distributed on Riemannian manifold;
+   \item The Riemannian metric is locally constant (or can be approximated as such);
+   \item The manifold is locally connected.
+ \end{enumerate}
+
+lack of ground truth in the data; I cannot say that two neighbors should be similar, since a model may model two samples differently even if the samples themselves are similar.
+
+A good scoring method can indicate for each slide whether there is overlap with others; this slides is probably overfitted
+A good scoring method can also average, though.
+Have to keep in mind that two photos can be disparate, e.g. 1 photo can have tumours, the other can be healthy, e.g.
+
+\subsection{Results}\label{sec:results}
+\begin{figure}\label{fig:loss}
+\begin{tikzpicture}
+  \begin{axis}[
+      xlabel = epoch,
+      ylabel = loss,
+    ]
+    \addplot [mark=none] table [x=epoch, y=loss, col sep=comma] {./loss_v2.csv};
+  \end{axis}
+\end{tikzpicture}
+\caption{Loss from training model}
+%TODO: train with 300 epochs???
+\end{figure}
+
+
+\subsection{SSL model}
+Do you/they run all the points in the reducer and then select 8 slides, or do they only use points from the 8 slides as training?
 
 \begin{figure*}
   \centering
@@ -492,21 +482,11 @@ Model $\alpha$ is standard, $\beta$ is a model trained on only 3 photos, $\gamma
   \label{tab:combinedres}
 \end{table}
 
-% \begin{table}
-% \centering
-%   \begin{tabular}{l l l l l l}
-%     % model type & Standard options & Trained on only 3 photos & Only 2 Augmentations & Uncoditional-\gls{SSL} & 1-epoch \\
-%     model type & m1 & m2 & m3 & m4 & m5\\
-%     Euclidean & 1 & 2 & 3 & 2.36 & 2.12  \\
-%     Shannon & 1 & 2 & 3 & 0.07 & 1 \\
-%     Cosine & 1 & 2 & 3 & 0.02 & 0.029  \\
-%   \end{tabular}
-%   \caption{Output from different sets}
-%   \label{tab:combinedres}
-% \end{table}
-% 
-% \subsection{Discussion}\label{sec:discussion}
-% discuss.
+\subsection{Discussion}\label{sec:discussion}
+discuss.
+
+\subsection{Future work}
+Compare more biased photos, metrics using more advanced lines, e.g. 2d comparison.. or not, since they rely on having the same amount of points? What we want is to just not be biased to one..
 
 %%%%%%%%% REFERENCES
 {\small
