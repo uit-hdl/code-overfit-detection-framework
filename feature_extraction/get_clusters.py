@@ -29,22 +29,19 @@ parser.add_argument('--out_dir', default='./', type=str)
 
 args = parser.parse_args()
 
-train_features = pickle.load(open(args.data_dir + '/test_embedding.pkl', 'rb'))
+# train_features = pickle.load(open(args.data_dir + '/test_embedding.pkl', 'rb'))
 # train_features_flattened = np.concatenate(list(train_features.values()), axis=0)
 # cluster = GaussianMixture(n_components=args.n_cluster).fit(train_features_flattened)
 # pickle.dump(cluster, open(args.out_dir + '/gmm_{}.pkl'.format(args.n_cluster), 'wb'))
 
-def umap_slice(start, end):
+def umap_slice(slide_ids):
     train_features = pickle.load(open(args.data_dir + '/test_embedding.pkl', 'rb'))
-    retain_number = end-start
-    len_dict = len(train_features.keys())
-    i = -1
     keys = []
-    for x in sorted(train_features.keys()):
-        i += 1
-        if i >= start and i < end:
+    for i,x in enumerate(sorted(train_features.keys())):
+        if i in slide_ids:
             continue
-        keys.append(x)
+        else:
+            keys.append(x)
     for x in keys:
         del train_features[x]
     train_features_flattened = np.concatenate(list(train_features.values()), axis=0)
@@ -131,13 +128,14 @@ def umap_slice(start, end):
     df = pd.DataFrame(metrics_l, columns=metrics)
     df.to_csv(os.path.join(args.out_dir, 'out.csv'), sep='\t', encoding='utf-8')
     print(df)
-    import ipdb; ipdb.set_trace()
 # plt.show()
 
 train_features = pickle.load(open(args.data_dir + '/test_embedding.pkl', 'rb'))
 len_keys = len(train_features.keys())
 # for s in range(0, len_keys-8, 8):
-#     umap_slice(s, s+8)
-umap_slice(0, 3)
+for s in combinations(range(len_keys), 8):
+    umap_slice(list(s))
+    break
+# umap_slice(0, 8)
 
 
