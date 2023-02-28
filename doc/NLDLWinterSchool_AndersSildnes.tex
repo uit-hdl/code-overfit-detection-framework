@@ -84,7 +84,7 @@ Postboks 6050 Langnes\\
 {\tt\small anders.sildnes@uit.no}
 }
 \maketitle
-Computational pathology is study of disease using methods such as artificial intelligence. For building models, there are three main hindrances: 1) lack of publicly available data, 2) large image-size and high number of details d 3) lack of ground truth data due to expert disagreeance. Consequently, developers have to compromise when building a model. To know if models are accurate enough, explainable AI can help. But, are the explanations good enough that a pathologist can trust a model used to evaluate patient diagnosis and/or prognosis? 
+% Computational pathology is study of disease using methods such as artificial intelligence. For building models, there are three main hindrances: 1) lack of publicly available data, 2) large image-size and high number of details d 3) lack of ground truth data due to expert disagreeance. Consequently, developers have to compromise when building a model. To know if models are accurate enough, explainable AI can help. But, are the explanations good enough that a pathologist can trust a model used to evaluate patient diagnosis and/or prognosis? 
 
 \section{Introduction} \label{sec:intro}
 This is a report from the 2023 Northern Lights Deep Learning (NLDL) conference. The first four pages contains a summary from each of the topics covered Monday 9th of January and Friday 13th January. I have primarily used the presentations as a source, but supplemented a little with papers I have found online. Citations to these sources are given. 
@@ -155,11 +155,23 @@ Since \gls{SSL} only defines \textit{pretext} tasks, it does mean that results f
 
 A technique for \textit{explainability} is to occlude parts of inputs. If the model is still able to accurately predict the classification, that means that the relevant features are still in the photo. You can repeat this process to retain only the features that the model depends on. A technique for \textit{comprehension} is mapping model outputs to a three-dimensional or two-dimensional space (covered in TODO CREF later) to visualize how a model maps different features. If two (theoretically) similar inputs don't end up close to each other, this could then be an \gls{XAI} relevant insight.
 
+
 Methods like data occlusion is \textit{model agnostic}: even if you modify or change the model the method would still operate in the same way. There is another family of techniques that are \textit{model aware}. One such method is saliency mapping~\cite{simonyan2014deep}, a gradient-based method. Somewhat similar to data occlusion, input to a machine learning model is modified. This time, however, the output from the model is tracked to determine its gradient with each change. By tracking what regions impact the gradients the most, the most relevant regions are established. The downside with model-aware methods is that their dependency of the model, and if the model is unstable, the explanations may be unstable, too.
 
 But, how robust are the metioned explanations?~\cite{geometryToBlame} finds that it is possible to modify input images in a way that is (barely) unoticable to humans but nevertheless dramatically modifies the output explanations. One such pertubation is shown in~\Cref{fig:arbitrary}.
 
-Since explanations can be erroneous and frail, a tool to measure the quality of explanations seems called for. I discuss this more in detail in~\Cref{sec:quantifiable}.
+% Since explanations can be erroneous and frail, a tool to measure the quality of explanations seems called for. I discuss this more in detail in~\Cref{sec:quantifiable}.
+
+% Quantus~\cite{hedstrom2023quantus} defines metrics for 6 different dimensions of quantifying explanations:
+% \begin{enumerate}
+%   \item Faithfulness: to what extent does the explanation follow the model? e.g.: do two similar explanations have similar inputs?
+%   \item Robustness: If you modify the input slighly, does the explanation remain the same?
+%   \item Localisation: Does the explanation consider the entire input, or are there just core regions of interest that matters?
+%   \item Complexity: can an explanation rely on only a few features, or is the entire input necessay?
+%   \item Randomisation: If you modify the model hyperparameters, is the explanation accuracy impacted
+%   \item Axiomatic: do explanations have axiomatic properties such as \textit{completeness}, \textit{non-sensitivity} and \textit{input invariance}?
+% \end{enumerate}
+
 
 \begin{figure}
   \includegraphics[scale=.4]{./manipulated_explanation_ai.png}
@@ -253,13 +265,14 @@ There are several possible pitfalls with a 2D\gls{UMAP} map: you could adjust th
 
 Summarized: I've done the following work:
 \begin{itemize}
-  \item Reproduced (to an extent) the code from~\cite{sslUMAP}
-  \item Taken output from the \gls{MOCO} model into a 2D \gls{UMAP} plot and quantified the quality of the explanations
+  \item Reproduced (to an extent) the code from~\cite{sslUMAP}. I'll refer to this by it's citation number and as ``the original paper'' later in the text.
+  \item Taken output from the \gls{MOCO} model into a 2D \gls{UMAP} plot and quantified the quality of the explanations using 6 different metrics.
 \end{itemize}
-\Cref{sec:background} discusses the work and idea of~\Cref{sslUMAP}. \Cref{sec:methodology} discusses my work and how I've configued my pipeline. \Cref{sec:results} shows my output from my model and my explanation metrics. Finally, I discuss these results in \Cref{sec:discussion}.
+
+\Cref{sec:background} discusses the work and idea of~\cite{sslUMAP}, including used technologies. \Cref{sec:methodology} discusses my work and how I've configured my pipeline. \Cref{sec:results} shows my output from my model and my explanation metrics. Finally, I discuss these results in \Cref{sec:discussion} and future work in~\Cref{sec:futurework}.
 
 \subsection{Background}\label{sec:background}
-\dots{}summary of the paper, chatGPT maybe.
+% \dots{}summary of the paper, chatGPT maybe.
 
 % TODO:  Check out the presentation with WSI and:
 % However, the contrastive loss, InfoNCE (van den Oord et al., 2018) is not tailored to
@@ -269,101 +282,82 @@ Summarized: I've done the following work:
 
 % TODO: moco doesn't have the g(x, .. in its bottom part of the fraction? is this C-InfoNCE?
 
-$$ \mathcal{L}(x, x^{+}, x^{-}) = -\log{\frac{\exp(g(x,x^{+}))}{\exp(g(x,x^{+})) + \sum\limits_{x^{-}}{\exp(g(x,x^{-}}))}}$$
+% $$ \mathcal{L}(x, x^{+}, x^{-}) = -\log{\frac{\exp(g(x,x^{+}))}{\exp(g(x,x^{+})) + \sum\limits_{x^{-}}{\exp(g(x,x^{-}}))}}$$
 
-that these images are too large to fit into a single \gls{GPU} and thus they are cropped into tiles.  
+% that these images are too large to fit into a single \gls{GPU} and thus they are cropped into tiles.  
 
-Popular \gls{SSL} algorithms such as \gls{MOCO} and SimCLR~\cite{simCLR} have a loss function named \gls{InfoNCE}. This is an instance discrimination function that uses combinations of positive pairs, an image $x$ and its augmentation $x^{+}$, and minimizes the difference between these while maximizing the difference between the image and other tiles $x^{-}$. However, the images $x^{-}$ are sampled from the same batch that the image $x$ is in. The problem that can arise is that there may not be formed negative pairs between tiles from the same slide. Thus the model learns to discriminate on features that may be slide-specific rather than feature-specific for the tumour. This is referred to by~\cite{sslUMAP} as \textit{slide-level batch effects}.
+\subsubsection{Summary of the original paper}
+Popular \gls{SSL} algorithms such as \gls{MOCO} (\Cref{subsec:moco}) and SimCLR~\cite{simCLR} have a loss function named \gls{InfoNCE}. This is an instance discrimination function that uses combinations of positive pairs, an image $x$ and its augmentation $x^{+}$, and minimizes the difference between these while maximizing the difference between the image and other tiles $x^{-}$. However, the images $x^{-}$ are sampled from the same batch that the image $x$ is in. The problem that can arise is that there may not be formed negative pairs between tiles from the same slide. Thus the model learns to discriminate on features that may be slide-specific rather than feature-specific for the tumour. This is referred to by~\cite{sslUMAP} as \textit{slide-level batch effects}.
 
-\cite{sslUMAP} notes, citing~\cite{contrastiveShortcut} that you can tweak the loss function by choosing samples using a given condition. However, this can be difficult to do without introducing bias or \textit{feature suppression}, that optimizing for one feature comes at the cost of another. For experimental evaluation, they compare their own model with a batch sampler that selects opposing tiles $x^{-}$ from the same slide. They find that their own solution performs slightly better, with a \textit{C-index}\footnote{concordance index: ratio of predicted risk and actual recurrence time, higher is better} of $0.646 \pm 0.055$ versus $0.631 \pm 0.052$. Random sampling gets a C-index of $0.0601 \pm 0.069$. Their \textit{brier} scores\footnote{mean square error from actual recurrence and predicted probability: lower is better} for the best model are $0.200 \pm 0.051$ for 2-year prediction.
+\cite{sslUMAP} notes, citing~\cite{contrastiveShortcut} that you can tweak the loss function by choosing samples using a given condition. However, this can be difficult to do without introducing bias or \textit{feature suppression}, that optimizing for one feature comes at the cost of another. 
 
-\subsection{Background}
+% \subsection{Background}
 Each \gls{WSI} is large, up to several gigapixels in size. Because of this, each image is usually cropped up into tiles. Unfortunetaly, annotations for each tile is not common, so instead you rely on slide-level annotations. Usually, tile-level predictions are thus pooled together for each slide after processing to get a form of aggregate prediction which is used later. \cite{unsupervisedClustering} shows an alternative in their DeepCluster algorithm. They first use \textit{k-means} to assigns clusters for each data feature they extract from unsupervised learning methods. Each cluster represents a feature. They then use these features to update their models (convnet). 
 
-\cite{sslUMAP} which we base our self off uses a similar technique as \textit{k-means} except \gls{GMM} is used instead of k-means. \gls{GMM} has a probabilistic rather than ``hard'' assignment of points to clusters, and doesn't rely on spherical shapes for their cluster assignments. Each tile embedding is assigned to a cluster and in the end a mean of probabilities from each tile embedding belonging to which clusters is calculated. The output is a vector $v \in \mathbb{R}^{k}$, where k are the numbers of clusters. 
-%TODO this is fucky, see code? 
-In addition to giving labels for prediction, the clustering algorithm helps with interpretability since you can see how different tiles activate different clusters.
+% The original paper uses a similar technique as \textit{k-means}: \gls{GMM}. \gls{GMM} has a probabilistic rather than ``hard'' assignment of points to clusters, and doesn't rely on spherical shapes for their cluster assignments. Each tile embedding is assigned to a cluster and in the end a mean of probabilities from each tile embedding belonging to which clusters is calculated. The output is a vector $v \in \mathbb{R}^{k}$, where k are the numbers of clusters. 
+% %TODO this is fucky, see code? 
+% In addition to giving labels for prediction, the clustering algorithm helps with interpretability since you can see how different tiles activate different clusters.
 
 Results from the \gls{SSL} are calculated based on a survival-analysis model. The vector $v_{j}$ (sum of probabilities of tiles from cluster from slide?) is compared with the slide-level ground truth $y_{j}$ of whether or not the tumour seen in the slide caused recurrence. If there is recurrence, they also use the number of days from observation until a follow-up oberservation $t_{j}$. If there was not recurrence, then length of followup-time is used? % TODO: WTF
 
-
 In training they use public TCGA and CPTAC datasets of H\&E-stained biopsy slides. They observe from previous work that other training algorithms cluster together tiles from the same slides, creating a batch effect where the algorithm learns features that are more slide specific than feature specific. This indicates that the network might do poorly on generalized input. They visualize this using 2D \gls{UMAP}, shown in~\cref{fig:umap}.
 
-\subsection{MoCo}\label{subsec:moco}
+The paper finds that the the model with 4 different slides per loss function evaluation in batches of 128 gives a high \textit{C-index}\footnote{concordance index: ratio of predicted risk and actual recurrence time, higher is better} of $0.646 \pm 0.055$. For experimental evaluation, they compare their own model with a batch sampler that selects opposing tiles $x^{-}$ from the same slide. They find that their own solution performs slightly better: the same-slide sampler achieves C-index of $0.631 \pm 0.052$. Random sampling gets a C-index of $0.0601 \pm 0.069$. Their \textit{brier} scores\footnote{mean square error from actual recurrence and predicted probability: lower is better} for the best model are $0.200 \pm 0.051$ for 2-year prediction.
+
+\begin{figure}
+  \includegraphics[scale=.17]{./umap.png}
+  \caption{Figure taken entirely from~\cite{sslUMAP}. Both pictures show a 2D \gls{UMAP} projection of tile representations. On the left a training algorithm with randomly sampled tiles from slides, showing that features learned in the same slide cluster together. Using a different sampling algorithm, the picture on the right shows a more even distribution w.r.t slides, according to the authors}
+  \label{fig:umap}
+\end{figure}
+
+
+\subsection{\gls{SSL} model: MoCo}\label{subsec:moco}
 \gls{MOCO}\cite{moco} is a contrastive learner (also discussed in~\Cref{sec:contrastiveLearning}. It uses two underlying models, one \textit{key encoder} which converts an input image to latent space and a \textit{query encoder} which translates negative or opposite pairings to latent space. A core feature of \gls{MOCO} is that it manages to keep a long \textit{dictionary}, which in layman's terms means it can have many comparison images for its loss functions. In the comparison paper~\cite{sslUMAP}, InceptionV4\cite{inceptionV4} is used for both encoders. This model has shown good peformance on ImageNet, but other papers on \gls{LSCC} have also used it, e.g.~\cite{otherInception}.
+
+\subsubsection{UMAP}\label{subsubsec:umap}
+\gls{UMAP} is a dimensionality reduction algorithm that can be used to visualize high-dimensional data~\cite{umap}. \gls{UMAP} works by first making a graph network of all points in its input and then learns an embedding by different techniques. I'll omit the technical details, but what is relevant is that it has elements of randomness for approximation steps. You can produce deterministic results by feeding a \textit{state variable}.
 
 
 \section{Methodology}\label{sec:methodology}
 \subsection{Pipeline}
-I follow the same pipeline as the original paper. First, images are pre-processed from slides into tiles. They are also color normalized using a Vahadane method~\cite{vahadane} with a reference image of a tumour WSI stain (image can be found in their online repository). Then, a \gls{MOCO} model is trained using InceptionV4 models as encoders. A pretrained InceptionV4 model is then used to detect which tiles have cancer and which tiles does not. The \textit{query encoder} is then extracted from \gls{MOCO} and used to embed features from cancerous tiles. These features are visualized using \gls{UMAP} in~\Cref{fig:umaps}. The embeddings from the InceptionV4 model are then clustered into 50 different groups (probabilistcly) using \gls{GMM}. From these groups, a link between survival rate and recurrence is predited using a Cox hazard model~\cite{cox1972regression}. For the survival model, slide-level annotations are also used as a ground truth.
+I follow the same pipeline as the original paper. First, images are pre-processed from slides into tiles. They are also color normalized using a Vahadane method~\cite{vahadane} with a reference image of a tumour WSI stain (image can be found in their online repository). Then, a \gls{MOCO} model is trained using InceptionV4 models as encoders. A pretrained fully supervised InceptionV4 model is then used to detect which tiles have cancer and which tiles does not. The \textit{query encoder} is then extracted from \gls{MOCO} and used to embed features from the selected cancerous tiles. These features are visualized using \gls{UMAP} in~\Cref{fig:umaps}. The embeddings from the InceptionV4 model are then clustered into 50 different groups (probabilistcly) using \gls{GMM}. From these groups, a link between survival rate and recurrence is predited using a Cox hazard model~\cite{cox1972regression}. For the survival model, slide-level annotations are also used as a ground truth.
 
 \subsection{Recreating Work}
 The first thing I did when re-creating the original paper was to get the code from their listed website \href{https://github.com/NYUMedML/conditional_ssl_hist}. The code repository has listed commands for re-creating their work. However, I ran into several following difficulties outlined in this section.
 
 \subsubsection{Datasets}
-On their website they listed their sources for finding the images, but the listed sources did not have the annotations. For \gls{TCGA}-\gls{LSCC} I tried both the official website~\cite{tcgaAnnotation} and the publicly listed ``\gls{TCGA}-Clinical Data Resource (CDR) Outcome'' from~\cite{pancan}. Neither dataset was compatible with the code as is, mismatching both on filename and certain columns. By combining different files from the former resource, I was, however, able to get the data that I was after. However, of the more than 500 patients that were in the image dataset, only 170 of those had a defined value in column \textit{new\_tumor\_event\_dx\_indicator}. 
-The code listed by~\cite{sslUMAP} only chooses these for training. So, either their annotation dataset was different than mine, or this is a recently (post-writing) introduced bug, or they might have gotten their own results on a much smaller dataset than what they claimed. As explained in~\Cref{subsubsec:code}, there is a high chance of this being a recently introduced bug.
+The original paper's GitHub page lists their sources for finding the images, but not the annotations. For \gls{TCGA}-\gls{LSCC} I tried both the official website~\cite{tcgaAnnotation} and the publicly listed ``\gls{TCGA}-Clinical Data Resource (CDR) Outcome'' from~\cite{pancan}. Neither dataset was compatible with the code as is, mismatching both on filename and certain columns. By combining different files from the former resource, I was, able to get the right data columns. However, of the more than 500 patients that were in the image dataset, only 170 of those had a defined value in column \textit{new\_tumor\_event\_dx\_indicator}, necessary for recurrence prediction. 
 % TODO: try to get a number on how many patients were supposed to have annotations so I don't look like an ass
-% TODO: CPTAC, maybe I could find annotations there now that I am old and wise?
+
+The code listed by~\cite{sslUMAP} only chooses these images for training, even though the training is unsupervised. So, either their annotation dataset was different than mine, I've misinterpreted something or this is a bug pruned away their input data. Nevertheless, due to hardware capacity issues discussed in~\Cref{subsec:mymodel}, I chose to only use the 170 \gls{WSI}'s, leaving the code as-is. The CPTAC dataset had similar issues, so I chose to leave it and defer it for future work.
 
 The authors offer a pretrained network. This network is an InceptionV4 model that can be used an encoder in \gls{MOCO}. However, they do not specify explicitly what the model is trained on nor what hyperparameters they used - assumably it would be the data used in their paper. It does however fit the description in their Appendix A.2: ``To only analyze the cancerous parts of WSIs, all the tiles in the tumor slides without any tumor cells were excluded based on a separate Inception-v4 trained with full supervision to distinguish tumor and normal
-cells (AUC at 98\%)''. For the model they cite~\cite{coudray2018classification}. That paper, however, claims to use Inception-v3, which is without the \textit{residual connections} of its successor.
+cells (AUC at 98\%)''. For the model they cite~\cite{coudray2018classification}. That paper, however, claims to use Inception-v3, which is without the \textit{residual connections} of its successor. Nevertheless, the pretrained model was compatible with an InceptionV4 structure.
 
 \subsubsection{Code}\label{subsubsec:code}
-Much of the code did not work out the box. The kind of errors I ran into were missing imports, file and directory names that were mangled (trying to access files in a directory and subsequently looking for the same files in a different directory) and other errors such as API mismatch when trying to load \textit{pickled}\footnote{serialized Python objects, written to file for later use, see \href{https://docs.python.org/3/library/pickle.html}{https://docs.python.org/3/library/pickle.html}} files directly into Pytorch. Missing imports might stem from having written code in an environment with hidden files, the file mangling might be because they had duplicate files scattered in their directories and the API errors might arise from using different versions of third-party tools. Another possibility is that the code that is published is not tested or used after it has been modified at some point. 
+Much of the code did not work out the box. The kind of errors I ran into were missing imports, file and directory names that were mangled (trying to access files in a directory and subsequently looking for the same files in a different directory) and other errors such as API mismatch when trying to load \textit{pickled}\footnote{serialized Python objects, written to file for later use, see \href{https://docs.python.org/3/library/pickle.html}{https://docs.python.org/3/library/pickle.html}} files directly into Pytorch. Missing imports might stem from having written code in an environment with hidden files, the file mangling might be because they had duplicate files scattered in their directories and the API errors might arise from using different versions of third-party tools. Be that as it may, it made the process of recreating their work difficult.
 
-There is no code to reproduce their plots and graphs. There is also no metioning in the code or the paper of what hyperparameters were used for \gls{UMAP}. 
-
-For I use their pretrained inception for cancer detection.
+There is no code to reproduce their plots and graphs. There is also no metioning in the code or the paper of what hyperparameters and slides that were used for their \gls{UMAP} plots. This would have been useful to do a verification of the original paper's main claim that they reduce slide batch effects.
 
 \subsection{SSL model}\label{subsec:mymodel}
 I follow suite of the original paper (and~\cite{moco}) and use 128 embedding dimensions, number of keys from negative pairs $K$ as 65536, temperature as 0.07 and encoder momentum as 0.999. For batch size, however, I ran into several issues. Setting batch size = 1 occupied around 27 GB of main memory on my computer, which only has around 32 GB total memory. When writing the model to disk, it occupied a few additional GB - grinding my computer down to a halt. I tried another machine with 128 GB available, but then the \gls{GPU} ran out of memory (max capacity 24 GB). This led me to reduce the floating point precision from 32bit to 16bit during training. I still did not have capacity to increase the batch size, however.
 
-Since my primary interest was not recreating their \textit{results}, and I seemed to limited by my hardware capacity, code and lack of annotations, I chose to use only \gls{TCGA} as a dataset. This does limit my results by not providing more differences between samples used. I leave this as future work.
-
-% \dots{} how weight are updated (momentum update), ask chatgpt?
-% \dots{} how they shuffle their data?! 
-% 
-% \subsection{InceptionV4}
-% \dots{}
-
-\subsection{Quantifyable explanations}\label{sec:quantifiable}
-\subsubsection{Quantus}
-
-Quantus~\cite{hedstrom2023quantus} defines metrics for 6 different dimensions of quantifying explanations:
-\begin{enumerate}
-  \item Faithfulness: to what extent does the explanation follow the model? e.g.: do two similar explanations have similar inputs?
-  \item Robustness: If you modify the input slighly, does the explanation remain the same?
-  \item Localisation: Does the explanation consider the entire input, or are there just core regions of interest that matters?
-  \item Complexity: can an explanation rely on only a few features, or is the entire input necessay?
-  \item Randomisation: If you modify the model hyperparameters, is the explanation accuracy impacted
-  \item Axiomatic: do explanations have axiomatic properties such as \textit{completeness}, \textit{non-sensitivity} and \textit{input invariance}?
-\end{enumerate}
-
+\subsection{Quantifyable Metrics}\label{sec:quantifiable}
 Testing all different dimensions on \gls{UMAP} examples is arguably difficult. I tried every metric listed in SciPy's ``spatial distance module'' ~\cite{scipy} and several other inspired from section $2.9$ in~\cite{datarepresentativity} (which was partially covered in~\Cref{sec:representative}). The ones I ended up finding the most \textit{indicative} when evaluating different samples were:
 \begin{enumerate}
   \item Euclidean distance: average of metric distances between points
-  \item Shannon index\textit{shannon1948mathematical}: a \textit{diversity index} for all points 
+  \item Shannon index~\cite{shannon1948mathematical}: a \textit{diversity index} for all points 
   \item Cosine similarity: angles between points, averaged
-  \item Hausdorf: given a point in set $S$, what is the worst distance if chosen by an aversary, that you have to travel to get to a point in another set $T$?
+  \item Hausdorff: given a point in set $S$, what is the worst distance if chosen by an aversary, that you have to travel to get to a point in another set $T$?
   \item Wasserstein~\cite{vaserstein1969markov}: Also known as the ``earth mover distance'' because it can be seen as how much earth you would have to move to get one set of points $S$ onto $T$. It's considered a \textit{distributional distance}
   \item Frechet~(as per \cite{eiter1994computing}): a similarity metric of \textit{curves}.
 \end{enumerate}
 
-The euclidean distance has an intutive interpretation: if the average is small, then all points are probably clustered together. A single point out of bounds can however skewer the number. The same applies to the Hausdorf and Frechet metric, which depends only on supremum or infima. Hausdorf is nevertheless a common set distance metric, and Frechet can deal with some of Hausdorf's weak points, so I've chose to include them nevertheless. Cosine similarity is not as common, but I chose to include it because of it's ``simple-to-comprehendedness'', similar to euclidean distances. The remaining metrics, Wasserstein and Shannon indices are distribution metrics. These are mentioned in~\cite{datarepresentativity} to find representative subgroups of populations, but also have potential utility in this paper. 
+The euclidean distance has an intutive interpretation: if the average is small, then all points are probably clustered together. A single point out of bounds can however skewer the number. The same applies to the Hausdorff and Frechet metric, which depends only on supremum or infima. Hausdorff is nevertheless a common set distance metric, and Frechet can deal with some of Hausdorff's weak points, so I've chose to include them nevertheless. Cosine similarity is not as common, but I chose to include it because of it's ``simple-to-comprehendedness'', similar to euclidean distances. The remaining metrics, Wasserstein and Shannon indices are distribution metrics. These are mentioned in~\cite{datarepresentativity} to find representative subgroups of populations, but also have potential utility in this paper. 
 
 Frechet and Wasserstein are metrics that depend on having the same number of points in comparison. To compare sets of different lengths, I have used random sampling to choose points from the larger set. I also compute averages between one and one sets, not from one set to all others.
 
-\subsection{UMAP}
-\gls{UMAP} is a dimensionality reduction algorithm that can be used to visualize high-dimensional data~\cite{umap}. In our case, we take the output from a machine learning model as input and output it to 2 dimensions. \gls{UMAP} works by first making a graph network of all points in its input and then learns an embedding by different techniques. I'll omit the technical details, but what is relevant is that it has elements of randomness for approximation steps. You can produce deterministic results by feeding a \textit{state variable}. For our work, we use \textit{random\_state = 42} in the python \gls{UMAP} API, version 0.5.
-
-\subsubsection{Metrics}
-
-\begin{figure}
-  \includegraphics[scale=.17]{./umap.png}
-  \caption{Figure taken entirely from~\cite{sslUMAP}. Both pictures show a 2D \gls{UMAP} projection of tile representations. On the left a training algorithm with randomly sampled tiles from slides, showing that features learned in the same slide cluster together. Using a different sampling algorithm, the picture on the right shows a more even distribution w.r.t slides}
-  \label{fig:umap}
-\end{figure}
+\subsubsection{Hyperparameters}
 
 \begin{figure}\label{fig:loss}
 \begin{tikzpicture}
@@ -380,11 +374,13 @@ Frechet and Wasserstein are metrics that depend on having the same number of poi
 
 \Cref{fig:defaultLoss} shows the loss output from training a model using similar parameters as~\cite{sslUMAP}. It seems to stabilize after the 50 last epochs, although it is possible that an extra few hundred epochs would reduce the loss down even further. This was not done in an effort to keep models as close to the original paper as possible.
 
+For our work, we use \textit{random\_state = 42} in the python \gls{UMAP} API, version 0.5.
+
 \subsection{Results}\label{sec:results}
 
 For comparative evaluation, five different models have been trained. Model $\alpha$ is the same as the optimal model from~\cite{sslUMAP}, except that the batch size is set to 1 rather than 4 as discussed in~\Cref{subsec:mymodel}. $\beta$ is a model trained on only 3 photos, $\gamma$ is a model similar to $\alpha$ except it has only used crop and color distortions as image augmentations (similar as in the recommended section from~\cite{simCLR}), $\delta$ is a model trained using unconditional \gls{SSL}, i.e. random sampling of slides and $\epsilon$ is a model similar to $\alpha$, except it's only trained for one epoch. $\epsilon$ is only used to a biased, clustered photos for~\Cref{fig:umaps}.
 
-\gls{UMAP} plots are generated by feeding in all points from slides that are going to be used in the \gls{UMAP} figure. Another option would be to insert points from \textit{all} slides into a photo and then visually representing a subset of these (e.g. the eight that I use here). This wasn't done because of .% TODO SECTION UMAP
+% \gls{UMAP} plots are generated by feeding in all points from slides that are going to be used in the \gls{UMAP} figure. Another option would be to insert points from \textit{all} slides into a photo and then visually representing a subset of these. This wasn't done as I didn't want because of .% TODO SECTION UMAP
 
 \begin{figure*}
   \centering
@@ -450,7 +446,7 @@ For comparative evaluation, five different models have been trained. Model $\alp
     \hline 
     model type & $\alpha$ & $\beta$ & $\gamma$ & $\delta$ & $\epsilon$ \\
     \hline 
-    Hausdorf & 3.84 & 3.06 & 3.26 & 3.57 & 12.98 \\
+    Hausdorff & 3.84 & 3.06 & 3.26 & 3.57 & 12.98 \\
     Frechet & 5.39 & 5.7 & 4.67 & 4.88 & 17.84 \\
     Wasserstein & 3.37 & 3.17 & 2.77 & 2.75 & 11.74 \\
     \hline
@@ -463,7 +459,10 @@ For comparative evaluation, five different models have been trained. Model $\alp
   \label{tab:quantitativeres}
 \end{table*}
 
-It can be difficult to tell the different models apart from the figures in~\Cref{fig:umaps}. $\epsilon$ is the only one to undubitously stand out with clear clustering from each slide. The numbers from~\Cref{tab:quantitativeres} capture this in the Hausdorf, Frechet and Wasserstein distance that are all significanly higher than for any other trained model. We can see (arguably) that slide 6 is clustered to an extent in all models. The cosine similarity stands out in model $\gamma$. This \textit{can} be used as an interpretation that the dataset is less biased, however, the results section in~\Cref{tab:combinedres} does not confirm this. 
+It can be difficult to tell the different models apart from the figures in~\Cref{fig:umaps}. $\epsilon$ is the only one to undubitously stand out with clear clustering from each slide. The numbers from~\Cref{tab:quantitativeres} capture this in the Hausdorff, Frechet and Wasserstein distance that are all significanly higher for $\epsilon$ than for any other trained model. The cosine similarity stands out in model $\gamma$. This \textit{may} be used as an interpretation that the dataset is less biased, however, the results section in~\Cref{tab:combinedres} are still low for $\gamma$ compared to others. 
+
+% TODO: put in slide 6 scores?
+% We can see (arguably) that slide 6 is clustered to an extent in all models. 
 
 \begin{table}
 \centering
@@ -480,25 +479,26 @@ It can be difficult to tell the different models apart from the figures in~\Cref
   \label{tab:combinedres}
 \end{table}
 
-From~\Cref{tab:combinedres} we see that $\beta$ is the model with the highest C-index. This is highly unexpected as it only has had three images for it's input during training. It's brier-score, however, is higher than all others, providing some comfort. 
+From~\Cref{tab:combinedres} we see that $\beta$ is the model with the highest C-index. This is highly unexpected as it only has had three images for it's input during training. It's brier-score, is worse than for all others. This could indicate that a C-index is not sufficient alone for model evaluation, unless the three slides for training were somehow entirely representative.
 
-The five-year brier score are significantly higher for all four models. The biggest discrepancy is for $\beta$ that jumps from $0.23$ to $0.39$. The most \textit{stable} model in this sense is model $\alpha$ that only jumps from $0.16$ to $0.23$. While 5-year brier scores was in the code from the original paper, it was not reported.
+The five-year brier score are significantly higher than the two-year for all four models. The biggest discrepancy is for $\beta$ that jumps from $0.23$ to $0.39$. The most \textit{stable} model in this sense is model $\alpha$ that only jumps from $0.16$ to $0.23$. While 5-year brier scores was in the code from the original paper, it was not reported in the paper.
 
 \subsection{Discussion}\label{sec:discussion}
 To make the results more reliable, multiple test and validation sets could be used to provide a confidence interval. It has, however, been omitted in this paper as my overall goal with this was \textit{not} to get a high score for \gls{LSCC} training but rather an evaluation of the \gls{XAI} \gls{UMAP} explanations.
 
-Models $\alpha$, $\beta$, $\gamma$ and $\delta$ did not in my opinion provide \gls{UMAP} figures that were signifcantly different from each other. This came as a surprise as the parameters from different models were quite different in both augmentations and input size. I would expect $\beta$ to be more clustered together since it was in a sense overfitted to its limited inputs, but this does not seem to be the case by both C-index and distance scores. It could be that it's dictionary of negative pairs was large enough that it learnt generalizable features.
+Models $\alpha$, $\beta$, $\gamma$ and $\delta$ did not in my opinion provide \gls{UMAP} figures that were signifcantly different from each other. This came as a surprise as the parameters from different models were quite different in both augmentations and input size. For a more thorough analysis, especially with consideration of Quantus~\cite{hedstrom2023quantus}, I should have used more obscure hyperparameters. 
 
-The different metrics seem to provide \textit{some} confidence for \gls{UMAP}, but not signifcantly. The Hausdorf, Frechet and Wasserstein distances can all indicate whether or not a model's output is heavily clustered and distanced from other sets, as seen for model $\epsilon$. To really assess the numbers, there should have been more model experimental evaluations from my end - but I was unable to find these in time.
+I would expect $\beta$ to be more clustered together since it was in a sense overfitted to its limited inputs, but this does not seem to be the case by both C-index and distance scores. It could be that it's dictionary of negative pairs was large enough that it learnt generalizable features. 
+
+The different metrics seem to provide \textit{some} confidence for \gls{UMAP}, but not signifcantly. The Hausdorff, Frechet and Wasserstein distances can all indicate whether or not a model's output is heavily clustered and distanced from other sets, as seen for model $\epsilon$. To really assess the numbers, there should have been more model experimental evaluations from my end - but I was unable to find these in time.
 
 While the slides were randomly chosen, it would be interesting to compare them for images that had different classes such as one image being tumor-free vs another that had tumours. This should ideally show some clusters that were far apart in the \gls{UMAP} figures.
 
-\subsection{Future work}
-There are many ways to compare different different model outputs. One is to calculate numbers for more (or all) combinations of slides. This is also feasible since the time to compute metrics and \gls{UMAP} models is only a few seconds on regular desktop computer. However, the numbers are there to interpret the \textit{visual} representation. Thus, in order to confirm whether or not the averages are useful, they should be experimentally validated on multple datasets, which could detect overfitting. Another consideration is how the points are sampled. Right now I have used averages between individual sets (slides) for Hausdorf, Frechet and Wasserstein. Another sampling method could be to compare these metrics for randomly sampled point from all other sets/slides.
+\subsection{Future work}\label{sec:futurework}
+There are many ways to compare different different model outputs. One is to calculate numbers for more (or all) combinations of slides. This is also feasible since the time to compute metrics and \gls{UMAP} models is only a few seconds on regular desktop computer. However, the numbers are there to interpret the \textit{visual} representation. Thus, in order to confirm whether or not the averages are useful, they should be experimentally validated on multple datasets, which could detect overfitting. Another consideration is how the points are sampled. Right now I have used averages between individual sets (slides) for Hausdorff, Frechet and Wasserstein. Another sampling method could be to compare these metrics for randomly sampled point from all other sets/slides.
 
 \subsection{Conclusion}
-In this paper, we have experimented and evaluated model from~\cite{sslUMAP}. Some of the work was difficult to reproduce both from unexpected errors in the code and harware limitations. However, five models were trained and compared, both for results and for a \gls{UMAP} evaluation, which was both quantitatively but also visually interpreted. 
-
+In this paper, we have experimented and evaluated model from~\cite{sslUMAP}. Some of the work was difficult to reproduce both from unexpected errors in the code and harware limitations. However, five models were trained and compared, both for results and for a \gls{UMAP} evaluation, which was both quantitatively but also visually interpreted. Overall, it seems that some metrics like Hausdorff, Frechet and Wasserstein \textit{might} be good indicators of overfit, but more work is needed to evaluate it thoroughly.
 
 %%%%%%%%% REFERENCES
 {\small
