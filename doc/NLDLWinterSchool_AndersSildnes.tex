@@ -414,7 +414,6 @@ Computational pathology is study of disease using methods such as artificial int
     \centering
     \umapSubPlot{fig:umap2augDefaultGood}{2augDefaultsGood}{9}{$\gamma$}
   \end{subfigure}
-  %TODO: why is there so much space?
   \\
   \vspace{-1.0cm}
   \begin{subfigure}{.25\textwidth}
@@ -460,19 +459,21 @@ Model $\alpha$ is standard, $\beta$ is a model trained on only 3 photos, $\gamma
 
 \begin{table*}
 \centering
-  \begin{tabular}{l l l l l l}
+  \begin{tabular}{|l l l l l l|}
     % model type & Standard options & Trained on only 3 photos & Only 2 Augmentations & Uncoditional-\gls{SSL} & 1-epoch \\
+    \hline 
     model type & $\alpha$ & $\beta$ & $\gamma$ & $\delta$ & $\epsilon$ \\
-    \hline \\
-    Hausdorf & 1 & 2 & 3 & 3.57 & 12.98 \\
-    Frechet & 1 & 2 & 3 & 4.88 & 17.84 \\
-    Wasserstein & 1 & 2 & 3 & 2.75 & 11.74 \\
-    \hline \\
-    Euclidean & 1 & 2 & 3 & 2.36 & 2.12  \\
-    Shannon & 1 & 2 & 3 & 0.07 & 1 \\
-    Cosine & 1 & 2 & 3 & 0.02 & 0.029  \\
+    \hline 
+    Hausdorf & 3.84 & 3.06 & 3.26 & 3.57 & 12.98 \\
+    Frechet & 5.39 & 5.7 & 4.67 & 4.88 & 17.84 \\
+    Wasserstein & 3.37 & 3.17 & 2.77 & 2.75 & 11.74 \\
+    \hline
+    Euclidean & 2.15 & 2.51 & 2.2  & 2.36 & 2.12  \\
+    Shannon & 0.06 & 0.07 & - & 0.07 & - \\
+    Cosine & 0.025 & 0.02 & 0.45 & 0.02 & 0.029  \\
+    \hline
   \end{tabular}
-  \caption{Quantitative measures/means from the \gls{UMAP} figures in~\Cref{fig:umaps}}
+  \caption{Quantitative measures/means from the \gls{UMAP} figures in~\Cref{fig:umaps}. \textit{Shannon} would not be computed for some sets, thus left blank}
   \label{tab:quantitativeres}
 \end{table*}
 
@@ -482,9 +483,9 @@ Model $\alpha$ is standard, $\beta$ is a model trained on only 3 photos, $\gamma
     % model type & Standard options & Trained on only 3 photos & Only 2 Augmentations & Uncoditional-\gls{SSL} \\
     model type & $\alpha$ & $\beta$ & $\gamma$ & $\delta$ \\
     \hline
-    C-Index & 0.53 & 0.40 & 0.35 & 0.32 \\
-    Brier (2 yrs) & $0.16$ & $0.18$ & $0.21$ & $0.16$  \\
-    Brier (5 yrs) & $0.23$ & $0.29$ & $0.34$ & $0.25$  \\
+    C-Index & 0.53 & 0.63 & 0.35 & 0.32 \\
+    Brier (2 yrs) & $0.16$ & $0.23$ & $0.21$ & $0.16$  \\
+    Brier (5 yrs) & $0.23$ & $0.39$ & $0.34$ & $0.25$  \\
     \hline
   \end{tabular}
   \caption{Brier and C-index scores from the validation set}
