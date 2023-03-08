@@ -303,7 +303,7 @@ augmentation = [
 print('Create dataset')
 
 
-train_dataset = TCGA_CPTAC_Dataset(cptac_dir=args.data_dir + "/CPTAC/tiles/",
+train_dataset = TCGA_CPTAC_Datase(cptac_dir=args.data_dir + "/CPTAC/tiles/",
                           tcga_dir=args.data_dir + "/TCGA/tiles/",
                           split_dir=args.split_dir,
                           transform=TwoCropsTransform(transforms.Compose(augmentation)), 

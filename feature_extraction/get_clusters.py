@@ -29,10 +29,10 @@ parser.add_argument('--out_dir', default='./', type=str)
 
 args = parser.parse_args()
 
-# train_features = pickle.load(open(args.data_dir + '/test_embedding.pkl', 'rb'))
-# train_features_flattened = np.concatenate(list(train_features.values()), axis=0)
-# cluster = GaussianMixture(n_components=args.n_cluster).fit(train_features_flattened)
-# pickle.dump(cluster, open(args.out_dir + '/gmm_{}.pkl'.format(args.n_cluster), 'wb'))
+train_features = pickle.load(open(args.data_dir + '/test_embedding.pkl', 'rb'))
+train_features_flattened = np.concatenate(list(train_features.values()), axis=0)
+cluster = GaussianMixture(n_components=args.n_cluster).fit(train_features_flattened)
+pickle.dump(cluster, open(args.out_dir + '/gmm_{}.pkl'.format(args.n_cluster), 'wb'))
 
 def umap_slice(slide_ids):
     train_features = pickle.load(open(args.data_dir + '/test_embedding.pkl', 'rb'))
