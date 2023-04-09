@@ -31,8 +31,8 @@ args = parser.parse_args()
 
 train_features = pickle.load(open(args.data_dir + '/test_embedding.pkl', 'rb'))
 train_features_flattened = np.concatenate(list(train_features.values()), axis=0)
-cluster = GaussianMixture(n_components=args.n_cluster).fit(train_features_flattened)
-pickle.dump(cluster, open(args.out_dir + '/gmm_{}.pkl'.format(args.n_cluster), 'wb'))
+# cluster = GaussianMixture(n_components=args.n_cluster).fit(train_features_flattened)
+# pickle.dump(cluster, open(args.out_dir + '/gmm_{}.pkl'.format(args.n_cluster), 'wb'))
 
 def umap_slice(slide_ids):
     train_features = pickle.load(open(args.data_dir + '/test_embedding.pkl', 'rb'))
@@ -59,8 +59,8 @@ def umap_slice(slide_ids):
     ax.get_xaxis().set_visible(False)
     ax.get_yaxis().set_visible(False)
     # only one of the below, not both
-    plt.show()
-    # plt.savefig(os.path.join('.', 'umap_output.png'))
+    # plt.show()
+    plt.savefig(os.path.join('.', 'umap_output.png'))
     hausdorf_l = np.zeros((len(train_features.keys()), len(train_features.keys())))
     np.fill_diagonal(hausdorf_l, np.nan)
     frechet_l = np.zeros((len(train_features.keys()), len(train_features.keys())))
@@ -107,17 +107,14 @@ def umap_slice(slide_ids):
     hausdorf_l = np.vstack([hausdorf_l, np.nanmean(hausdorf_l, axis=1)])
     hausdorf_l = np.pad(hausdorf_l, ((0,0),(0,1)), mode='constant', constant_values=mean_hausdorf)
     hdf = pd.DataFrame(hausdorf_l, columns=labels).to_csv(os.path.join(args.out_dir, 'hausdorf.csv'))
-    print(hdf)
     mean_frechet = np.nanmean(frechet_l)
     frechet_l = np.vstack([frechet_l, np.nanmean(frechet_l, axis=1)])
     frechet_l = np.pad(frechet_l, ((0,0),(0,1)), mode='constant', constant_values=mean_frechet)
     hdf = pd.DataFrame(frechet_l, columns=labels).to_csv(os.path.join(args.out_dir, 'frechet.csv'))
-    print(hdf)
     mean_wd = np.nanmean(wasserstein_l)
     wasserstein_l = np.vstack([wasserstein_l, np.nanmean(wasserstein_l, axis=1)])
     wasserstein_l = np.pad(wasserstein_l, ((0,0),(0,1)), mode='constant', constant_values=mean_wd)
     hdf = pd.DataFrame(wasserstein_l, columns=labels).to_csv(os.path.join(args.out_dir, 'wasserstein.csv'))
-    print(hdf)
 
     metrics = ['braycurtis', 'canberra', 'chebyshev', 'cityblock', 'correlation', 'cosine', 'dice', 'euclidean', 'hamming', 'jaccard', 'jensenshannon', 'kulczynski1', 'mahalanobis', 'matching', 'minkowski', 'rogerstanimoto', 'russellrao', 'seuclidean', 'sokalmichener', 'sokalsneath', 'sqeuclidean', 'yule']
 # metrics_l = np.zeros((len(train_features.keys())), len(metrics))
@@ -125,7 +122,6 @@ def umap_slice(slide_ids):
     for ((i,points), (j,metric)) in product(enumerate(slide_sets), enumerate(metrics)):
         metrics_l[i][j] = np.mean(pdist(points, metric))
 
-    import ipdb; ipdb.set_trace();
     # TODO: extract mean
     df = pd.DataFrame(metrics_l, columns=metrics)
     df.to_csv(os.path.join(args.out_dir, 'out.csv'), sep='\t', encoding='utf-8')
@@ -135,7 +131,7 @@ def umap_slice(slide_ids):
 train_features = pickle.load(open(args.data_dir + '/test_embedding.pkl', 'rb'))
 len_keys = len(train_features.keys())
 # for s in range(0, len_keys-8, 8):
-for s in combinations(range(len_keys), 8):
+for s in combinations(range(len_keys), 3):
     umap_slice(list(s))
     break
 # umap_slice(0, 8)

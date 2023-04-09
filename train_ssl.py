@@ -6,16 +6,15 @@ import random
 import shutil
 import time
 import warnings
+from GPUtil import showUtilization as gpu_usage
 
 import torch
 import torch.nn as nn
 import torch.nn.parallel
 import torch.backends.cudnn as cudnn
-import torch.distributed as dist
 import torch.optim
 import torch.multiprocessing as mp
 import torch.utils.data
-import torch.utils.data.distributed
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 import torchvision.models as models
@@ -72,10 +71,13 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
         # if args.gpu is not None:
         #     images[0] = images[0].cuda(args.gpu, non_blocking=True)
         #     images[1] = images[1].cuda(args.gpu, non_blocking=True)
-        # compute output
-        with torch.autocast(device_type='cuda', dtype=torch.float16):
-            output, target = model(im_q=images[0].cuda(non_blocking=(args.gpu is not None)), im_k=images[1].cuda(non_blocking=(args.gpu is not None)))
-            loss = criterion(output, target)
+        # for 2 lines below:
+        # with torch.autocast(device_type='cuda', dtype=torch.float32):
+        gpu_usage()
+        import ipdb; ipdb.set_trace()
+
+        output, target = model(im_q=images[0].cuda(), im_k=images[1].cuda())
+        loss = criterion(output, target)
 
         # acc1/acc5 are (K+1)-way contrast classifier accuracy
         # measure accuracy and record loss
@@ -201,24 +203,8 @@ parser.add_argument('-p', '--print-freq', default=10, type=int,
                     metavar='N', help='print frequency (default: 10)')
 parser.add_argument('--resume', default='', type=str, metavar='PATH',
                     help='path to latest checkpoint (default: none)')
-parser.add_argument('--world-size', default=-1, type=int,
-                    help='number of nodes for distributed training')
-parser.add_argument('--rank', default=-1, type=int,
-                    help='node rank for distributed training')
-parser.add_argument('--dist-url', default='tcp://224.66.41.62:23456', type=str,
-                    help='url used to set up distributed training')
-parser.add_argument('--dist-backend', default='nccl', type=str,
-                    help='distributed backend')
 parser.add_argument('--seed', default=None, type=int,
                     help='seed for initializing training. ')
-parser.add_argument('--gpu', default=None, type=int,
-                    help='GPU id to use.')
-parser.add_argument('--multiprocessing-distributed', action='store_true',
-                    help='Use multi-processing distributed training to launch '
-                         'N processes per node, which has N GPUs. This is the '
-                         'fastest way to use PyTorch for either single node or '
-                         'multi node data parallel training')
-parser.add_argument("--local_rank", type=int, default=0)
 
 # moco specific configs:
 parser.add_argument('--moco-dim', default=128, type=int,
@@ -260,15 +246,6 @@ if args.seed is not None:
                   'You may see unexpected behavior when restarting '
                   'from checkpoints.')
 
-if args.gpu is not None:
-    warnings.warn('You have chosen a specific GPU. This will completely '
-                  'disable data parallelism.')
-
-if args.dist_url == "env://" and args.world_size == -1:
-    args.world_size = int(os.environ["WORLD_SIZE"])
-args.distributed = args.world_size > 1 or args.multiprocessing_distributed
-ngpus_per_node = torch.cuda.device_count()
-
 
 print("=> creating model '{}'".format('x64'))
 
@@ -278,11 +255,9 @@ model = condssl.builder.MoCo(
     encoder, args.moco_dim, args.moco_k, args.moco_m, args.moco_t, args.mlp, condition=args.condition)
 
 model = model.cuda()
-torch.distributed.init_process_group('nccl')
-model = torch.nn.parallel.DistributedDataParallel(model)
 
 print('Model builder Done.')
-criterion = nn.CrossEntropyLoss().cuda(args.gpu)
+criterion = nn.CrossEntropyLoss().cuda()
 optimizer = torch.optim.SGD(model.parameters(), args.lr,
                                 momentum=args.momentum,
                                 weight_decay=args.weight_decay)
@@ -312,10 +287,7 @@ train_dataset = TCGA_CPTAC_Dataset(cptac_dir=args.data_dir + "/CPTAC/tiles/",
 
 print("Dataset Created ...")
 
-if args.distributed:
-    train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
-else:
-    train_sampler = None
+train_sampler = None
 train_loader = torch.utils.data.DataLoader(
         train_dataset, batch_size=args.batch_size, shuffle=(train_sampler is None),
         num_workers=args.workers, pin_memory=True, sampler=train_sampler, drop_last=True, collate_fn=collate_fn_moco)
@@ -328,21 +300,17 @@ if args.resume:
 
 
 for epoch in range(args.start_epoch, args.epochs):
-    if args.distributed:
-        train_sampler.set_epoch(epoch)
     adjust_learning_rate(optimizer, epoch, args)
 
     # train for one epoch
     train(train_loader, model, criterion, optimizer, epoch, args)
 
-    if not args.multiprocessing_distributed or (args.multiprocessing_distributed
-            and args.rank % ngpus_per_node == 0):
-        if 0 == 0:
-        #TODO: fixup
-        # if (epoch + 1) % 25 == 0:
-            save_checkpoint({
-                'epoch': epoch + 1,
-                'arch': 'x64',
-                'state_dict': model.state_dict(),
-                'optimizer' : optimizer.state_dict(),
-            }, is_best=False, filename='{}/checkpoint_{:04d}.pth.tar'.format(args.out_dir, epoch))
+    if 0 == 0:
+    #TODO: fixup
+    # if (epoch + 1) % 25 == 0:
+        save_checkpoint({
+            'epoch': epoch + 1,
+            'arch': 'x64',
+            'state_dict': model.state_dict(),
+            'optimizer' : optimizer.state_dict(),
+        }, is_best=False, filename='{}/checkpoint_{:04d}.pth.tar'.format(args.out_dir, epoch))

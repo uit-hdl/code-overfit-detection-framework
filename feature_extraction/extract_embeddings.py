@@ -115,7 +115,8 @@ val_dataset = TCGA_CPTAC_Bag_Dataset(args.root_dir, args.split_dir, 'val')
 test_dataset = TCGA_CPTAC_Bag_Dataset(args.root_dir, args.split_dir, 'test')
 
 with torch.no_grad():
-    names = ['train', 'val', 'test']
+    # names = ['train', 'val', 'test']
+    names = ['test']
     for name, data_set in zip(names, [train_dataset, val_dataset, test_dataset]):
         print(name)
         embedding_dict, outcomes_dict = get_embeddings_bagging(feature_extractor, subtype_model, data_set)

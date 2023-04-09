@@ -1,3 +1,4 @@
+umap_out
 *.log
 .~lock.*#
 __pycache__/
