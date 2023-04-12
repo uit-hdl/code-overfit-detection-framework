@@ -287,10 +287,9 @@ train_dataset = TCGA_CPTAC_Dataset(cptac_dir=args.data_dir + "/CPTAC/tiles/",
 
 print("Dataset Created ...")
 
-train_sampler = None
 train_loader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=args.batch_size, shuffle=(train_sampler is None),
-        num_workers=args.workers, pin_memory=True, sampler=train_sampler, drop_last=True, collate_fn=collate_fn_moco)
+        train_dataset, batch_size=args.batch_size,
+        num_workers=args.workers, pin_memory=False, drop_last=True, collate_fn=collate_fn_moco)
 
 if args.resume:
     print ("Loading checkpoint. Make sure start_epoch is set correctly")
