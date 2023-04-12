@@ -62,6 +62,7 @@ class TCGA_CPTAC_Dataset(Dataset):
             image_tensor = self.transform(image)
             imgs.append(image_tensor)
             indices.append(index)
+        import ipdb; ipdb.set_trace()
         return imgs, indices
 
     def __len__(self):

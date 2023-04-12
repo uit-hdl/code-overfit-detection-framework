@@ -281,8 +281,11 @@ print('Create dataset')
 train_dataset = TCGA_CPTAC_Dataset(cptac_dir=args.data_dir + "/CPTAC/tiles/",
                           tcga_dir=args.data_dir + "/TCGA/tiles/",
                           split_dir=args.split_dir,
-                          transform=TwoCropsTransform(transforms.Compose(augmentation)), 
+                          transform=TwoCropsTransform(transforms.Compose(augmentation)),
+                          # TODO: why isn't batch_size default here?
+                          batch_size=args.batch_size,
                           batch_slide_num=args.batch_slide_num)
+train_dataset = datasets.ImageFolder(args.data_dir + "/TCGA/tiles/", TwoCropsTransform(transforms.Compose(augmentation)))
 
 
 print("Dataset Created ...")
@@ -291,7 +294,7 @@ train_loader = torch.utils.data.DataLoader(
         train_dataset, batch_size=args.batch_size,
         num_workers=args.workers, pin_memory=False, drop_last=True, collate_fn=collate_fn_moco)
 
-if args.resume:
+if args.resume
     print ("Loading checkpoint. Make sure start_epoch is set correctly")
     checkpoint = torch.load(args.resume)
     model.load_state_dict(checkpoint['state_dict'])
