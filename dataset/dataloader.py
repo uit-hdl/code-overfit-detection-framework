@@ -50,13 +50,7 @@ class TCGA_CPTAC_Dataset(Dataset):
         tile_names += selected_tiles
         for i in range(self.batch_slide_num - 1):
             slide_id = self.idx2slide[np.random.randint(len(self.idx2slide))]
-            try:
-                tile_names += [slide_id + '/' + t for t in np.random.choice(self.slide2tiles[slide_id], self.batch_size // self.batch_slide_num)]
-            except Exception as e:
-                print (slide_id, self.slide2tiles[slide_id], self.batch_size, self.batch_slide_num)
-                print (slide_id, self.slide2tiles[slide_id], self.batch_size, self.batch_slide_num)
-                print (slide_id, self.slide2tiles[slide_id], self.batch_size, self.batch_slide_num)
-                raise e
+            tile_names += [slide_id + '/' + t for t in np.random.choice(self.slide2tiles[slide_id], self.batch_size // self.batch_slide_num)]
         indices = []
         imgs = []
         for tile_name in tile_names:
