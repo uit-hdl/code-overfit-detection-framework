@@ -1,3 +1,6 @@
+import ipdb
+from torchvision.models.maxvit import WindowDepartition
+from train_util import *
 import argparse
 import builtins
 import math
@@ -43,10 +46,11 @@ class TwoCropsTransform:
 def collate_fn_moco(batch):
     q_list = []
     k_list = []
-    for imgs, indices in batch:
-        for img in imgs:
-            q_list.append(img[0].unsqueeze(0))
-            k_list.append(img[1].unsqueeze(0))
+    for imgs in batch:
+        for (img, transformed) in imgs:
+            q_list.append(img.unsqueeze(0))
+            k_list.append(transformed.unsqueeze(0))
+    import ipdb; ipdb.set_trace()
     return torch.cat(q_list, dim=0), torch.cat(k_list, dim=0)
 
 
@@ -65,16 +69,12 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
     model.train()
 
     end = time.time()
-    for i, (images) in enumerate(train_loader):
+    # for i, ((images, transformed_images)) in enumerate(train_loader):
+    for i, images in enumerate(train_loader):
         # measure data loading time
         data_time.update(time.time() - end)
-        # if args.gpu is not None:
-        #     images[0] = images[0].cuda(args.gpu, non_blocking=True)
-        #     images[1] = images[1].cuda(args.gpu, non_blocking=True)
         # for 2 lines below:
         # with torch.autocast(device_type='cuda', dtype=torch.float32):
-        gpu_usage()
-        import ipdb; ipdb.set_trace()
 
         output, target = model(im_q=images[0].cuda(), im_k=images[1].cuda())
         loss = criterion(output, target)
@@ -102,48 +102,6 @@ def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
     torch.save(state, filename)
     if is_best:
         shutil.copyfile(filename, 'model_best.pth.tar')
-
-
-class AverageMeter(object):
-    """Computes and stores the average and current value"""
-    def __init__(self, name, fmt=':f'):
-        self.name = name
-        self.fmt = fmt
-        self.reset()
-
-    def reset(self):
-        self.val = 0
-        self.avg = 0
-        self.sum = 0
-        self.count = 0
-
-    def update(self, val, n=1):
-        self.val = val
-        self.sum += val * n
-        self.count += n
-        self.avg = self.sum / self.count
-
-    def __str__(self):
-        fmtstr = '{name} {val' + self.fmt + '} ({avg' + self.fmt + '})'
-        return fmtstr.format(**self.__dict__)
-
-
-class ProgressMeter(object):
-    def __init__(self, num_batches, meters, prefix=""):
-        self.batch_fmtstr = self._get_batch_fmtstr(num_batches)
-        self.meters = meters
-        self.prefix = prefix
-
-    def display(self, batch):
-        entries = [self.prefix + self.batch_fmtstr.format(batch)]
-        entries += [str(meter) for meter in self.meters]
-        print('\t'.join(entries))
-
-    def _get_batch_fmtstr(self, num_batches):
-        num_digits = len(str(num_batches // 1))
-        fmt = '{:' + str(num_digits) + 'd}'
-        return '[' + fmt + '/' + fmt.format(num_batches) + ']'
-
 
 def adjust_learning_rate(optimizer, epoch, args):
     """Decay the learning rate based on schedule"""
@@ -278,23 +236,25 @@ augmentation = [
 print('Create dataset')
 
 
+print("Batch size: {}".format(args.batch_size))
 train_dataset = TCGA_CPTAC_Dataset(cptac_dir=args.data_dir + "/CPTAC/tiles/",
-                          tcga_dir=args.data_dir + "/TCGA/tiles/",
+                          tcga_dir=os.path.join(args.data_dir, "TCGA", "tiles"),
                           split_dir=args.split_dir,
                           transform=TwoCropsTransform(transforms.Compose(augmentation)),
                           # TODO: why isn't batch_size default here?
                           batch_size=args.batch_size,
                           batch_slide_num=args.batch_slide_num)
-train_dataset = datasets.ImageFolder(args.data_dir + "/TCGA/tiles/", TwoCropsTransform(transforms.Compose(augmentation)))
+#train_dataset = datasets.ImageFolder(args.data_dir + "/TCGA/tiles/", TwoCropsTransform(transforms.Compose(augmentation)))
 
 
 print("Dataset Created ...")
 
 train_loader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=args.batch_size,
-        num_workers=args.workers, pin_memory=False, drop_last=True, collate_fn=collate_fn_moco)
+        train_dataset, batch_size=12,
+        pin_memory=False, drop_last=True)
+        #, collate_fn=collate_fn_moco)
 
-if args.resume
+if args.resume:
     print ("Loading checkpoint. Make sure start_epoch is set correctly")
     checkpoint = torch.load(args.resume)
     model.load_state_dict(checkpoint['state_dict'])
