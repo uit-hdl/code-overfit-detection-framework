@@ -28,6 +28,7 @@ import condssl.builder
 import sys
 from network.inception_v4 import InceptionV4
 from dataset.dataloader import TCGA_CPTAC_Dataset
+from dataset.dataloader_preprocessed import PreprocessedTcgaLoader
 
 # os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:1024"
 
@@ -69,22 +70,23 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
     model.train()
 
     end = time.time()
+    start_time = time.time()
     # for i, ((images, transformed_images)) in enumerate(train_loader):
-    for i, images in enumerate(train_loader):
+    for i, (images_q, images_k) in enumerate(train_loader):
         # measure data loading time
         data_time.update(time.time() - end)
         # for 2 lines below:
         # with torch.autocast(device_type='cuda', dtype=torch.float32):
 
-        output, target = model(im_q=images[0].cuda(), im_k=images[1].cuda())
+        output, target = model(im_q=images_q.cuda(), im_k=images_k.cuda())
         loss = criterion(output, target)
 
         # acc1/acc5 are (K+1)-way contrast classifier accuracy
         # measure accuracy and record loss
         acc1, acc5 = accuracy(output, target, topk=(1, 5))
-        losses.update(loss.item(), images[0].size(0))
-        top1.update(acc1[0], images[0].size(0))
-        top5.update(acc5[0], images[0].size(0))
+        losses.update(loss.item(), images_q.size(0))
+        top1.update(acc1[0], images_q.size(0))
+        top5.update(acc5[0], images_q.size(0))
 
         # compute gradient and do SGD step
         optimizer.zero_grad()
@@ -97,6 +99,9 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
 
         if i % args.print_freq == 0:
             progress.display(i)
+            end_time = time.time()
+            print("Time elapsed: {}".format(end_time - start_time))
+            start = time.time()
 
 def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
     torch.save(state, filename)
@@ -214,7 +219,7 @@ model = condssl.builder.MoCo(
 
 model = model.cuda()
 
-print('Model builder Done.')
+print('Model builder done, placed on cuda()')
 criterion = nn.CrossEntropyLoss().cuda()
 optimizer = torch.optim.SGD(model.parameters(), args.lr,
                                 momentum=args.momentum,
@@ -237,21 +242,28 @@ print('Create dataset')
 
 
 print("Batch size: {}".format(args.batch_size))
-train_dataset = TCGA_CPTAC_Dataset(cptac_dir=args.data_dir + "/CPTAC/tiles/",
-                          tcga_dir=os.path.join(args.data_dir, "TCGA", "tiles"),
-                          split_dir=args.split_dir,
-                          transform=TwoCropsTransform(transforms.Compose(augmentation)),
-                          # TODO: why isn't batch_size default here?
-                          batch_size=args.batch_size,
-                          batch_slide_num=args.batch_slide_num)
+# train_dataset = TCGA_CPTAC_Dataset(cptac_dir=args.data_dir + "/CPTAC/tiles/",
+#                           tcga_dir=os.path.join(args.data_dir, "TCGA", "tiles"),
+#                           split_dir=args.split_dir,
+#                           transform=TwoCropsTransform(transforms.Compose(augmentation)),
+#                           # TODO: why isn't batch_size default here?
+#                           batch_size=args.batch_size,
+#                           batch_slide_num=args.batch_slide_num)
+train_dataset = PreprocessedTcgaLoader(cptac_dir=args.data_dir + "/CPTAC/tiles/",
+                                   tcga_dir=os.path.join("/Data/cropped_tcga_conditional/"),
+                                   split_dir=args.split_dir,
+                                   transform=TwoCropsTransform(transforms.Compose(augmentation)),
+                                   # TODO: why isn't batch_size default here?
+                                   batch_size=args.batch_size,
+                                   batch_slide_num=args.batch_slide_num)
 #train_dataset = datasets.ImageFolder(args.data_dir + "/TCGA/tiles/", TwoCropsTransform(transforms.Compose(augmentation)))
 
 
 print("Dataset Created ...")
 
 train_loader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=12,
-        pin_memory=False, drop_last=True)
+        train_dataset, batch_size=args.batch_size,
+        pin_memory=True, drop_last=True)
         #, collate_fn=collate_fn_moco)
 
 if args.resume:

@@ -65,19 +65,29 @@ class TCGA_CPTAC_Dataset(Dataset):
                     sampled_slides += 1
         self.batch_ordering = list(itertools.chain(*batch_ordering))
         self.tile_list = [None] * len(self.batch_ordering)
+        # for i, tile_name in enumerate(self.batch_ordering):
+        #     #image = cv2.imread(os.path.join(self.tcga_dir, tile_name))
+        #     img_arr = Image.open(os.path.join(self.tcga_dir, tile_name))
+        #     self.tile_list[i] = self.transform(img_arr)
+        #     del img_arr
+        #     if i % 1000 == 0:
+        #         print("Iterating images: {}/{}".format(i, len(self.batch_ordering)))
+        #         print('RAM Used (GB):', psutil.virtual_memory()[3] / 1000000000)
+
         for i, tile_name in enumerate(self.batch_ordering):
             #image = cv2.imread(os.path.join(self.tcga_dir, tile_name))
             img_arr = Image.open(os.path.join(self.tcga_dir, tile_name))
-            self.tile_list[i] = self.transform(img_arr)
-            del img_arr
+            self.tile_list[i] = img_arr
             if i % 1000 == 0:
                 print("Iterating images: {}/{}".format(i, len(self.batch_ordering)))
                 print('RAM Used (GB):', psutil.virtual_memory()[3] / 1000000000)
 
-        self.batch_ordering = [self.transform(Image.fromarray(cv2.imread(os.path.join(self.tcga_dir, tile_name)))) for tile_name in self.batch_ordering]
-
     def __getitem__(self, index):
-        return self.batch_ordering[index]
+        image = self.tile_list[index]
+        return self.transform(image)
+        #
+        #return self.batch_ordering[index]
+        #
         # tile_name = self.batch_ordering[index]
         # if "TCGA" in tile_name:
         #     image = cv2.imread(os.path.join(self.tcga_dir, tile_name))
