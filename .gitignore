@@ -1,5 +1,6 @@
 output_from_training.txt
 raw_data_preprocessed
+doc_for_figure
 umap_out
 *.log
 .~lock.*#
