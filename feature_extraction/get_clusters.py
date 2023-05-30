@@ -1,5 +1,6 @@
 #!/usr/bin/env -S python -m IPython
 
+import os
 from itertools import accumulate, combinations, product
 from scipy.optimize import linear_sum_assignment
 from scipy.spatial.distance import directed_hausdorff, pdist, cdist
@@ -31,36 +32,28 @@ args = parser.parse_args()
 
 train_features = pickle.load(open(args.data_dir + '/test_embedding.pkl', 'rb'))
 train_features_flattened = np.concatenate(list(train_features.values()), axis=0)
-# cluster = GaussianMixture(n_components=args.n_cluster).fit(train_features_flattened)
+#cluster = GaussianMixture(n_components=args.n_cluster).fit(train_features_flattened)
 # pickle.dump(cluster, open(args.out_dir + '/gmm_{}.pkl'.format(args.n_cluster), 'wb'))
 
-def umap_slice(slide_ids):
-    train_features = pickle.load(open(args.data_dir + '/test_embedding.pkl', 'rb'))
-    keys = []
-    for i,x in enumerate(sorted(train_features.keys())):
-        if i in slide_ids:
-            continue
-        else:
-            keys.append(x)
-    for x in keys:
-        del train_features[x]
-    train_features_flattened = np.concatenate(list(train_features.values()), axis=0)
-    umap_projection = reducer.fit_transform(train_features_flattened)
-    slices = list(accumulate([0] + [len(y) for y in train_features.values()], operator.add))
+def umap_slice(features):
+    features_flattened = np.concatenate(list(features.values()), axis=0)
+    umap_projection = reducer.fit_transform(features_flattened)
+    slices = list(accumulate([0] + [len(y) for y in features.values()], operator.add))
     fig, ax = plt.subplots()
-    slide_sets = [[]] * len(train_features.keys())
+    slide_sets = [[]] * len(features.keys())
+    keys = list(features.keys())
 # [i]nterval_[s]tart, [e]nd
     for slide_number,(i_s,i_e) in enumerate(zip(slices, slices[1:])):
-        ax.scatter(umap_projection[i_s:i_e, 0], umap_projection[i_s:i_e, 1], label = f"Slide {slide_number+1}", alpha=.5)
+        ax.scatter(umap_projection[i_s:i_e, 0], umap_projection[i_s:i_e, 1], label = f"Slide {keys[slide_number]}", alpha=.5)
         slide_sets[slide_number] = umap_projection[i_s:i_e]
-    for i,ss in enumerate(slide_sets):
-        savetxt(os.path.join(args.out_dir, 'slide%d.csv' % (i+1)), ss, delimiter=',')
+    for i, ss in enumerate(slide_sets):
+        savetxt(os.path.join(args.out_dir, '{}.csv'.format(keys[i])), ss, delimiter=',')
     ax.legend()
     ax.get_xaxis().set_visible(False)
     ax.get_yaxis().set_visible(False)
     # only one of the below, not both
-    # plt.show()
-    plt.savefig(os.path.join('.', 'umap_output.png'))
+    plt.show()
+    #plt.savefig(os.path.join('.', 'umap_output.png'))
     hausdorf_l = np.zeros((len(train_features.keys()), len(train_features.keys())))
     np.fill_diagonal(hausdorf_l, np.nan)
     frechet_l = np.zeros((len(train_features.keys()), len(train_features.keys())))
@@ -129,11 +122,16 @@ def umap_slice(slide_ids):
 # plt.show()
 
 train_features = pickle.load(open(args.data_dir + '/test_embedding.pkl', 'rb'))
-len_keys = len(train_features.keys())
-# for s in range(0, len_keys-8, 8):
-for s in combinations(range(len_keys), 3):
-    umap_slice(list(s))
-    break
+keys_sorted = list(sorted(train_features.keys()))
+print ("There are {} images in the dataset".format(len(keys_sorted)))
+# for s in combinations(keys_sorted, 3):
+#     train_features = pickle.load(open(args.data_dir + '/test_embedding.pkl', 'rb'))
+#     y = list(s)
+#     # get a subset of train_features from the keys in s
+#     subset_features = {k : train_features[k] for k in y}
+#     umap_slice(subset_features)
+#     break
 # umap_slice(0, 8)
+#umap_slice(train_features)
 
 

@@ -29,7 +29,7 @@ def get_embeddings_bagging(feature_extractor, subtype_model, data_set):
     data_loader = torch.utils.data.DataLoader(data_set, batch_size=256, shuffle=False, num_workers=torch.cuda.device_count())
     with torch.no_grad():
         count = 1
-        for batch in tqdm(data_loader, position=0, leave=True):
+        for batch in tqdm(data_loader, position=0, leave=True, desc="processing batch"):
             count += 1
             # bag idx is same as slide_id. 0 is first slide, 1 is second, etc
             img_batch, _, bag_idx = batch
@@ -48,18 +48,20 @@ def get_embeddings_bagging(feature_extractor, subtype_model, data_set):
             bag_idx = bag_idx[tumor_idx]
             # For each image in current batch that has tumors
             for i in range(len(bag_idx)):
+                slide_index = bag_idx[i].item()
                 # Append all tensor values from tile (feat[i]) into embedding_dict which is indexed by slide
-                embedding_dict[bag_idx[i].item()].append(feat[i][np.newaxis,:])
-                slide_id = data_set.idx2slide[bag_idx[i].item()]
+                slide_id = data_set.idx2slide[slide_index]
                 if "TCGA" in slide_id:
                     case_id = '-'.join(slide_id.split('-', 3)[:3])
                 else:
                     case_id = slide_id.rsplit('-', 1)[0]
-                # Yes, this line will execute redundantly
-                outcomes_dict[bag_idx[i].item()] = annotations[case_id]
-        for k in embedding_dict:
+                outcomes_dict[slide_index] = annotations[case_id]
+                embedding_dict[slide_id].append(feat[i][np.newaxis, :])
+        # The next for loop is more about making tensors into numpy arrays. We prune away the first dimension which doesn't need to exist
+        # it is not merging all tiles from slides
+        for slide_id in embedding_dict:
             # flatten the array: np.concatenate(np.array([[1,2],[3,4]]), axis=0) = array([1, 2, 3, 4])
-            embedding_dict[k] = np.concatenate(embedding_dict[k], axis=0)
+            embedding_dict[slide_id] = np.concatenate(embedding_dict[slide_id], axis=0)
     # Embedding dict now has all tensors for each tiles with tumour, grouped by slide
     # Outcomes_dict has annotation info for all slides with tumorous tile, e.g.
     # ... {0: {'recurrence': 0, 'slide_id': ['TCGA-   ...
@@ -69,7 +71,7 @@ def load_pretrained(net, model_dir):
 
     # original
     checkpoint = torch.load(model_dir)
-    model_state_dict = {k.replace("module.encoder_q.", ""): v for k, v in checkpoint['state_dict'].items() if
+    model_state_dict = {k.replace("encoder_q.", ""): v for k, v in checkpoint['state_dict'].items() if
                         "encoder_q" in k}
     net.load_state_dict(model_state_dict)
     net.last_linear = nn.Identity() # the linear layer removes our dependency/link to the key encoder
@@ -115,9 +117,8 @@ val_dataset = TCGA_CPTAC_Bag_Dataset(args.root_dir, args.split_dir, 'val')
 test_dataset = TCGA_CPTAC_Bag_Dataset(args.root_dir, args.split_dir, 'test')
 
 with torch.no_grad():
-    # names = ['train', 'val', 'test']
-    names = ['test']
-    for name, data_set in zip(names, [train_dataset, val_dataset, test_dataset]):
+    folds = list(zip(['train', 'val', 'test'], [train_dataset, val_dataset, test_dataset]))
+    for name, data_set in folds[2:]:
         print(name)
         embedding_dict, outcomes_dict = get_embeddings_bagging(feature_extractor, subtype_model, data_set)
         pickle.dump(embedding_dict, open("{}/{}_embedding.pkl".format(args.out_dir, name), 'wb'), protocol=4)
