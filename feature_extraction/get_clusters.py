@@ -126,12 +126,12 @@ keys_sorted = list(sorted(train_features.keys()))
 print ("There are {} images in the dataset".format(len(keys_sorted)))
 # for s in combinations(keys_sorted, 3):
 #     train_features = pickle.load(open(args.data_dir + '/test_embedding.pkl', 'rb'))
-#     y = list(s)
+#     y = {k : train_features[k] for k in s}
 #     # get a subset of train_features from the keys in s
 #     subset_features = {k : train_features[k] for k in y}
 #     umap_slice(subset_features)
-#     break
-# umap_slice(0, 8)
-#umap_slice(train_features)
-
-
+umap_slice({'TCGA-43-8115-01A-01-BS1': train_features['TCGA-43-8115-01A-01-BS1'],
+            'TCGA-34-8456-01A-01-BS1': train_features['TCGA-34-8456-01A-01-BS1'],
+            'TCGA-68-A59J-01A-02-TSB': train_features['TCGA-68-A59J-01A-02-TSB'],
+            })
+# umap_slice(train_features)
