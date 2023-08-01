@@ -13,7 +13,7 @@ import numpy as np
 import itertools
 
 class PreprocessedTcgaLoader(Dataset):
-    def __init__(self, cptac_dir, tcga_dir, split_dir, transform=None, mode='train', batch_slide_num=4, batch_size=128):
+    def __init__(self, cptac_dir, tcga_dir, transform=None, mode='train', batch_slide_num=4, batch_size=128):
         self.cptac_dir = cptac_dir
         self.tcga_dir = tcga_dir
 

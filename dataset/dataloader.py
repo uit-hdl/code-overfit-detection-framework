@@ -1,15 +1,14 @@
-import os
+import itertools
 import math
+import os
+
+import cv2
+import numpy as np
 import psutil
-import pickle
-import ipdb
-import torch
 from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import transforms
-import cv2
-import numpy as np
-import itertools
+
 
 class TCGA_CPTAC_Dataset(Dataset):
     def __init__(self, cptac_dir, tcga_dir, split_dir, transform=None, mode='train', batch_slide_num=4, batch_size=128):
@@ -125,7 +124,7 @@ class TCGA_CPTAC_Dataset(Dataset):
 
 
 class TCGA_CPTAC_Bag_Dataset(Dataset):
-    def __init__(self, data_dir, split_dir, mode='train'):
+    def __init__(self, data_dir, mode='train'):
         self.data_dir = data_dir
         # slide_list = pickle.load(open(os.path.join(split_dir, 'case_split_2yr.pkl'), 'rb'))[mode + '_id']
         # slide_list = [

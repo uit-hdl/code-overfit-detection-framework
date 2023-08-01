@@ -1,26 +1,32 @@
+import os
 import sys
-sys.path.append('./')
-import argparse
+
 import numpy as np
+
+sys.path.append('./')
+
+import condssl.builder
+import argparse
 import pickle
 import torch
 import torch.nn as nn
-import os
-import cv2
-from torchvision import transforms
 from collections import defaultdict
 from tqdm import tqdm
-import pandas as pd
-from PIL import Image
-import shelve
 from dataset.dataloader import TCGA_CPTAC_Bag_Dataset
 from network.inception_v4 import InceptionV4
+from pathlib import Path
 
 if torch.cuda.is_available():
     device = 'cuda'
 else:
     device = 'cpu'
 print(device)
+
+
+def ensure_dir_exists(path):
+    dest_dir = os.path.dirname(path)
+    if not os.path.exists(dest_dir):
+        Path(dest_dir).mkdir(parents=True, exist_ok=True)
 
 def get_embeddings_bagging(feature_extractor, subtype_model, data_set):
     embedding_dict = defaultdict(list)
@@ -86,11 +92,10 @@ def load_pretrained(net, model_dir):
 
 parser = argparse.ArgumentParser(description='Extract embeddings ')
 
-parser.add_argument('--feature_extractor_dir', default='./pretrained/checkpoint.pth.tar', type=str)
-parser.add_argument('--subtype_model_dir', default='./subtype_cls/checkpoint.pth.tar', type=str)
-parser.add_argument('--root_dir', type=str)
-parser.add_argument('--split_dir', type=str)
-parser.add_argument('--out_dir', type=str)
+parser.add_argument('--feature_extractor_dir', default='./pretrained/checkpoint.pth.tar', type=str, help='path to feature extractor, which will extract features from tiles')
+parser.add_argument('--subtype_model_dir', default='./subtype_cls/checkpoint.pth.tar', type=str, help='path to subtype model, which will differentiate tumor and normal')
+parser.add_argument('--src_dir', type=str, help='path to preprocessed slide images')
+parser.add_argument('--out_dir', type=str, help='path to save extracted embeddings')
 
 args = parser.parse_args()
 
@@ -112,15 +117,19 @@ subtype_model.load_state_dict(cancer_subtype_model_load)
 subtype_model = nn.DataParallel(subtype_model, device_ids=device_ids)
 
 
-train_dataset = TCGA_CPTAC_Bag_Dataset(args.root_dir, args.split_dir, 'train')
-val_dataset = TCGA_CPTAC_Bag_Dataset(args.root_dir, args.split_dir, 'val')
-test_dataset = TCGA_CPTAC_Bag_Dataset(args.root_dir, args.split_dir, 'test')
+train_dataset = TCGA_CPTAC_Bag_Dataset(args.root_dir, 'train')
+val_dataset = TCGA_CPTAC_Bag_Dataset(args.root_dir, 'val')
+test_dataset = TCGA_CPTAC_Bag_Dataset(args.root_dir, 'test')
+
+model_name = condssl.builder.MoCo.__name__
+data_dir_name = args.data_dir.split(os.sep)[-1]
+ensure_dir_exists(os.path.join(args.out_dir, model_name, data_dir_name, "embeddings"))
+ensure_dir_exists(os.path.join(args.out_dir, model_name, data_dir_name, "outcomes"))
 
 with torch.no_grad():
-    folds = list(zip(['train', 'val', 'test'], [train_dataset, val_dataset, test_dataset]))
-    for name, data_set in folds[2:]:
+    for name, data_set in list(zip(['train', 'val', 'test'], [train_dataset, val_dataset, test_dataset]))[2:]:
         print(name)
         embedding_dict, outcomes_dict = get_embeddings_bagging(feature_extractor, subtype_model, data_set)
-        pickle.dump(embedding_dict, open("{}/{}_embedding.pkl".format(args.out_dir, name), 'wb'), protocol=4)
-        pickle.dump((outcomes_dict), open("{}/{}_outcomes.pkl".format(args.out_dir, name), 'wb'), protocol=4)
+        pickle.dump(embedding_dict, open(os.path.join(args.out_dir, model_name,  "embeddings", f"{name}_{data_dir_name}_embedding.pkl"), 'wb'), protocol=4)
+        pickle.dump((outcomes_dict), open(os.path.join(args.out_dir, model_name, "outcomes", f"{name}_{data_dir_name}_outcomes.pkl"), 'wb'), protocol=4)
 
