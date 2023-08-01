@@ -74,6 +74,7 @@ class TCGA_CPTAC_Dataset(Dataset):
         #         print("Iterating images: {}/{}".format(i, len(self.batch_ordering)))
         #         print('RAM Used (GB):', psutil.virtual_memory()[3] / 1000000000)
 
+    
         for i, tile_name in enumerate(self.batch_ordering):
             #image = cv2.imread(os.path.join(self.tcga_dir, tile_name))
             img_arr = Image.open(os.path.join(self.tcga_dir, tile_name))

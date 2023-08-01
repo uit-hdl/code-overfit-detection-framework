@@ -11,6 +11,7 @@ import random
 import shutil
 import time
 import warnings
+from tqdm import tqdm
 from GPUtil import showUtilization as gpu_usage
 
 import torch
@@ -76,7 +77,7 @@ print("Dataset Created ...")
 
 number_of_images = len(train_dataset)
 
-for i, ((images_q, images_k), _) in enumerate(train_dataset):
+for i, ((images_q, images_k), _) in tqdm(enumerate(train_dataset)):
     filename, _ = train_dataset.imgs[i]
     tile_name = Path(os.path.basename(filename)).resolve().stem
     slide_name = pathlib.PurePath(filename).parent.name
@@ -85,6 +86,3 @@ for i, ((images_q, images_k), _) in enumerate(train_dataset):
         os.mkdir(slide_folder)
     torch.save(images_q, os.path.join(slide_folder, tile_name + ".pt"))
     torch.save(images_k, os.path.join(slide_folder, tile_name + "_key.pt"))
-
-    if i % 1000 == 0:
-         print("Iterating images: {}/{}".format(i, number_of_images))

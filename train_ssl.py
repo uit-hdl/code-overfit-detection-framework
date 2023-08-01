@@ -76,8 +76,7 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
         # measure data loading time
         data_time.update(time.time() - end)
         # for 2 lines below:
-        # with torch.autocast(device_type='cuda', dtype=torch.float32):
-
+        #with torch.autocast(device_type='cuda', dtype=torch.float16):
         output, target = model(im_q=images_q.cuda(), im_k=images_k.cuda())
         loss = criterion(output, target)
 
@@ -178,7 +177,6 @@ parser.add_argument('--moco-m', default=0.999, type=float,
                     help='moco momentum of updating key encoder (default: 0.999)')
 parser.add_argument('--moco-t', default=0.07, type=float,
                     help='softmax temperature (default: 0.07)')
-
 # options for moco v2
 parser.add_argument('--mlp', action='store_true',
                     help='use mlp head')
@@ -242,15 +240,15 @@ print('Create dataset')
 
 
 print("Batch size: {}".format(args.batch_size))
-# train_dataset = TCGA_CPTAC_Dataset(cptac_dir=args.data_dir + "/CPTAC/tiles/",
-#                           tcga_dir=os.path.join(args.data_dir, "TCGA", "tiles"),
-#                           split_dir=args.split_dir,
-#                           transform=TwoCropsTransform(transforms.Compose(augmentation)),
-#                           # TODO: why isn't batch_size default here?
-#                           batch_size=args.batch_size,
-#                           batch_slide_num=args.batch_slide_num)
+#train_dataset = TCGA_CPTAC_Dataset(cptac_dir=args.data_dir + "/CPTAC/tiles/",
+                           #tcga_dir=os.path.join(args.data_dir, "TCGA", "tiles"),
+                           #split_dir=args.split_dir,
+                           #transform=TwoCropsTransform(transforms.Compose(augmentation)),
+                           # TODO: why isn't batch_size default here?
+                           #batch_size=args.batch_size,
+                           #batch_slide_num=args.batch_slide_num)
 train_dataset = PreprocessedTcgaLoader(cptac_dir=args.data_dir + "/CPTAC/tiles/",
-                                   tcga_dir=os.path.join("/Data/cropped_tcga_conditional/"),
+                                   tcga_dir=os.path.join(args.data_dir),
                                    split_dir=args.split_dir,
                                    transform=TwoCropsTransform(transforms.Compose(augmentation)),
                                    # TODO: why isn't batch_size default here?
