@@ -11,6 +11,7 @@ import numpy as np
 import umap
 from numpy import savetxt
 
+
 parser = argparse.ArgumentParser(description='Get cluster features')
 reducer = umap.UMAP(random_state=42)
 
