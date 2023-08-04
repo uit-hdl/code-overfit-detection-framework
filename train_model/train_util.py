@@ -75,3 +75,4 @@ def ensure_dir_exists(path):
     dest_dir = os.path.dirname(path)
     if not os.path.exists(dest_dir):
         Path(dest_dir).mkdir(parents=True, exist_ok=True)
+        print(f"mkdir: '{dest_dir}'")

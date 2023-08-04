@@ -1,31 +1,30 @@
 import argparse
 import glob
-import numpy as np
 import random
-from collections import defaultdict
+import tempfile
 import sys
 import time
 import warnings
-import random
-import itertools
-
+from collections import defaultdict
+from sklearn.model_selection import train_test_split
 
 import monai.transforms as mt
 import torch.backends.cudnn as cudnn
 import torch.nn as nn
-import torch.utils.data
 import torchvision.transforms as transforms
-from monai.data import DataLoader, Dataset
+from monai.data import DataLoader, Dataset, set_track_meta, CacheDataset
 from torch.utils.data import Sampler
 
 sys.path.append("../")
 import condssl.builder
 import condssl.loader
-from dataset.dataloader import TCGA_CPTAC_Dataset
 
-from dataset.dataloader_preprocessed import PreprocessedTcgaLoader
 from network.inception_v4 import InceptionV4
 from train_util import *
+import nvtx
+from monai.utils.nvtx import Range
+import contextlib
+no_profiling = contextlib.nullcontext()
 
 from itertools import zip_longest
 
@@ -34,64 +33,60 @@ def grouper(iterable, n, fillvalue=None):
     args = [iter(iterable)] * n
     return zip_longest(*args, fillvalue=fillvalue)
 
-class TwoCropsTransform:
-    """Take two random crops of one image as the query and key."""
-    def __init__(self, base_transform):
-        self.base_transform = base_transform
+def train(train_loader, val_loader, model, criterion, optimizer, max_epochs, lr, cos, schedule, is_profiling=True):
+    epoch_loss_values = []
+    metric_values = []
+    epoch_times = []
+    total_start = time.time()
+    set_track_meta(True)
 
-    def __call__(self, x):
-        q = self.base_transform(x)
-        k = self.base_transform(x)
-        return [q, k]
+    for epoch in range(max_epochs):
+        epoch_start = time.time()
+        print("-" * 10)
+        print(f"epoch {epoch + 1}/{max_epochs}")
+        model.train()
+        epoch_loss = 0
+        train_loader_iterator = iter(train_loader)
+        adjust_learning_rate(optimizer, epoch, lr, cos, schedule, max_epochs)
 
-def train(train_loader, model, criterion, optimizer, epoch, args):
-    batch_time = AverageMeter('Time', ':6.3f')
-    data_time = AverageMeter('Data', ':6.3f')
-    losses = AverageMeter('Loss', ':.4e')
-    top1 = AverageMeter('Acc@1', ':6.2f')
-    top5 = AverageMeter('Acc@5', ':6.2f')
-    progress = ProgressMeter(
-        len(train_loader),
-        [batch_time, data_time, losses, top1, top5],
-        prefix="Epoch: [{}]".format(epoch))
+        # https://github.com/Project-MONAI/tutorials/blob/main/acceleration/fast_training_tutorial.ipynb
+        # using step instead of iterate through train_loader directly to track data loading time
+        # steps are 1-indexed for printing and calculation purposes
+        #for i, d in enumerate(train_loader):
+        for step in range(1, len(train_loader) + 1):
+            step_start = time.time()
+            # profiling: train dataload
+            with nvtx.annotate("dataload", color="red") if is_profiling else no_profiling:
+                # rng_train_dataload = nvtx.start_range(message="dataload", color="red")
+                batch_data = next(train_loader_iterator)
+                images_q, images_k = batch_data['q'].cuda(), batch_data['k'].cuda()
+            output, target = model(im_q=images_q, im_k=images_k)
+            loss = criterion(output, target)
 
-    # switch to train mode
-    model.train()
+            # compute gradient and do SGD step
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
 
-    end = time.time()
-    start_time = time.time()
-    # for i, ((images, transformed_images)) in enumerate(train_loader):
-    for i, d in enumerate(train_loader):
-        # measure data loading time
-        data_time.update(time.time() - end)
-        # for 2 lines below:
-        #with torch.autocast(device_type='cuda', dtype=torch.float16):
-        images_q, images_k = d['q'], d['k']
-        output, target = model(im_q=images_q.cuda(), im_k=images_k.cuda())
-        loss = criterion(output, target)
+            epoch_loss += loss.item()
+            epoch_len = math.ceil(len(train_loader) / train_loader.batch_size)
+            print(
+                f"{step}/{epoch_len}, train_loss: {loss.item():.4f}" f" step time: {(time.time() - step_start):.4f}"
+            )
+        epoch_loss /= step
+        epoch_loss_values.append(epoch_loss)
+        print(f"epoch {epoch + 1} average loss: {epoch_loss:.4f}")
 
-        # acc1/acc5 are (K+1)-way contrast classifier accuracy
-        # measure accuracy and record loss
-        acc1, acc5 = accuracy(output, target, topk=(1, 5))
-        losses.update(loss.item(), images_q.size(0))
-        top1.update(acc1[0], images_q.size(0))
-        top5.update(acc5[0], images_q.size(0))
+        if 0 == 0:
+            model_filename = os.path.join(args.out_dir, model_name, data_dir_name, "model",
+                                          'checkpoint_{}_{}_{:04d}.pth.tar'.format(model_name, data_dir_name, epoch))
+            torch.save({
+                'epoch': epoch + 1,
+                'arch': 'x64',
+                'state_dict': model.state_dict(),
+                'optimizer' : optimizer.state_dict(),
+            }, model_filename)
 
-        # compute gradient and do SGD step
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-
-        # measure elapsed time
-        batch_time.update(time.time() - end)
-        end = time.time()
-
-        if i % args.print_freq == 0:
-            progress.display(i)
-            end_time = time.time()
-            print("Time elapsed: {}".format(end_time - start_time))
-            start = time.time()
-    
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
 # parser.add_argument('data', metavar='DIR',
 #                     help='path to dataset')
@@ -118,6 +113,8 @@ parser.add_argument('--wd', '--weight-decay', default=1e-4, type=float,
                     dest='weight_decay')
 parser.add_argument('-p', '--print-freq', default=10, type=int,
                     metavar='N', help='print frequency (default: 10)')
+parser.add_argument('--profile', default=True, type=bool, action=argparse.BooleanOptionalAction,
+                    metavar='P', help='whether to profile training or not', dest='is_profiling')
 parser.add_argument('--resume', default='', type=str, metavar='PATH',
                     help='path to latest checkpoint (default: none)')
 parser.add_argument('--seed', default=None, type=int,
@@ -147,16 +144,7 @@ parser.add_argument('--out_dir', default='./models/', type=str,
 parser.add_argument('--batch_slide_num', default=4, type=int)
 parser.add_argument('--condition', default=True, type=bool)
 
-encoder = InceptionV4
-
-criterion = nn.CrossEntropyLoss().cuda()
-
-
-def find_data(src_dir, batch_size, batch_slide_num, workers):
-    def my_collate_fn(data, *args, **kwargs):
-        pass
-
-
+def find_data(src_dir, batch_size, batch_slide_num, workers, is_profiling):
     class MySampler(Sampler):
         def __init__(self, data_source, slide2tiles, batch_size, batch_slide_num):
             self.data_source = data_source
@@ -206,15 +194,17 @@ def find_data(src_dir, batch_size, batch_slide_num, workers):
                 i += 1
                 all_data.append({"q": file, "k": file, "filename": file})
 
+    def range_func(x, y):
+        return Range(x)(y) if is_profiling else y
     transformations = mt.Compose(
         [
-            mt.LoadImaged(["q", "k"], image_only=True),
-            mt.EnsureChannelFirstd(["q", "k"]),
-            mt.Lambdad(["q", "k"], cropper),
-            mt.RandLambdad(["q", "k"], jitterer, prob=0.8),
-            mt.RandLambdad(["q", "k"], grayer, prob=0.2),
-            mt.RandFlipd(["q", "k"], prob=0.5, spatial_axis=0),
-            mt.RandFlipd(["q", "k"], prob=0.5, spatial_axis=1),
+            range_func("LoadImage", mt.LoadImaged(["q", "k"], image_only=True)),
+            range_func("EnsureChannelFirst", mt.EnsureChannelFirstd(["q", "k"])),
+            range_func("Crop", mt.Lambdad(["q", "k"], cropper)),
+            range_func("ColorJitter", mt.RandLambdad(["q", "k"], jitterer, prob=0.8)),
+            range_func("Grayscale", mt.RandLambdad(["q", "k"], grayer, prob=0.2)),
+            range_func("Flip0", mt.RandFlipd(["q", "k"], prob=0.5, spatial_axis=0)),
+            range_func("Flip1", mt.RandFlipd(["q", "k"], prob=0.5, spatial_axis=1)),
             mt.ToTensord(["q", "k"], track_meta=False),
         ]
     )
@@ -222,15 +212,17 @@ def find_data(src_dir, batch_size, batch_slide_num, workers):
     if not all_data:
         raise RuntimeError(f"Found no data in {src_dir}")
 
-    ds = Dataset(all_data, transformations)
-    dl = DataLoader(ds, sampler=MySampler(ds, slide2tiles, batch_size, batch_slide_num), batch_size=batch_size, num_workers=workers, shuffle=False)
-    #dl = TCGA_CPTAC_Dataset(all_data, batch_size=batch_size, num_workers=workers, shuffle=True)
+    train_data, test_data = train_test_split(all_data, test_size=0.1, random_state=42)
+    # note that we split the train data again, not the entire dataset
+    train_data, validation_data = train_test_split(train_data, test_size=0.1, random_state=42)
+    ds_train, ds_val, ds_test = CacheDataset(train_data, transformations), CacheDataset(validation_data, transformations), CacheDataset(test_data, transformations)
+    sampler = MySampler(ds, slide2tiles, batch_size, batch_slide_num)
+    dl_train = DataLoader(ds_train, sampler=sampler, batch_size=batch_size, num_workers=workers, shuffle=False)
+    dl_val = DataLoader(ds_val, batch_size=batch_size, num_workers=workers, shuffle=False)
+    dl_test = DataLoader(ds_test, batch_size=batch_size, num_workers=workers, shuffle=False)
 
     print("Dataset Created ...")
-    for x in dl:
-        pass
-    return ds, dl
-
+    return dl_train, dl_val, dl_test
 
 if __name__ == '__main__':
     args = parser.parse_args()
@@ -239,8 +231,12 @@ if __name__ == '__main__':
         print('No GPU device available')
         sys.exit(1)
 
+    directory = os.environ.get("MONAI_DATA_DIRECTORY")
+    root_dir = tempfile.mkdtemp() if directory is None else directory
+    print(f"root dir for MONAI is: {root_dir}")
+
     print('Create dataset')
-    ds, dl = find_data(args.data_dir, args.batch_size, args.batch_slide_num, args.workers)
+    dl_train, dl_val, dl_test = find_data(args.data_dir, args.batch_size, args.batch_slide_num, args.workers, args.is_profiling)
     print("Dataset Created ...")
 
     if args.seed is not None:
@@ -255,7 +251,7 @@ if __name__ == '__main__':
 
     print("=> creating model '{}'".format('x64'))
     model = condssl.builder.MoCo(
-        encoder, args.moco_dim, args.moco_k, args.moco_m, args.moco_t, args.mlp, condition=args.condition)
+        InceptionV4, args.moco_dim, args.moco_k, args.moco_m, args.moco_t, args.mlp, condition=args.condition)
     model = model.cuda()
     optimizer = torch.optim.SGD(model.parameters(), args.lr,
                                 momentum=args.momentum,
@@ -273,17 +269,5 @@ if __name__ == '__main__':
     data_dir_name = args.data_dir.split(os.sep)[-1]
     ensure_dir_exists(os.path.join(args.out_dir, model_name, data_dir_name, "model"))
 
-    for epoch in range(args.start_epoch, args.epochs):
-        adjust_learning_rate(optimizer, epoch, args.lr, args.cos, args.schedule, args.epochs)
-
-        # train for one epoch
-        train(dl, model, criterion, optimizer, epoch, args)
-        if 0 == 0:
-            model_filename = os.path.join(args.out_dir, model_name, data_dir_name, "model",
-                                          'checkpoint_{}_{}_{:04d}.pth.tar'.format(model_name, data_dir_name, epoch))
-            torch.save({
-                'epoch': epoch + 1,
-                'arch': 'x64',
-                'state_dict': model.state_dict(),
-                'optimizer' : optimizer.state_dict(),
-            }, model_filename)
+    criterion = nn.CrossEntropyLoss().cuda()
+    train(dl_train, dl_val, model, criterion, optimizer, args.epochs, args.lr, args.cos, args.schedule)
