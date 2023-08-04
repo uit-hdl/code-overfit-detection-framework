@@ -1,23 +1,38 @@
 import argparse
-import math
-import os
+import glob
+import numpy as np
 import random
+from collections import defaultdict
 import sys
 import time
 import warnings
+import random
+import itertools
 
+
+import monai.transforms as mt
 import torch.backends.cudnn as cudnn
 import torch.nn as nn
 import torch.utils.data
 import torchvision.transforms as transforms
+from monai.data import DataLoader, Dataset
+from torch.utils.data import Sampler
 
 sys.path.append("../")
 import condssl.builder
 import condssl.loader
+from dataset.dataloader import TCGA_CPTAC_Dataset
 
 from dataset.dataloader_preprocessed import PreprocessedTcgaLoader
 from network.inception_v4 import InceptionV4
 from train_util import *
+
+from itertools import zip_longest
+
+#https://stackoverflow.com/a/434411
+def grouper(iterable, n, fillvalue=None):
+    args = [iter(iterable)] * n
+    return zip_longest(*args, fillvalue=fillvalue)
 
 class TwoCropsTransform:
     """Take two random crops of one image as the query and key."""
@@ -46,11 +61,12 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
     end = time.time()
     start_time = time.time()
     # for i, ((images, transformed_images)) in enumerate(train_loader):
-    for i, (images_q, images_k) in enumerate(train_loader):
+    for i, d in enumerate(train_loader):
         # measure data loading time
         data_time.update(time.time() - end)
         # for 2 lines below:
         #with torch.autocast(device_type='cuda', dtype=torch.float16):
+        images_q, images_k = d['q'], d['k']
         output, target = model(im_q=images_q.cuda(), im_k=images_k.cuda())
         loss = criterion(output, target)
 
@@ -134,18 +150,86 @@ parser.add_argument('--condition', default=True, type=bool)
 encoder = InceptionV4
 
 criterion = nn.CrossEntropyLoss().cuda()
-augmentation = [
-    transforms.RandomResizedCrop(299, scale=(0.2, 1.)),
-    transforms.RandomApply([
-        transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)  # not strengthened
-    ], p=0.8),
-    transforms.RandomGrayscale(p=0.2),
-    transforms.RandomApply([condssl.loader.GaussianBlur([.1, 2.])], p=0.5),
-    transforms.RandomHorizontalFlip(),
-    transforms.RandomVerticalFlip(),
-    transforms.ToTensor()
-    # normalize
-]
+
+
+def find_data(src_dir, batch_size, batch_slide_num, workers):
+    def my_collate_fn(data, *args, **kwargs):
+        pass
+
+
+    class MySampler(Sampler):
+        def __init__(self, data_source, slide2tiles, batch_size, batch_slide_num):
+            self.data_source = data_source
+            self.batch_size = batch_size
+            self.batch_slide_num = batch_slide_num
+            self.slide2tiles = slide2tiles
+
+        def __iter__(self):
+            slides_per_batch = self.batch_size // self.batch_slide_num
+            tile_chunks = []
+            for slide,tiles in slide2tiles.items():
+                indices = [tiles[i:i + self.batch_slide_num] for i in range(0, len(tiles), self.batch_slide_num)]
+                if len(indices[-1]) < self.batch_slide_num:
+                    indices = indices[:-1]
+                random.shuffle(indices)
+                if indices:
+                    tile_chunks.append(indices)
+
+            random.seed(42)
+            random.shuffle(tile_chunks)
+
+            # flatten the list
+            tile_chunks = [item for sublist in tile_chunks for item in sublist]
+            random.shuffle(tile_chunks)
+            # flatten the list MORE
+            tile_chunks = [item for sublist in tile_chunks for item in sublist]
+
+            for i in tile_chunks:
+                yield i
+
+        def __len__(self):
+            return len(self.data_source) // (self.batch_size * self.batch_slide_num)
+
+    print('Creating dataset')
+    grayer = transforms.Grayscale(num_output_channels=3)
+    cropper = transforms.RandomResizedCrop(299, scale=(0.2, 1.))
+    jitterer = transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)
+
+    all_data = []
+    slide2tiles = defaultdict(list)
+    i = 0
+    for directory in glob.glob(f"{src_dir}{os.sep}*"):
+        for file in glob.glob(f"{directory}{os.sep}**{os.sep}*", recursive=True):
+            if os.path.isfile(file):
+                slide_id = os.path.basename(os.path.dirname(file))
+                slide2tiles[slide_id].append(i)
+                i += 1
+                all_data.append({"q": file, "k": file, "filename": file})
+
+    transformations = mt.Compose(
+        [
+            mt.LoadImaged(["q", "k"], image_only=True),
+            mt.EnsureChannelFirstd(["q", "k"]),
+            mt.Lambdad(["q", "k"], cropper),
+            mt.RandLambdad(["q", "k"], jitterer, prob=0.8),
+            mt.RandLambdad(["q", "k"], grayer, prob=0.2),
+            mt.RandFlipd(["q", "k"], prob=0.5, spatial_axis=0),
+            mt.RandFlipd(["q", "k"], prob=0.5, spatial_axis=1),
+            mt.ToTensord(["q", "k"], track_meta=False),
+        ]
+    )
+
+    if not all_data:
+        raise RuntimeError(f"Found no data in {src_dir}")
+
+    ds = Dataset(all_data, transformations)
+    dl = DataLoader(ds, sampler=MySampler(ds, slide2tiles, batch_size, batch_slide_num), batch_size=batch_size, num_workers=workers, shuffle=False)
+    #dl = TCGA_CPTAC_Dataset(all_data, batch_size=batch_size, num_workers=workers, shuffle=True)
+
+    print("Dataset Created ...")
+    for x in dl:
+        pass
+    return ds, dl
 
 
 if __name__ == '__main__':
@@ -156,22 +240,7 @@ if __name__ == '__main__':
         sys.exit(1)
 
     print('Create dataset')
-    # train_dataset = TCGA_CPTAC_Dataset(cptac_dir=args.data_dir + "/CPTAC/tiles/",
-    # tcga_dir=os.path.join(args.data_dir, "TCGA", "tiles"),
-    # split_dir=args.split_dir,
-    # transform=TwoCropsTransform(transforms.Compose(augmentation)),
-    # batch_size=args.batch_size,
-    # batch_slide_num=args.batch_slide_num)
-    # train_dataset = datasets.ImageFolder(args.data_dir + "/TCGA/tiles/", TwoCropsTransform(transforms.Compose(augmentation)))
-    train_dataset = PreprocessedTcgaLoader(cptac_dir=args.data_dir + "/CPTAC/tiles/",
-                                           tcga_dir=args.data_dir,
-                                           transform=TwoCropsTransform(transforms.Compose(augmentation)),
-                                           # TODO: why isn't batch_size default here?
-                                           batch_size=args.batch_size,
-                                           batch_slide_num=args.batch_slide_num)
-    train_loader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=args.batch_size,
-        pin_memory=True, drop_last=True)
+    ds, dl = find_data(args.data_dir, args.batch_size, args.batch_slide_num, args.workers)
     print("Dataset Created ...")
 
     if args.seed is not None:
@@ -208,7 +277,7 @@ if __name__ == '__main__':
         adjust_learning_rate(optimizer, epoch, args.lr, args.cos, args.schedule, args.epochs)
 
         # train for one epoch
-        train(train_loader, model, criterion, optimizer, epoch, args)
+        train(dl, model, criterion, optimizer, epoch, args)
         if 0 == 0:
             model_filename = os.path.join(args.out_dir, model_name, data_dir_name, "model",
                                           'checkpoint_{}_{}_{:04d}.pth.tar'.format(model_name, data_dir_name, epoch))
