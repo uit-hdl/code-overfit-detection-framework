@@ -141,6 +141,7 @@ def train(train_loader, val_loader, model, criterion, optimizer, max_epochs, lr,
             print(
                     f"{step}/{len(train_loader)}, train_loss: {loss.item():.4f} acc1: {acc1:.2f} acc5: {acc5:.2f} step time: {(time.time() - step_start):.4f}"
             )
+        # Verify this is not off by one lol
         epoch_loss /= step
         epoch_loss_values.append(epoch_loss)
         acc /= step
