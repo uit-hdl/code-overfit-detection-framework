@@ -95,7 +95,7 @@ parser = argparse.ArgumentParser(description='Extract embeddings ')
 parser.add_argument('--feature_extractor_dir', default='./pretrained/checkpoint.pth.tar', type=str, help='path to feature extractor, which will extract features from tiles')
 parser.add_argument('--subtype_model_dir', default='./subtype_cls/checkpoint.pth.tar', type=str, help='path to subtype model, which will differentiate tumor and normal')
 parser.add_argument('--src_dir', type=str, help='path to preprocessed slide images')
-parser.add_argument('--out_dir', type=str, help='path to save extracted embeddings')
+parser.add_argument('--out_dir', default='./out', type=str, help='path to save extracted embeddings')
 
 args = parser.parse_args()
 
@@ -117,9 +117,9 @@ subtype_model.load_state_dict(cancer_subtype_model_load)
 subtype_model = nn.DataParallel(subtype_model, device_ids=device_ids)
 
 
-train_dataset = TCGA_CPTAC_Bag_Dataset(args.root_dir, 'train')
-val_dataset = TCGA_CPTAC_Bag_Dataset(args.root_dir, 'val')
-test_dataset = TCGA_CPTAC_Bag_Dataset(args.root_dir, 'test')
+train_dataset = TCGA_CPTAC_Bag_Dataset(args.src_dir, 'train')
+val_dataset = TCGA_CPTAC_Bag_Dataset(args.src_dir, 'val')
+test_dataset = TCGA_CPTAC_Bag_Dataset(args.src_dir, 'test')
 
 model_name = condssl.builder.MoCo.__name__
 data_dir_name = args.data_dir.split(os.sep)[-1]
