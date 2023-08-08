@@ -4,6 +4,7 @@ import torch.nn.functional as F
 import torch.utils.model_zoo as model_zoo
 import os
 import sys
+from torch.utils.checkpoint import checkpoint_sequential
 
 
 class BasicConv2d(nn.Module):
@@ -280,7 +281,8 @@ class InceptionV4(nn.Module):
         return x
 
     def forward(self, input):
-        x = self.features(input)
+        x = checkpoint_sequential(self.features, 4, input)
+        #x = self.features(input)
         x = self.logits(x)
         return x
 

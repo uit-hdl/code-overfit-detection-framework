@@ -1,6 +1,7 @@
 import argparse
 import glob
 import random
+import csv
 import tempfile
 import sys
 import time
@@ -28,65 +29,6 @@ no_profiling = contextlib.nullcontext()
 
 from itertools import zip_longest
 
-#https://stackoverflow.com/a/434411
-def grouper(iterable, n, fillvalue=None):
-    args = [iter(iterable)] * n
-    return zip_longest(*args, fillvalue=fillvalue)
-
-def train(train_loader, val_loader, model, criterion, optimizer, max_epochs, lr, cos, schedule, is_profiling=True):
-    epoch_loss_values = []
-    metric_values = []
-    epoch_times = []
-    total_start = time.time()
-    set_track_meta(True)
-
-    for epoch in range(max_epochs):
-        epoch_start = time.time()
-        print("-" * 10)
-        print(f"epoch {epoch + 1}/{max_epochs}")
-        model.train()
-        epoch_loss = 0
-        train_loader_iterator = iter(train_loader)
-        adjust_learning_rate(optimizer, epoch, lr, cos, schedule, max_epochs)
-
-        # https://github.com/Project-MONAI/tutorials/blob/main/acceleration/fast_training_tutorial.ipynb
-        # using step instead of iterate through train_loader directly to track data loading time
-        # steps are 1-indexed for printing and calculation purposes
-        #for i, d in enumerate(train_loader):
-        for step in range(1, len(train_loader) + 1):
-            step_start = time.time()
-            # profiling: train dataload
-            with nvtx.annotate("dataload", color="red") if is_profiling else no_profiling:
-                # rng_train_dataload = nvtx.start_range(message="dataload", color="red")
-                batch_data = next(train_loader_iterator)
-                images_q, images_k = batch_data['q'].cuda(), batch_data['k'].cuda()
-            output, target = model(im_q=images_q, im_k=images_k)
-            loss = criterion(output, target)
-
-            # compute gradient and do SGD step
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-
-            epoch_loss += loss.item()
-            epoch_len = math.ceil(len(train_loader) / train_loader.batch_size)
-            print(
-                f"{step}/{epoch_len}, train_loss: {loss.item():.4f}" f" step time: {(time.time() - step_start):.4f}"
-            )
-        epoch_loss /= step
-        epoch_loss_values.append(epoch_loss)
-        print(f"epoch {epoch + 1} average loss: {epoch_loss:.4f}")
-
-        if 0 == 0:
-            model_filename = os.path.join(args.out_dir, model_name, data_dir_name, "model",
-                                          'checkpoint_{}_{}_{:04d}.pth.tar'.format(model_name, data_dir_name, epoch))
-            torch.save({
-                'epoch': epoch + 1,
-                'arch': 'x64',
-                'state_dict': model.state_dict(),
-                'optimizer' : optimizer.state_dict(),
-            }, model_filename)
-
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
 # parser.add_argument('data', metavar='DIR',
 #                     help='path to dataset')
@@ -113,7 +55,7 @@ parser.add_argument('--wd', '--weight-decay', default=1e-4, type=float,
                     dest='weight_decay')
 parser.add_argument('-p', '--print-freq', default=10, type=int,
                     metavar='N', help='print frequency (default: 10)')
-parser.add_argument('--profile', default=True, type=bool, action=argparse.BooleanOptionalAction,
+parser.add_argument('--profile', default=False, type=bool, action=argparse.BooleanOptionalAction,
                     metavar='P', help='whether to profile training or not', dest='is_profiling')
 parser.add_argument('--resume', default='', type=str, metavar='PATH',
                     help='path to latest checkpoint (default: none)')
@@ -137,43 +79,134 @@ parser.add_argument('--aug-plus', action='store_true',
 parser.add_argument('--cos', action='store_true',
                     help='use cosine lr schedule')
 
-parser.add_argument('--data_dir', default='./data/', type=str,
-                    help='path to output directory')
-parser.add_argument('--out_dir', default='./models/', type=str,
+parser.add_argument('--data-dir', default='./data/', type=str,
+                    help='path to source directory')
+parser.add_argument('--out-dir', default='./models/', type=str,
                     help='path to output directory')
 parser.add_argument('--batch_slide_num', default=4, type=int)
 parser.add_argument('--condition', default=True, type=bool)
 
+def save_data_to_csv(data, filename, label):
+    ensure_dir_exists(filename)
+    with open(filename, 'w') as csvfile:
+        csvwriter = csv.writer(csvfile)
+        csvwriter.writerow(["epoch", label])
+        for e, l in enumerate(data):
+            csvwriter.writerow([e,l])
+
+
+def train(train_loader, val_loader, model, criterion, optimizer, max_epochs, lr, cos, schedule, out_path, is_profiling):
+    epoch_loss_values = []
+    accuracy_values = []
+    metric_values = []
+    epoch_times = []
+    total_start = time.time()
+    set_track_meta(True)
+
+    total_accuracy = [None] * max_epochs
+
+    for epoch in range(max_epochs):
+        epoch_start = time.time()
+        print("-" * 10)
+        print(f"epoch {epoch + 1}/{max_epochs}")
+        model.train()
+        epoch_loss = 0
+        acc = 0
+        train_loader_iterator = iter(train_loader)
+        adjust_learning_rate(optimizer, epoch, lr, cos, schedule, max_epochs)
+
+        # https://github.com/Project-MONAI/tutorials/blob/main/acceleration/fast_training_tutorial.ipynb
+        # using step instead of iterate through train_loader directly to track data loading time
+        # steps are 1-indexed for printing and calculation purposes
+        #for i, d in enumerate(train_loader):
+        for step in range(1, len(train_loader) + 1):
+            step_start = time.time()
+            # profiling: train dataload
+            with nvtx.annotate("dataload", color="red") if is_profiling else no_profiling:
+                # rng_train_dataload = nvtx.start_range(message="dataload", color="red")
+                batch_data = next(train_loader_iterator)
+                images_q, images_k = batch_data['q'].cuda(), batch_data['k'].cuda()
+            output, target = model(im_q=images_q, im_k=images_k)
+            loss = criterion(output, target)
+            acc1, acc5 = accuracy(output, target, topk=(1, 5))
+            acc1, acc5 = acc1[0], acc5[0]
+
+            # compute gradient and do SGD step
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            epoch_loss += loss.item()
+            acc += acc5
+            print(
+                    f"{step}/{len(train_loader)}, train_loss: {loss.item():.4f} acc1: {acc1:.2f} acc5: {acc5:.2f} step time: {(time.time() - step_start):.4f}"
+            )
+        epoch_loss /= step
+        epoch_loss_values.append(epoch_loss)
+        acc /= step
+        accuracy_values.append(acc)
+        print(f"epoch {epoch + 1} average loss: {epoch_loss:.4f}")
+
+        if 0 == 0:
+            model_filename = os.path.join(out_path, 'model', 'checkpoint_{}_{}_{:04d}.pth.tar'.format(model_name, data_dir_name, epoch))
+            ensure_dir_exists(model_filename)
+            torch.save({
+                'epoch': epoch + 1,
+                'arch': 'x64',
+                'state_dict': model.state_dict(),
+                'optimizer' : optimizer.state_dict(),
+            }, model_filename)
+    save_data_to_csv(accuracy_values, os.path.join(out_path, "data", f"accuracy_{model.__class__.__name__}.csv"), "accuracy")
+    save_data_to_csv(epoch_loss_values, os.path.join(out_path, "data", f"loss_{model.__class__.__name__}.csv"), "loss")
+
 def find_data(src_dir, batch_size, batch_slide_num, workers, is_profiling):
     class MySampler(Sampler):
-        def __init__(self, data_source, slide2tiles, batch_size, batch_slide_num):
+        ''' 
+        Conditional sampler that will generate batches made out of `batch_size` with at least `batch_slide_num` tiles from each slide
+        E.g. if `batch_slide_num` is 4 and `batch_size is 32, there will be 8 slides with 4 tiles each in one batch
+
+        Note: Don't pass in a MONAI dataset object here: the default iterator performs transformations right away
+        this is very slow, and we only need the filenames to generate the indices
+        '''
+        def __init__(self, data_source, batch_size, batch_slide_num):
             self.data_source = data_source
             self.batch_size = batch_size
             self.batch_slide_num = batch_slide_num
-            self.slide2tiles = slide2tiles
 
         def __iter__(self):
-            slides_per_batch = self.batch_size // self.batch_slide_num
+            random.seed(42)
             tile_chunks = []
+
+            slide2tiles = defaultdict(list)
+            for i,d in enumerate(self.data_source):
+                filename = d['filename']
+                slide_id = os.path.basename(filename.split(os.sep)[-2])
+                slide2tiles[slide_id].append(i)
+
+            cut_off_indices = []
+
+            # Generate chunks of indices. If one slide has indices slide2tiles['slide'] = [1 .. 10] the result can be like
+            # tile_chunks = [[1 .. 4], [ 1 .. 8 ]]
+            # cut_off_indices = [ 9, 10 ]
             for slide,tiles in slide2tiles.items():
                 indices = [tiles[i:i + self.batch_slide_num] for i in range(0, len(tiles), self.batch_slide_num)]
+                # Prune if a chunk created above is less than `batch_slide_num`
                 if len(indices[-1]) < self.batch_slide_num:
+                    cut_off_indices.append(indices[-1])
                     indices = indices[:-1]
-                random.shuffle(indices)
                 if indices:
+                    random.shuffle(indices)
                     tile_chunks.append(indices)
 
-            random.seed(42)
             random.shuffle(tile_chunks)
 
-            # flatten the list
+            # flatten the list so we can shuffle around chunks
             tile_chunks = [item for sublist in tile_chunks for item in sublist]
             random.shuffle(tile_chunks)
-            # flatten the list MORE
-            tile_chunks = [item for sublist in tile_chunks for item in sublist]
 
-            for i in tile_chunks:
-                yield i
+            chunks_per_batch = self.batch_size // self.batch_slide_num
+            for chunk in [tile_chunks[i:i + chunks_per_batch] for i in range(0, len(tile_chunks), chunks_per_batch)]:
+                yield [item for sublist in chunk for item in sublist]
 
         def __len__(self):
             return len(self.data_source) // (self.batch_size * self.batch_slide_num)
@@ -184,14 +217,9 @@ def find_data(src_dir, batch_size, batch_slide_num, workers, is_profiling):
     jitterer = transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)
 
     all_data = []
-    slide2tiles = defaultdict(list)
-    i = 0
     for directory in glob.glob(f"{src_dir}{os.sep}*"):
         for file in glob.glob(f"{directory}{os.sep}**{os.sep}*", recursive=True):
             if os.path.isfile(file):
-                slide_id = os.path.basename(os.path.dirname(file))
-                slide2tiles[slide_id].append(i)
-                i += 1
                 all_data.append({"q": file, "k": file, "filename": file})
 
     def range_func(x, y):
@@ -215,9 +243,11 @@ def find_data(src_dir, batch_size, batch_slide_num, workers, is_profiling):
     train_data, test_data = train_test_split(all_data, test_size=0.1, random_state=42)
     # note that we split the train data again, not the entire dataset
     train_data, validation_data = train_test_split(train_data, test_size=0.1, random_state=42)
-    ds_train, ds_val, ds_test = CacheDataset(train_data, transformations), CacheDataset(validation_data, transformations), CacheDataset(test_data, transformations)
-    sampler = MySampler(ds, slide2tiles, batch_size, batch_slide_num)
-    dl_train = DataLoader(ds_train, sampler=sampler, batch_size=batch_size, num_workers=workers, shuffle=False)
+    ds_train = Dataset(train_data, transformations)
+    ds_val = Dataset(validation_data, transformations), 
+    ds_test = Dataset(test_data, transformations)
+
+    dl_train = DataLoader(ds_train, batch_sampler=MySampler(train_data, batch_size, batch_slide_num), num_workers=workers)
     dl_val = DataLoader(ds_val, batch_size=batch_size, num_workers=workers, shuffle=False)
     dl_test = DataLoader(ds_test, batch_size=batch_size, num_workers=workers, shuffle=False)
 
@@ -267,7 +297,7 @@ if __name__ == '__main__':
 
     model_name = condssl.builder.MoCo.__name__
     data_dir_name = args.data_dir.split(os.sep)[-1]
-    ensure_dir_exists(os.path.join(args.out_dir, model_name, data_dir_name, "model"))
+    out_path = os.path.join(args.out_dir, model_name, data_dir_name)
 
     criterion = nn.CrossEntropyLoss().cuda()
-    train(dl_train, dl_val, model, criterion, optimizer, args.epochs, args.lr, args.cos, args.schedule)
+    train(dl_train, dl_val, model, criterion, optimizer, args.epochs, args.lr, args.cos, args.schedule, out_path, args.is_profiling)
