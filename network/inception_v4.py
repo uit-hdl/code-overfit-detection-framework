@@ -235,6 +235,56 @@ class Inception_C(nn.Module):
         out = torch.cat((x0, x1, x2, x3), 1)
         return out
 
+class InceptionV4_compat(nn.Module):
+
+    def __init__(self, num_classes=1001):
+        super(InceptionV4_compat, self).__init__()
+        # Special attributs
+        self.input_space = None
+        self.input_size = (299, 299, 3)
+        self.mean = None
+        self.std = None
+        # Modules
+        self.features = nn.Sequential(
+            BasicConv2d(3, 32, kernel_size=3, stride=2),
+            BasicConv2d(32, 32, kernel_size=3, stride=1),
+            BasicConv2d(32, 64, kernel_size=3, stride=1, padding=1),
+            Mixed_3a(),
+            Mixed_4a(),
+            Mixed_5a(),
+            Inception_A(),
+            Inception_A(),
+            Inception_A(),
+            Inception_A(),
+            Reduction_A(), # Mixed_6a
+            Inception_B(),
+            Inception_B(),
+            Inception_B(),
+            Inception_B(),
+            Inception_B(),
+            Inception_B(),
+            Inception_B(),
+            Reduction_B(), # Mixed_7a
+            Inception_C(),
+            Inception_C(),
+            Inception_C()
+        )
+
+    def logits(self, features):
+        #Allows image of any size to be processed
+        adaptiveAvgPoolWidth = features.shape[2]
+        x = F.avg_pool2d(features, kernel_size=adaptiveAvgPoolWidth)
+        x = x.view(x.size(0), -1)
+        #x = self.last_linear(x)
+        return x
+
+    def forward(self, input):
+        x = self.features(input)
+        x = self.logits(x)
+        return x
+
+
+
 
 class InceptionV4(nn.Module):
 
@@ -281,8 +331,8 @@ class InceptionV4(nn.Module):
         return x
 
     def forward(self, input):
-        x = checkpoint_sequential(self.features, 4, input)
-        #x = self.features(input)
+        #x = checkpoint_sequential(self.features, 4, input)
+        x = self.features(input)
         x = self.logits(x)
         return x
 

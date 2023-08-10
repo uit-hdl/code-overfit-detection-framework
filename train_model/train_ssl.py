@@ -97,21 +97,21 @@ def save_data_to_csv(data, filename, label):
 
 def train(train_loader, val_loader, model, criterion, optimizer, max_epochs, lr, cos, schedule, out_path, is_profiling):
     epoch_loss_values = []
-    accuracy_values = []
+    accuracy1_values = []
+    accuracy5_values = []
     metric_values = []
     epoch_times = []
     total_start = time.time()
     set_track_meta(True)
 
-    total_accuracy = [None] * max_epochs
-
-    for epoch in range(max_epochs):
+    for epoch in range(1, max_epochs + 1):
         epoch_start = time.time()
         print("-" * 10)
         print(f"epoch {epoch + 1}/{max_epochs}")
         model.train()
         epoch_loss = 0
-        acc = 0
+        acc5 = 0
+        acc1 = 0
         train_loader_iterator = iter(train_loader)
         adjust_learning_rate(optimizer, epoch, lr, cos, schedule, max_epochs)
 
@@ -137,22 +137,25 @@ def train(train_loader, val_loader, model, criterion, optimizer, max_epochs, lr,
             optimizer.step()
 
             epoch_loss += loss.item()
-            acc += acc5
+            acc5 += acc5
+            acc1 += acc1
             print(
                     f"{step}/{len(train_loader)}, train_loss: {loss.item():.4f} acc1: {acc1:.2f} acc5: {acc5:.2f} step time: {(time.time() - step_start):.4f}"
             )
         # Verify this is not off by one lol
         epoch_loss /= step
         epoch_loss_values.append(epoch_loss)
-        acc /= step
-        accuracy_values.append(acc)
-        print(f"epoch {epoch + 1} average loss: {epoch_loss:.4f}")
+        acc5 /= step
+        accuracy5_values.append(acc5)
+        acc1 /= step
+        accuracy1_values.append(acc1)
+        print(f"epoch {epoch} average loss: {epoch_loss:.4f}")
 
         if 0 == 0:
             model_filename = os.path.join(out_path, 'model', 'checkpoint_{}_{}_{:04d}.pth.tar'.format(model_name, data_dir_name, epoch))
             ensure_dir_exists(model_filename)
             torch.save({
-                'epoch': epoch + 1,
+                'epoch': epoch,
                 'arch': 'x64',
                 'state_dict': model.state_dict(),
                 'optimizer' : optimizer.state_dict(),
@@ -245,7 +248,7 @@ def find_data(src_dir, batch_size, batch_slide_num, workers, is_profiling):
     # note that we split the train data again, not the entire dataset
     train_data, validation_data = train_test_split(train_data, test_size=0.1, random_state=42)
     ds_train = Dataset(train_data, transformations)
-    ds_val = Dataset(validation_data, transformations), 
+    ds_val = Dataset(validation_data, transformations)
     ds_test = Dataset(test_data, transformations)
 
     dl_train = DataLoader(ds_train, batch_sampler=MySampler(train_data, batch_size, batch_slide_num), num_workers=workers)
