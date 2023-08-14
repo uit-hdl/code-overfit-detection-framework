@@ -32,6 +32,7 @@ args = parser.parse_args()
 def umap_slice(names, features):
     values = [[x[0] for x in features[name]] for name in names]
     tile_names = [[x[1] for x in features[name]] for name in names]
+    tile_names = ["file:///" + x for x in np.concatenate(tile_names, axis=0)]
     features_flattened = np.concatenate(values, axis=0)
     umap_projection = reducer.fit_transform(features_flattened)
     mapper = reducer.fit(features_flattened)
@@ -40,14 +41,32 @@ def umap_slice(names, features):
     names_labels = [item for sublist in names_labels for item in sublist]
 
     hover_data = pd.DataFrame({'index': np.arange(len(features_flattened)),
-                               'tile': np.concatenate(tile_names, axis=0),
+                               'image_url': tile_names,
                                'label': names_labels})
-
     p = umap.plot.interactive(mapper, labels=names_labels, hover_data=hover_data, point_size=7)
+    TOOLTIPS = """
+        <div>
+            <div>
+                <img
+                    src="@image_url" height="150" alt="@label" width="150"
+                    style="float: left; margin: 0px 15px 15px 0px;"
+                    border="2"
+                ></img>
+            </div>
+            <div>
+                <span style="font-size: 17px; font-weight: bold;">@label</span>
+            </div>
+            <div>
+                <span style="font-size: 15px;">Location</span>
+                <span style="font-size: 10px; color: #696;">($x, $y)</span>
+            </div>
+        </div>
+    """
+    p.hover.tooltips = TOOLTIPS
+
     p.add_tools(TapTool())
-    url = "file:///@tile/"
     taptool = p.select(type=TapTool)
-    taptool.callback = OpenURL(url=url)
+    taptool.callback = OpenURL(url='@image_url')
     show_interactive(p)
     #umap.plot.show(p)
 #     fig, ax = plt.subplots()
