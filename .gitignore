@@ -1,3 +1,7 @@
+pretrained/run2a/
+pretrained/checkpoint/
+pretrained/venv
+pretrained/venv_v2
 output_from_training.txt
 raw_data_preprocessed
 doc_for_figure

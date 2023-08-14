@@ -103,6 +103,7 @@ feature_extractor = nn.DataParallel(feature_extractor, device_ids=device_ids)
 # Need to replicate https://github.com/ncoudray/DeepPATH/tree/master, based on advice from
 # https://github.com/NYUMedML/conditional_ssl_hist/issues/3
 subtype_model = InceptionV4(num_classes=2).to('cuda')
+import ipdb; ipdb.set_trace()
 cancer_subtype_model_load = torch.load(args.subtype_model)
 subtype_model.load_state_dict(cancer_subtype_model_load)
 subtype_model = nn.DataParallel(subtype_model, device_ids=device_ids)
