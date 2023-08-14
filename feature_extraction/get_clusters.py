@@ -2,6 +2,8 @@
 
 import argparse
 import pandas as pd
+from bokeh.plotting import show as show_interactive
+from bokeh.models import ColumnDataSource, OpenURL, TapTool
 import operator
 import os
 import pickle
@@ -42,21 +44,26 @@ def umap_slice(names, features):
                                'label': names_labels})
 
     p = umap.plot.interactive(mapper, labels=names_labels, hover_data=hover_data, point_size=7)
-    umap.plot.show(p)
-    fig, ax = plt.subplots()
-    slide_sets = [[]] * len(names)
-# [i]nterval_[s]tart, [e]nd
-    for slide_number,(i_s,i_e) in enumerate(zip(slices, slices[1:])):
-        ax.scatter(umap_projection[i_s:i_e, 0], umap_projection[i_s:i_e, 1], label = f"Slide {names[slide_number]}", alpha=.5)
-        slide_sets[slide_number] = umap_projection[i_s:i_e]
-    for i, ss in enumerate(slide_sets):
-        savetxt(os.path.join(args.out_dir, '{}.csv'.format(names[i])), ss, delimiter=',')
-    ax.legend()
-    ax.get_xaxis().set_visible(False)
-    ax.get_yaxis().set_visible(False)
-    # only one of the below, not both
-    #plt.show()
-    plt.savefig(os.path.join('.', 'umap_output.png'))
+    p.add_tools(TapTool())
+    url = "file:///@tile/"
+    taptool = p.select(type=TapTool)
+    taptool.callback = OpenURL(url=url)
+    show_interactive(p)
+    #umap.plot.show(p)
+#     fig, ax = plt.subplots()
+#     slide_sets = [[]] * len(names)
+# # [i]nterval_[s]tart, [e]nd
+#     for slide_number,(i_s,i_e) in enumerate(zip(slices, slices[1:])):
+#         ax.scatter(umap_projection[i_s:i_e, 0], umap_projection[i_s:i_e, 1], label = f"Slide {names[slide_number]}", alpha=.5)
+#         slide_sets[slide_number] = umap_projection[i_s:i_e]
+#     for i, ss in enumerate(slide_sets):
+#         savetxt(os.path.join(args.out_dir, '{}.csv'.format(names[i])), ss, delimiter=',')
+#     ax.legend()
+#     ax.get_xaxis().set_visible(False)
+#     ax.get_yaxis().set_visible(False)
+#     # only one of the below, not both
+#     #plt.show()
+#     plt.savefig(os.path.join('.', 'umap_output.png'))
 
 if __name__ == "__main__":
     features = pickle.load(open(args.embeddings_path, 'rb'))
