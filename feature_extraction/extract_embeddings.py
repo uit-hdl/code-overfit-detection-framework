@@ -30,11 +30,11 @@ def ensure_dir_exists(path):
     if not os.path.exists(dest_dir):
         Path(dest_dir).mkdir(parents=True, exist_ok=True)
 
-def get_embeddings_bagging(feature_extractor, subtype_model, dl, do_outcomes):
+def get_embeddings_bagging(feature_extractor, dl, do_outcomes):
     embedding_dict = defaultdict(list)
     outcomes_dict = defaultdict(list)
     feature_extractor.eval()
-    subtype_model.eval()
+    #subtype_model.eval()
     with torch.no_grad():
         for d in tqdm(dl, position=0, leave=True, desc="processing batch"):
             # bag idx is same as slide_id. 0 is first slide, 1 is second, etc
@@ -43,22 +43,22 @@ def get_embeddings_bagging(feature_extractor, subtype_model, dl, do_outcomes):
             bag_idx = d['slide_id']
 
             feat = feature_extractor(img_batch) 
-            subtype_prob = subtype_model(img_batch)
-            subtype_pred = torch.argmax(subtype_prob, dim=1)
-            tumor_filter = (subtype_pred != 0).cpu().numpy()
+
+            for f,bag in zip(feat, bag_idx):
+                embedding_dict[bag].append(f[np.newaxis, :].cpu().numpy())
+            #subtype_prob = subtype_model(img_batch)
+            #subtype_pred = torch.argmax(subtype_prob, dim=1)
+            #tumor_filter = (subtype_pred != 0).cpu().numpy()
             # Feat and bag_idx now has images with tumors, those that didn't are excluded
-            feat = feat[tumor_filter].cpu().numpy()
-            if any(tumor_filter):
-                import ipdb; ipdb.set_trace(); 
-                print("hoozah!")
+            #feat = feat[tumor_filter].cpu().numpy()
 
             # For each image in current batch that has tumors
-            for i, val in enumerate(tumor_filter):
-                if not val:
-                    continue
-                if do_outcomes:
-                    outcomes_dict[slide_index] = annotations[case_id]
-                embedding_dict[bag_idx[i]].append(feat[i][np.newaxis, :])
+            # for i, val in enumerate(tumor_filter):
+            #     if not val:
+            #         continue
+            #     if do_outcomes:
+            #         outcomes_dict[slide_index] = annotations[case_id]
+                #embedding_dict[bag_idx[i]].append(feat[i][np.newaxis, :])
         # The next for loop is more about making tensors into numpy arrays. We prune away the first dimension which doesn't need to exist
         # it is not merging all tiles from slides
         for slide_id in embedding_dict:
@@ -102,11 +102,13 @@ feature_extractor = nn.DataParallel(feature_extractor, device_ids=device_ids)
 # FIXME: broken: turns out I was supposed to use a different model, based off paper https://www.nature.com/articles/s41591-018-0177-5
 # Need to replicate https://github.com/ncoudray/DeepPATH/tree/master, based on advice from
 # https://github.com/NYUMedML/conditional_ssl_hist/issues/3
-subtype_model = InceptionV4(num_classes=2).to('cuda')
-import ipdb; ipdb.set_trace()
-cancer_subtype_model_load = torch.load(args.subtype_model)
-subtype_model.load_state_dict(cancer_subtype_model_load)
-subtype_model = nn.DataParallel(subtype_model, device_ids=device_ids)
+# ... FIXME: but that model (above) is just trained on labeled SLIDES, not tiles. So I might as well just use annotation info referenced in annotations/README.md??
+# ah, but it would work on CPTAC, for which I don't know if there are annotations?
+
+# subtype_model = InceptionV4(num_classes=2).to('cuda')
+# cancer_subtype_model_load = torch.load(args.subtype_model)
+# subtype_model.load_state_dict(cancer_subtype_model_load)
+# subtype_model = nn.DataParallel(subtype_model, device_ids=device_ids)
 
 all_data = []
 for directory in glob.glob(f"{args.src_dir}{os.sep}*"):
@@ -135,11 +137,11 @@ dl_val = DataLoader(ds_val, batch_size=256, num_workers=torch.cuda.device_count(
 dl_test = DataLoader(ds_test, batch_size=256, num_workers=torch.cuda.device_count(), shuffle=False)
 
 model_name = condssl.builder.MoCo.__name__
-data_dir_name = args.src_dir.split(os.sep)[-1]
+data_dir_name = [s for s in args.src_dir.split(os.sep) if s][-1].replace("_", "")
 
 for name, dl in list(zip(['train', 'val', 'test'], [dl_train, dl_val, dl_test]))[2:]:
     print(name)
-    embedding_dict, outcomes_dict = get_embeddings_bagging(feature_extractor, subtype_model, dl, args.do_outcomes)
+    embedding_dict, outcomes_dict = get_embeddings_bagging(feature_extractor, dl, args.do_outcomes)
     embedding_dest_path = os.path.join(args.out_dir, model_name,  "embeddings", f"{name}_{data_dir_name}_embedding.pkl")
     ensure_dir_exists(embedding_dest_path)
     pickle.dump(embedding_dict, open(embedding_dest_path, 'wb'), protocol=4)
