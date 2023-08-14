@@ -220,12 +220,6 @@ def find_data(src_dir, batch_size, batch_slide_num, workers, is_profiling):
     cropper = transforms.RandomResizedCrop(299, scale=(0.2, 1.))
     jitterer = transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)
 
-    all_data = []
-    for directory in glob.glob(f"{src_dir}{os.sep}*"):
-        for file in glob.glob(f"{directory}{os.sep}**{os.sep}*", recursive=True):
-            if os.path.isfile(file):
-                all_data.append({"q": file, "k": file, "filename": file})
-
     def range_func(x, y):
         return Range(x)(y) if is_profiling else y
     transformations = mt.Compose(
@@ -241,14 +235,32 @@ def find_data(src_dir, batch_size, batch_slide_num, workers, is_profiling):
         ]
     )
 
-    if not all_data:
+    all_data = []
+    number_of_slides = len(glob.glob(f"{args.src_dir}{os.sep}*"))
+    splits = [int(number_of_slides * 0.8), int(number_of_slides * 0.1), int(number_of_slides * 0.1)]
+    def add_dir(directory):
+        all_data = []
+        for filename in glob.glob(f"{directory}{os.sep}**{os.sep}*", recursive=True):
+            if os.path.isfile(filename):
+                slide_id = os.path.basename(filename.split(os.sep)[-2])
+                tile_id = os.path.basename(filename.split(os.sep)[-1])
+                all_data.append({"image": filename, "tile_id": tile_id, "slide_id": slide_id})
+        return all_data
+
+    train_data, val_data, test_data = [], [], []
+    for i, directory in enumerate(glob.glob(f"{args.src_dir}{os.sep}*")):
+        if i < splits[0]:
+            train_data += add_dir(directory)
+        elif i < splits[0] + splits[1]:
+            val_data += add_dir(directory)
+        else:
+            test_data += add_dir(directory)
+
+    if not train_data:
         raise RuntimeError(f"Found no data in {src_dir}")
 
-    train_data, test_data = train_test_split(all_data, test_size=0.1, random_state=42)
-    # note that we split the train data again, not the entire dataset
-    train_data, validation_data = train_test_split(train_data, test_size=0.1, random_state=42)
     ds_train = Dataset(train_data, transformations)
-    ds_val = Dataset(validation_data, transformations)
+    ds_val = Dataset(val_data, transformations)
     ds_test = Dataset(test_data, transformations)
 
     dl_train = DataLoader(ds_train, batch_sampler=MySampler(train_data, batch_size, batch_slide_num), num_workers=workers)

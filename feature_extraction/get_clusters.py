@@ -15,7 +15,7 @@ from numpy import savetxt
 parser = argparse.ArgumentParser(description='Get cluster features')
 reducer = umap.UMAP(random_state=42)
 
-parser.add_argument('--embeddings_dir', default='./', type=str, help="location of embeddings")
+parser.add_argument('--embeddings_path', default='./', type=str, help="location of embedding pkl from feature_extraction.py")
 parser.add_argument('--cluster_type', default='gmm', type=str)
 parser.add_argument('--n_cluster', default=50, type=int)
 parser.add_argument('--out_dir', default='./out', type=str)
@@ -31,14 +31,13 @@ def umap_slice(names, features):
     umap_projection = reducer.fit_transform(features_flattened)
     slices = list(accumulate([0] + [len(y) for y in values], operator.add))
     fig, ax = plt.subplots()
-    slide_sets = [[]] * len(names())
-    keys = list(features.keys())
+    slide_sets = [[]] * len(names)
 # [i]nterval_[s]tart, [e]nd
     for slide_number,(i_s,i_e) in enumerate(zip(slices, slices[1:])):
-        ax.scatter(umap_projection[i_s:i_e, 0], umap_projection[i_s:i_e, 1], label = f"Slide {keys[slide_number]}", alpha=.5)
+        ax.scatter(umap_projection[i_s:i_e, 0], umap_projection[i_s:i_e, 1], label = f"Slide {names[slide_number]}", alpha=.5)
         slide_sets[slide_number] = umap_projection[i_s:i_e]
     for i, ss in enumerate(slide_sets):
-        savetxt(os.path.join(args.out_dir, '{}.csv'.format(keys[i])), ss, delimiter=',')
+        savetxt(os.path.join(args.out_dir, '{}.csv'.format(names[i])), ss, delimiter=',')
     ax.legend()
     ax.get_xaxis().set_visible(False)
     ax.get_yaxis().set_visible(False)
@@ -46,16 +45,10 @@ def umap_slice(names, features):
     plt.show()
     #plt.savefig(os.path.join('.', 'umap_output.png'))
 
-train_features = pickle.load(open(args.embeddings_dir + '/test_embedding.pkl', 'rb'))
-train_features_flattened = np.concatenate(list(train_features.values()), axis=0)
-train_features = pickle.load(open(args.embeddings_dir + '/test_embedding.pkl', 'rb'))
-keys_sorted = list(sorted(train_features.keys()))
-print ("There are {} images in the dataset".format(len(keys_sorted)))
-# for s in combinations(keys_sorted, 3):
-#     train_features = pickle.load(open(args.data_dir + '/test_embedding.pkl', 'rb'))
-#     y = {k : train_features[k] for k in s}
-#     # get a subset of train_features from the keys in s
-#     subset_features = {k : train_features[k] for k in y}
-#     umap_slice(subset_features)
-umap_slice(['TCGA-43-8115-01A-01-BS1', 'TCGA-34-8456-01A-01-BS1', 'TCGA-68-A59J-01A-02-TSB'], train_features)
+if __name__ == "__main__":
+    features = pickle.load(open(args.embeddings_path, 'rb'))
+    keys_sorted = list(sorted(features.keys()))
+    print ("There are {} images in the dataset".format(len(keys_sorted)))
+    umap_slice(keys_sorted[:5], features)
+    #umap_slice(['TCGA-43-8115-01A-01-BS1', 'TCGA-34-8456-01A-01-BS1', 'TCGA-68-A59J-01A-02-TSB'], features)
 # umap_slice(train_features)

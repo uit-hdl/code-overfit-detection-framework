@@ -15,7 +15,7 @@ import torch
 import torch.nn as nn
 from collections import defaultdict
 from tqdm import tqdm
-from network.inception_v4 import InceptionV4, InceptionV4_compat
+from network.inception_v4 import InceptionV4
 from pathlib import Path
 import monai.transforms as mt
 
@@ -37,8 +37,6 @@ def get_embeddings_bagging(feature_extractor, dl, do_outcomes):
     #subtype_model.eval()
     with torch.no_grad():
         for d in tqdm(dl, position=0, leave=True, desc="processing batch"):
-            # bag idx is same as slide_id. 0 is first slide, 1 is second, etc
-            #img_batch, _, bag_idx = batch
             img_batch = d['image']
             bag_idx = d['slide_id']
 
@@ -46,19 +44,6 @@ def get_embeddings_bagging(feature_extractor, dl, do_outcomes):
 
             for f,bag in zip(feat, bag_idx):
                 embedding_dict[bag].append(f[np.newaxis, :].cpu().numpy())
-            #subtype_prob = subtype_model(img_batch)
-            #subtype_pred = torch.argmax(subtype_prob, dim=1)
-            #tumor_filter = (subtype_pred != 0).cpu().numpy()
-            # Feat and bag_idx now has images with tumors, those that didn't are excluded
-            #feat = feat[tumor_filter].cpu().numpy()
-
-            # For each image in current batch that has tumors
-            # for i, val in enumerate(tumor_filter):
-            #     if not val:
-            #         continue
-            #     if do_outcomes:
-            #         outcomes_dict[slide_index] = annotations[case_id]
-                #embedding_dict[bag_idx[i]].append(feat[i][np.newaxis, :])
         # The next for loop is more about making tensors into numpy arrays. We prune away the first dimension which doesn't need to exist
         # it is not merging all tiles from slides
         for slide_id in embedding_dict:
@@ -111,12 +96,25 @@ feature_extractor = nn.DataParallel(feature_extractor, device_ids=device_ids)
 # subtype_model = nn.DataParallel(subtype_model, device_ids=device_ids)
 
 all_data = []
-for directory in glob.glob(f"{args.src_dir}{os.sep}*"):
+number_of_slides = len(glob.glob(f"{args.src_dir}{os.sep}*"))
+splits = [int(number_of_slides * 0.8), int(number_of_slides * 0.1), int(number_of_slides * 0.1)]
+def add_dir(directory):
+    all_data = []
     for filename in glob.glob(f"{directory}{os.sep}**{os.sep}*", recursive=True):
         if os.path.isfile(filename):
             slide_id = os.path.basename(filename.split(os.sep)[-2])
             tile_id = os.path.basename(filename.split(os.sep)[-1])
-            all_data.append({"image": filename, "tile_id": tile_id, "slide_id": slide_id })
+            all_data.append({"image": filename, "tile_id": tile_id, "slide_id": slide_id})
+    return all_data
+
+train_data, val_data, test_data = [], [], []
+for i, directory in enumerate(glob.glob(f"{args.src_dir}{os.sep}*")):
+    if i < splits[0]:
+        train_data += add_dir(directory)
+    elif i < splits[0] + splits[1]:
+        val_data += add_dir(directory)
+    else:
+        test_data += add_dir(directory)
 
 transformations = mt.Compose(
     [
@@ -125,11 +123,11 @@ transformations = mt.Compose(
         mt.ToTensord("image", track_meta=False),
     ])
 
-train_data, test_data = train_test_split(all_data, test_size=0.1, random_state=42)
-# note that we split the train data again, not the entire dataset
-train_data, validation_data = train_test_split(train_data, test_size=0.1, random_state=42)
+# train_data, test_data = train_test_split(all_data, test_size=0.1, random_state=42)
+# # note that we split the train data again, not the entire dataset
+# train_data, validation_data = train_test_split(train_data, test_size=0.1, random_state=42)
 ds_train = Dataset(train_data, transformations)
-ds_val = Dataset(validation_data, transformations)
+ds_val = Dataset(val_data, transformations)
 ds_test = Dataset(test_data, transformations)
 
 dl_train = DataLoader(ds_train, batch_size=256, num_workers=torch.cuda.device_count(), shuffle=False)
