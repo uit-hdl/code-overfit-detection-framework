@@ -1,6 +1,7 @@
 #!/usr/bin/env -S python -m IPython
 
 import argparse
+import pandas as pd
 import operator
 import os
 import pickle
@@ -9,6 +10,7 @@ from itertools import accumulate
 import matplotlib.pyplot as plt
 import numpy as np
 import umap
+import umap.plot
 from numpy import savetxt
 
 
@@ -26,10 +28,21 @@ args = parser.parse_args()
 # pickle.dump(cluster, open(args.out_dir + '/gmm_{}.pkl'.format(args.n_cluster), 'wb'))
 
 def umap_slice(names, features):
-    values = [features[name] for name in names]
+    values = [[x[0] for x in features[name]] for name in names]
+    tile_names = [[x[1] for x in features[name]] for name in names]
     features_flattened = np.concatenate(values, axis=0)
     umap_projection = reducer.fit_transform(features_flattened)
+    mapper = reducer.fit(features_flattened)
     slices = list(accumulate([0] + [len(y) for y in values], operator.add))
+    names_labels = [[names[i]] * (i_e - i_s) for i,(i_s,i_e) in enumerate(zip(slices, slices[1:]))]
+    names_labels = [item for sublist in names_labels for item in sublist]
+
+    hover_data = pd.DataFrame({'index': np.arange(len(features_flattened)),
+                               'tile': np.concatenate(tile_names, axis=0),
+                               'label': names_labels})
+
+    p = umap.plot.interactive(mapper, labels=names_labels, hover_data=hover_data, point_size=7)
+    umap.plot.show(p)
     fig, ax = plt.subplots()
     slide_sets = [[]] * len(names)
 # [i]nterval_[s]tart, [e]nd
@@ -42,8 +55,8 @@ def umap_slice(names, features):
     ax.get_xaxis().set_visible(False)
     ax.get_yaxis().set_visible(False)
     # only one of the below, not both
-    plt.show()
-    #plt.savefig(os.path.join('.', 'umap_output.png'))
+    #plt.show()
+    plt.savefig(os.path.join('.', 'umap_output.png'))
 
 if __name__ == "__main__":
     features = pickle.load(open(args.embeddings_path, 'rb'))

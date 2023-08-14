@@ -39,16 +39,17 @@ def get_embeddings_bagging(feature_extractor, dl, do_outcomes):
         for d in tqdm(dl, position=0, leave=True, desc="processing batch"):
             img_batch = d['image']
             bag_idx = d['slide_id']
+            tile_idx = d['tile_id']
 
             feat = feature_extractor(img_batch) 
 
-            for f,bag in zip(feat, bag_idx):
-                embedding_dict[bag].append(f[np.newaxis, :].cpu().numpy())
+            for f,bag,tile in zip(feat, bag_idx, tile_idx):
+                embedding_dict[bag].append((f[np.newaxis, :].cpu().numpy(), tile))
         # The next for loop is more about making tensors into numpy arrays. We prune away the first dimension which doesn't need to exist
         # it is not merging all tiles from slides
         for slide_id in embedding_dict:
             # flatten the array: np.concatenate(np.array([[1,2],[3,4]]), axis=0) = array([1, 2, 3, 4])
-            embedding_dict[slide_id] = np.concatenate(embedding_dict[slide_id], axis=0)
+            embedding_dict[slide_id] = list(zip(np.concatenate([x[0] for x in embedding_dict[slide_id]], axis=0), [x[1] for x in embedding_dict[slide_id]]))
     # Embedding dict now has all tensors for each tiles with tumour, grouped by slide
     # Outcomes_dict has annotation info for all slides with tumorous tile, e.g.
     # ... {0: {'recurrence': 0, 'slide_id': ['TCGA-   ...
@@ -104,7 +105,7 @@ def add_dir(directory):
         if os.path.isfile(filename):
             slide_id = os.path.basename(filename.split(os.sep)[-2])
             tile_id = os.path.basename(filename.split(os.sep)[-1])
-            all_data.append({"image": filename, "tile_id": tile_id, "slide_id": slide_id})
+            all_data.append({"image": filename, "tile_id": filename, "slide_id": slide_id})
     return all_data
 
 train_data, val_data, test_data = [], [], []
