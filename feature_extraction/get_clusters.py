@@ -2,8 +2,10 @@
 
 import argparse
 import pandas as pd
+from bokeh.layouts import column, row, gridplot
 from bokeh.plotting import show as show_interactive
-from bokeh.models import ColumnDataSource, OpenURL, TapTool, WheelZoomTool
+from bokeh.models import ColumnDataSource, OpenURL, TapTool, WheelZoomTool, Legend, LegendItem
+from bokeh.palettes import Spectral10
 from sklearn.mixture import GaussianMixture
 import operator
 import os
@@ -52,14 +54,19 @@ def umap_slice(names, features, cluster, clinical, out_dir):
     names_labels = [item for sublist in names_labels for item in sublist]
     case_submitter_ids = ["-".join(name.split("-")[:3]) for name in names_labels]
     gender_labels = [clinical['gender'][case][0] for case in case_submitter_ids]
+    race_labels = [clinical['race'][case][0] for case in case_submitter_ids]
+    # If you want to see what the codes refer to https://gdc.cancer.gov/resources-tcga-users/tcga-code-tables/tissue-source-site-codes
+    institution_labels = [case.split("-")[1] for case in case_submitter_ids]
+
 
     hover_data = pd.DataFrame({'index': np.arange(len(features_flattened)),
                                'cluster_id': cluster_labels,
                                'gender': gender_labels,
+                               'race': race_labels,
+                               'institution': institution_labels,
                                'slide': names_labels,
                                'image_url': tile_names,
                                })
-    p = umap.plot.interactive(mapper, labels=gender_labels, hover_data=hover_data, point_size=7)
     TOOLTIPS = """
         <div>
             <div>
@@ -81,18 +88,58 @@ def umap_slice(names, features, cluster, clinical, out_dir):
                 <span style="font-size: 15px;">@gender</span>
             </div>
             <div>
+                <span style="font-size: 15px;">Institution:</span>
+                <span style="font-size: 15px;">@institution</span>
+            </div>
+            <div>
+                <span style="font-size: 15px;">Race:</span>
+                <span style="font-size: 15px;">@race</span>
+            </div>
+            <div>
                 <span style="font-size: 15px;">Location</span>
                 <span style="font-size: 10px; color: #696;">($x, $y)</span>
             </div>
         </div>
     """
-    p.hover.tooltips = TOOLTIPS
-
-    p.add_tools(TapTool())
-    taptool = p.select(type=TapTool)
+    p1 = umap.plot.interactive(mapper, labels=names_labels, hover_data=hover_data, point_size=7)
+    p1.title = "Slide"
+    p1.hover.tooltips = TOOLTIPS
+    p1.add_tools(TapTool())
+    legend = Legend(items=[LegendItem(label=name, renderers=p1.renderers, index=i) for i,name in zip(slices, names)])
+    #legend.click_policy="hide"
+    p1.add_layout(legend)
+    taptool = p1.select(type=TapTool)
     taptool.callback = OpenURL(url='@image_url')
-    wheeltool = p.select(type=WheelZoomTool)
-    show_interactive(p)
+
+    p2 = umap.plot.interactive(mapper, labels=gender_labels, hover_data=hover_data, point_size=7)
+    p2.hover.tooltips = TOOLTIPS
+    p2.title = "Gender"
+    legend = Legend(items=[LegendItem(label=gender, renderers=p2.renderers, index=i) for i,gender in zip(slices, set(gender_labels))])
+    p2.add_layout(legend)
+    p2.add_tools(TapTool())
+    taptool = p2.select(type=TapTool)
+    taptool.callback = OpenURL(url='@image_url')
+
+    p3 = umap.plot.interactive(mapper, labels=institution_labels, hover_data=hover_data, point_size=7)
+    p3.hover.tooltips = TOOLTIPS
+    p3.title = "Institution"
+    legend = Legend(items=[LegendItem(label=inst, renderers=p3.renderers, index=i) for i,inst in zip(slices, set(institution_labels))])
+    p3.add_layout(legend)
+    p3.add_tools(TapTool())
+    taptool = p3.select(type=TapTool)
+    taptool.callback = OpenURL(url='@image_url')
+
+    p4 = umap.plot.interactive(mapper, labels=race_labels, hover_data=hover_data, point_size=7)
+    p4.hover.tooltips = TOOLTIPS
+    p4.title = "Race"
+    legend = Legend(items=[LegendItem(label=race, renderers=p4.renderers, index=i) for i,race in zip(slices, set(race_labels))])
+    p4.add_layout(legend)
+    p4.add_tools(TapTool())
+    taptool = p4.select(type=TapTool)
+    taptool.callback = OpenURL(url='@image_url')
+
+
+    show_interactive(gridplot([[p1, p2], [p3, p4]]))
     #umap.plot.show(p)
 #     fig, ax = plt.subplots()
 #     slide_sets = [[]] * len(names)
@@ -127,8 +174,8 @@ if __name__ == "__main__":
 
     keys_sorted = list(sorted(features.keys()))
     print ("There are {} images in the dataset".format(len(keys_sorted)))
-    for i in range(20, len(keys_sorted), 5):
-        umap_slice(keys_sorted[i:i+15], features, cluster, clinical, args.out_dir)
+    for i in range(30, len(keys_sorted), 5):
+        umap_slice(keys_sorted[i:i+20], features, cluster, clinical, args.out_dir)
         break
 
     #umap_slice(['TCGA-21-5787-01A-01-TS1'], features, cluster, args.out_dir)
