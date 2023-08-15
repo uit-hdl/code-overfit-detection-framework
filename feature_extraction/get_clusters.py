@@ -3,7 +3,7 @@
 import argparse
 import pandas as pd
 from bokeh.plotting import show as show_interactive
-from bokeh.models import ColumnDataSource, OpenURL, TapTool
+from bokeh.models import ColumnDataSource, OpenURL, TapTool, WheelZoomTool
 from sklearn.mixture import GaussianMixture
 import operator
 import os
@@ -27,7 +27,8 @@ def ensure_dir_exists(path):
 parser = argparse.ArgumentParser(description='Get cluster features')
 reducer = umap.UMAP(random_state=42)
 
-parser.add_argument('--embeddings_path', default='./', type=str, help="location of embedding pkl from feature_extraction.py")
+parser.add_argument('--embeddings_path', default='./out/MoCo/embeddings/test_lungscc_embedding.pkl', type=str, help="location of embedding pkl from feature_extraction.py")
+parser.add_argument('--clinical_path', default='./annotations/clinical.tsv', type=str, help="location of file containing clinical data")
 parser.add_argument('--cluster', default=False, type=bool, action=argparse.BooleanOptionalAction,
                     metavar='O', help='whether to cluster or not', dest='do_cluster')
 parser.add_argument('--n_cluster', default=50, type=int)
@@ -35,7 +36,9 @@ parser.add_argument('--out_dir', default='./out', type=str)
 
 args = parser.parse_args()
 
-def umap_slice(names, features, cluster, out_dir):
+# color by gender
+
+def umap_slice(names, features, cluster, clinical, out_dir):
     values = [[x[0] for x in features[name]] for name in names]
     cluster_labels = [cluster.predict(y) for y in values]
     cluster_labels = [item for sublist in cluster_labels for item in sublist]
@@ -47,27 +50,35 @@ def umap_slice(names, features, cluster, out_dir):
     slices = list(accumulate([0] + [len(y) for y in values], operator.add))
     names_labels = [[names[i]] * (i_e - i_s) for i,(i_s,i_e) in enumerate(zip(slices, slices[1:]))]
     names_labels = [item for sublist in names_labels for item in sublist]
+    case_submitter_ids = ["-".join(name.split("-")[:3]) for name in names_labels]
+    gender_labels = [clinical['gender'][case][0] for case in case_submitter_ids]
 
     hover_data = pd.DataFrame({'index': np.arange(len(features_flattened)),
                                'cluster_id': cluster_labels,
+                               'gender': gender_labels,
+                               'slide': names_labels,
                                'image_url': tile_names,
-                               'label': names_labels})
-    p = umap.plot.interactive(mapper, labels=names_labels, hover_data=hover_data, point_size=7)
+                               })
+    p = umap.plot.interactive(mapper, labels=gender_labels, hover_data=hover_data, point_size=7)
     TOOLTIPS = """
         <div>
             <div>
                 <img
-                    src="@image_url" height="150" alt="@label" width="150"
+                    src="@image_url" height="150" alt="@slide" width="150"
                     style="float: left; margin: 0px 15px 15px 0px;"
                     border="2"
                 ></img>
             </div>
             <div>
-                <span style="font-size: 17px; font-weight: bold;">@label</span>
+                <span style="font-size: 17px; font-weight: bold;">@slide</span>
             </div>
             <div>
-                <span style="font-size: 15px;">Cluster:</span>
+                <span style="font-size: 15px;">GMM Cluster:</span>
                 <span style="font-size: 15px;">@cluster_id</span>
+            </div>
+            <div>
+                <span style="font-size: 15px;">Gender:</span>
+                <span style="font-size: 15px;">@gender</span>
             </div>
             <div>
                 <span style="font-size: 15px;">Location</span>
@@ -80,6 +91,7 @@ def umap_slice(names, features, cluster, out_dir):
     p.add_tools(TapTool())
     taptool = p.select(type=TapTool)
     taptool.callback = OpenURL(url='@image_url')
+    wheeltool = p.select(type=WheelZoomTool)
     show_interactive(p)
     #umap.plot.show(p)
 #     fig, ax = plt.subplots()
@@ -100,6 +112,9 @@ def umap_slice(names, features, cluster, out_dir):
 #     plt.savefig(plt_dst)
 
 if __name__ == "__main__":
+    clinical = pd.read_csv(args.clinical_path, sep='\t')
+    clinical = clinical.set_index('case_submitter_id')
+
     features = pickle.load(open(args.embeddings_path, 'rb'))
 
     cluster_dst = os.path.join(args.out_dir, 'cluster', f'gmm_{args.n_cluster}.pkl')
@@ -112,8 +127,8 @@ if __name__ == "__main__":
 
     keys_sorted = list(sorted(features.keys()))
     print ("There are {} images in the dataset".format(len(keys_sorted)))
-    for i in range(10, len(keys_sorted), 5):
-        umap_slice(keys_sorted[i:i+5], features, cluster, args.out_dir)
+    for i in range(20, len(keys_sorted), 5):
+        umap_slice(keys_sorted[i:i+15], features, cluster, clinical, args.out_dir)
         break
 
     #umap_slice(['TCGA-21-5787-01A-01-TS1'], features, cluster, args.out_dir)
