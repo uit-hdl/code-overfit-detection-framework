@@ -4,6 +4,7 @@ import argparse
 import pandas as pd
 from bokeh.plotting import show as show_interactive
 from bokeh.models import ColumnDataSource, OpenURL, TapTool
+from sklearn.mixture import GaussianMixture
 import operator
 import os
 import pickle
@@ -14,23 +15,30 @@ import numpy as np
 import umap
 import umap.plot
 from numpy import savetxt
+from pathlib import Path
+
+def ensure_dir_exists(path):
+    dest_dir = os.path.dirname(path)
+    if not os.path.exists(dest_dir):
+        Path(dest_dir).mkdir(parents=True, exist_ok=True)
+
 
 
 parser = argparse.ArgumentParser(description='Get cluster features')
 reducer = umap.UMAP(random_state=42)
 
 parser.add_argument('--embeddings_path', default='./', type=str, help="location of embedding pkl from feature_extraction.py")
-parser.add_argument('--cluster_type', default='gmm', type=str)
+parser.add_argument('--cluster', default=False, type=bool, action=argparse.BooleanOptionalAction,
+                    metavar='O', help='whether to cluster or not', dest='do_cluster')
 parser.add_argument('--n_cluster', default=50, type=int)
 parser.add_argument('--out_dir', default='./out', type=str)
 
 args = parser.parse_args()
 
-#cluster = GaussianMixture(n_components=args.n_cluster).fit(train_features_flattened)
-# pickle.dump(cluster, open(args.out_dir + '/gmm_{}.pkl'.format(args.n_cluster), 'wb'))
-
-def umap_slice(names, features):
+def umap_slice(names, features, cluster, out_dir):
     values = [[x[0] for x in features[name]] for name in names]
+    cluster_labels = [cluster.predict(y) for y in values]
+    cluster_labels = [item for sublist in cluster_labels for item in sublist]
     tile_names = [[x[1] for x in features[name]] for name in names]
     tile_names = ["file:///" + x for x in np.concatenate(tile_names, axis=0)]
     features_flattened = np.concatenate(values, axis=0)
@@ -41,6 +49,7 @@ def umap_slice(names, features):
     names_labels = [item for sublist in names_labels for item in sublist]
 
     hover_data = pd.DataFrame({'index': np.arange(len(features_flattened)),
+                               'cluster_id': cluster_labels,
                                'image_url': tile_names,
                                'label': names_labels})
     p = umap.plot.interactive(mapper, labels=names_labels, hover_data=hover_data, point_size=7)
@@ -55,6 +64,10 @@ def umap_slice(names, features):
             </div>
             <div>
                 <span style="font-size: 17px; font-weight: bold;">@label</span>
+            </div>
+            <div>
+                <span style="font-size: 15px;">Cluster:</span>
+                <span style="font-size: 15px;">@cluster_id</span>
             </div>
             <div>
                 <span style="font-size: 15px;">Location</span>
@@ -82,12 +95,27 @@ def umap_slice(names, features):
 #     ax.get_yaxis().set_visible(False)
 #     # only one of the below, not both
 #     #plt.show()
-#     plt.savefig(os.path.join('.', 'umap_output.png'))
+#     plt_dst = os.path.join(args.out_dir, 'cluster', 'umap_output.png')
+#     ensure_dir_exists(plt_dst)
+#     plt.savefig(plt_dst)
 
 if __name__ == "__main__":
     features = pickle.load(open(args.embeddings_path, 'rb'))
+
+    cluster_dst = os.path.join(args.out_dir, 'cluster', f'gmm_{args.n_cluster}.pkl')
+    if os.path.exists(cluster_dst):
+        cluster = pickle.load(open(cluster_dst, 'rb'))
+    else:
+        cluster = GaussianMixture(n_components=args.n_cluster, random_state=42).fit([item[0] for sublist in features.values() for item in sublist])
+        ensure_dir_exists(cluster_dst)
+        pickle.dump(cluster, open(cluster_dst, 'wb'))
+
     keys_sorted = list(sorted(features.keys()))
     print ("There are {} images in the dataset".format(len(keys_sorted)))
-    umap_slice(keys_sorted[:5], features)
-    #umap_slice(['TCGA-43-8115-01A-01-BS1', 'TCGA-34-8456-01A-01-BS1', 'TCGA-68-A59J-01A-02-TSB'], features)
+    for i in range(10, len(keys_sorted), 5):
+        umap_slice(keys_sorted[i:i+5], features, cluster, args.out_dir)
+        break
+
+    #umap_slice(['TCGA-21-5787-01A-01-TS1'], features, cluster, args.out_dir)
+    #umap_slice(['TCGA-43-8115-01A-01-BS1', 'TCGA-34-8456-01A-01-BS1', 'TCGA-68-A59J-01A-02-TSB'], features, cluster, args.out_dir)
 # umap_slice(train_features)
