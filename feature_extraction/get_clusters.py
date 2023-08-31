@@ -106,7 +106,7 @@ def umap_slice(names, features, cluster, clinical, out_dir):
     p4 = umap_plot.interactive(mapper, labels=race_labels, hover_data=hover_data, point_size=7, hover_tips=TOOLTIPS, title="Race")
     p5 = umap_plot.interactive(mapper, labels=cluster_labels, hover_data=hover_data, point_size=7, hover_tips=TOOLTIPS, title="GMM Cluster")
 
-    gp = gridplot([[p1, p2], [p3, p4], [None, p5]])
+    gp = gridplot([[p1, p4], [p3, p2], [None, p5]])
     tt = TapTool()
     tt.callback = OpenURL(url="@image_url")
     gp.toolbar.tools.append(tt)
@@ -146,7 +146,7 @@ if __name__ == "__main__":
 
     keys_sorted = list(sorted(features.keys()))
     print ("There are {} images in the dataset".format(len(keys_sorted)))
-    umap_slice(keys_sorted[0:20], features, cluster, clinical, args.out_dir)
+    umap_slice(keys_sorted[0:10], features, cluster, clinical, args.out_dir)
 
     #umap_slice(['TCGA-21-5787-01A-01-TS1'], features, cluster, args.out_dir)
     #umap_slice(['TCGA-43-8115-01A-01-BS1', 'TCGA-34-8456-01A-01-BS1', 'TCGA-68-A59J-01A-02-TSB'], features, cluster, args.out_dir)
