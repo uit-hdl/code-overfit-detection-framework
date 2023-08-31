@@ -2,6 +2,7 @@
 
 import argparse
 import operator
+from sklearn.neighbors import NearestNeighbors
 import os
 import pickle
 from itertools import accumulate
@@ -12,7 +13,7 @@ import numpy as np
 import pandas as pd
 import umap.plot
 from bokeh.layouts import gridplot
-from bokeh.plotting import show as show_interactive
+from bokeh.plotting import show as show_interactive, output_file, save
 from sklearn.mixture import GaussianMixture
 
 import umap_plot
@@ -83,6 +84,20 @@ def umap_slice(names, features, cluster, clinical, out_dir):
     features_flattened = np.concatenate(values, axis=0)
     umap_projection = reducer.fit_transform(features_flattened)
     mapper = reducer.fit(features_flattened)
+
+    # TODO: #1 make a KNN in high-dimensional space
+    # TODO: #2 make a KNN in low-dimensional space
+    # TODO: compute how many of the neighbors from #1 that are preserved in #2
+    # (The art of using t-SNE for single-cell transcriptomics)
+
+    # #1
+    nbrs_high = NearestNeighbors(n_neighbors=10, algorithm='ball_tree').fit(features_flattened)
+    nbrs_low = NearestNeighbors(n_neighbors=10, algorithm='ball_tree').fit(mapper.embedding_)
+
+    distances_high, indices_high = nbrs_high.kneighbors(features_flattened)
+    distances_low, indices_low = nbrs_low.kneighbors(mapper.embedding_)
+
+    #umap_projection = reducer.fit_transform(features_flattened)
     slices = list(accumulate([0] + [len(y) for y in values], operator.add))
     names_labels = [[names[i]] * (i_e - i_s) for i,(i_s,i_e) in enumerate(zip(slices, slices[1:]))]
     names_labels = [item for sublist in names_labels for item in sublist]
@@ -100,6 +115,10 @@ def umap_slice(names, features, cluster, clinical, out_dir):
                                'slide': names_labels,
                                'image_url': tile_names,
                                })
+
+    out_html = os.path.join(out_dir, "web", "condssl_out.html")
+    ensure_dir_exists(out_html)
+    output_file(out_html, title="Static HTML file")
     p1 = umap_plot.interactive(mapper, labels=names_labels, hover_data=hover_data, point_size=7, hover_tips=TOOLTIPS, title="Slide")
     p2 = umap_plot.interactive(mapper, labels=gender_labels, hover_data=hover_data, point_size=7, hover_tips=TOOLTIPS, title="Gender")
     p3 = umap_plot.interactive(mapper, labels=institution_labels, hover_data=hover_data, point_size=7, hover_tips=TOOLTIPS, title="Instiution")
@@ -111,7 +130,8 @@ def umap_slice(names, features, cluster, clinical, out_dir):
     tt.callback = OpenURL(url="@image_url")
     gp.toolbar.tools.append(tt)
 
-    show_interactive(gp)
+    save(gp)
+    #show_interactive(gp)
     #umap.plot.show(p)
 #     fig, ax = plt.subplots()
 #     slide_sets = [[]] * len(names)
