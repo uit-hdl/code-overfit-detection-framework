@@ -78,6 +78,35 @@ TOOLTIPS = """
     </div>
 """
 
+def compute_knn(high_dimensional_points, low_dimensional_points, k=10):
+    nbrs_high = NearestNeighbors(n_neighbors=k, algorithm='ball_tree').fit(high_dimensional_points)
+    nbrs_low = NearestNeighbors(n_neighbors=k, algorithm='ball_tree').fit(low_dimensional_points)
+
+    distances_high, indices_high = nbrs_high.kneighbors(high_dimensional_points)
+    distances_low, indices_low = nbrs_low.kneighbors(low_dimensional_points)
+    # Calculate how many elements in b that is in a
+    knn_frac = lambda s: len(set(s[0]).intersection(s[1])) / k
+    knn_fractions = list(map(knn_frac, zip(indices_low, indices_high)))
+
+    return knn_fractions
+
+def compute_knc(high_dimensional_points, low_dimensional_points, cluster_labels, k=10):
+    nbrs_high = NearestNeighbors(n_neighbors=k, algorithm='ball_tree').fit(high_dimensional_points)
+    nbrs_low = NearestNeighbors(n_neighbors=k, algorithm='ball_tree').fit(low_dimensional_points)
+
+    distances_high, indices_high = nbrs_high.kneighbors(high_dimensional_points)
+    distances_low, indices_low = nbrs_low.kneighbors(low_dimensional_points)
+    cluster_map = lambda x: cluster_labels[x]
+    class_mapping_high = [list(map(cluster_map, li)) for li in indices_high]
+    class_mapping_low = [list(map(cluster_map, li)) for li in indices_low]
+
+    # Calculate how many elements in b that is in a
+    knn_frac = lambda s: len(set(s[0]).intersection(s[1])) / k
+    knn_fractions = list(map(knn_frac, zip(class_mapping_high, class_mapping_low)))
+
+    return knn_fractions
+
+
 def umap_slice(names, features, cluster, clinical, out_dir):
     values = [[x[0] for x in features[name]] for name in names]
     cluster_labels = [cluster.predict(y) for y in values]
@@ -95,16 +124,8 @@ def umap_slice(names, features, cluster, clinical, out_dir):
     # (The art of using t-SNE for single-cell transcriptomics)
 
     # #1
-    k = 10
-    nbrs_high = NearestNeighbors(n_neighbors=k, algorithm='ball_tree').fit(features_flattened)
-    nbrs_low = NearestNeighbors(n_neighbors=k, algorithm='ball_tree').fit(mapper.embedding_)
-
-    distances_high, indices_high = nbrs_high.kneighbors(features_flattened)
-    distances_low, indices_low = nbrs_low.kneighbors(mapper.embedding_)
-    # Calculate how many elements in b that is in a
-    knn_frac = lambda s: len(set(s[0]).intersection(s[1])) / k
-    knn_fractions = list(map(knn_frac, zip(indices_low, indices_high)))
-    knn_fraction = np.mean(knn_fractions)
+    knn_fractions = compute_knn(features_flattened, mapper.embedding_, k=10)
+    knc_fractions = compute_knc(features_flattened, mapper.embedding_, cluster_labels, k=10)
 
     #umap_projection = reducer.fit_transform(features_flattened)
     slices = list(accumulate([0] + [len(y) for y in values], operator.add))
@@ -137,12 +158,17 @@ def umap_slice(names, features, cluster, clinical, out_dir):
         "KNN": [np.mean(knn_fractions)]
        })
     # Print knn_fraction with 4 decimals
-    knn_statbox = figure(title="KNN stats: mean {:.4f}".format(knn_fraction), y_range = (0, 1))
+    knn_statbox = figure(title="KNN stats: mean {:.4f}".format(np.mean(knn_fractions)), y_range = (0, 1))
     knn_statbox.xaxis[0].axis_label = 'slide'
     knn_statbox.yaxis[0].axis_label = 'Fraction'
     knn_statbox.circle(list(range(len(knn_fractions))), knn_fractions, color='red', size=5, line_alpha=0)
 
-    gp = gridplot([[p1, p3], [p2, p4], [knn_statbox, p5]])
+    knc_statbox = figure(title="KNC stats: mean {:.4f}".format(np.mean(knc_fractions)), y_range = (0, 1))
+    knc_statbox.xaxis[0].axis_label = 'slide'
+    knc_statbox.yaxis[0].axis_label = 'Fraction'
+    knc_statbox.circle(list(range(len(knc_fractions))), knc_fractions, color='red', size=5, line_alpha=0)
+
+    gp = gridplot([[p1, p3], [p2, p4], [None, p5], [knn_statbox, knc_statbox]])
     #gp = gridplot([[p1]])
     tt = TapTool()
     tt.callback = OpenURL(url="@image_url")
