@@ -2,6 +2,8 @@
 
 import argparse
 import operator
+
+import pandas
 from sklearn.neighbors import NearestNeighbors
 import os
 import pickle
@@ -13,7 +15,8 @@ import numpy as np
 import pandas as pd
 import umap.plot
 from bokeh.layouts import gridplot
-from bokeh.plotting import show as show_interactive, output_file, save
+from bokeh.plotting import output_file, save, figure
+from bokeh.models import Whisker
 from sklearn.mixture import GaussianMixture
 
 import umap_plot
@@ -92,11 +95,16 @@ def umap_slice(names, features, cluster, clinical, out_dir):
     # (The art of using t-SNE for single-cell transcriptomics)
 
     # #1
-    #nbrs_high = NearestNeighbors(n_neighbors=10, algorithm='ball_tree').fit(features_flattened)
-    #nbrs_low = NearestNeighbors(n_neighbors=10, algorithm='ball_tree').fit(mapper.embedding_)
+    k = 10
+    nbrs_high = NearestNeighbors(n_neighbors=k, algorithm='ball_tree').fit(features_flattened)
+    nbrs_low = NearestNeighbors(n_neighbors=k, algorithm='ball_tree').fit(mapper.embedding_)
 
-    #distances_high, indices_high = nbrs_high.kneighbors(features_flattened)
-    #distances_low, indices_low = nbrs_low.kneighbors(mapper.embedding_)
+    distances_high, indices_high = nbrs_high.kneighbors(features_flattened)
+    distances_low, indices_low = nbrs_low.kneighbors(mapper.embedding_)
+    # Calculate how many elements in b that is in a
+    knn_frac = lambda s: len(set(s[0]).intersection(s[1])) / k
+    knn_fractions = list(map(knn_frac, zip(indices_low, indices_high)))
+    knn_fraction = np.mean(knn_fractions)
 
     #umap_projection = reducer.fit_transform(features_flattened)
     slices = list(accumulate([0] + [len(y) for y in values], operator.add))
@@ -119,14 +127,22 @@ def umap_slice(names, features, cluster, clinical, out_dir):
 
     out_html = os.path.join(out_dir, "web", "condssl_out.html")
     ensure_dir_exists(out_html)
-    output_file(out_html, title="Static HTML file")
+    output_file(out_html, title="Conditional SSL UMAP")
     p1 = umap_plot.interactive(mapper, labels=names_labels, hover_data=hover_data, point_size=7, hover_tips=TOOLTIPS, title="Slide")
     p2 = umap_plot.interactive(mapper, labels=gender_labels, hover_data=hover_data, point_size=7, hover_tips=TOOLTIPS, title="Gender")
     p3 = umap_plot.interactive(mapper, labels=institution_labels, hover_data=hover_data, point_size=7, hover_tips=TOOLTIPS, title="Instiution")
     p4 = umap_plot.interactive(mapper, labels=race_labels, hover_data=hover_data, point_size=7, hover_tips=TOOLTIPS, title="Race")
     p5 = umap_plot.interactive(mapper, labels=cluster_labels, hover_data=hover_data, point_size=7, hover_tips=TOOLTIPS, title="GMM Cluster")
+    df = pandas.DataFrame({
+        "KNN": [np.mean(knn_fractions)]
+       })
+    # Print knn_fraction with 4 decimals
+    knn_statbox = figure(title="KNN stats: mean {:.4f}".format(knn_fraction), y_range = (0, 1))
+    knn_statbox.xaxis[0].axis_label = 'slide'
+    knn_statbox.yaxis[0].axis_label = 'Fraction'
+    knn_statbox.circle(list(range(len(knn_fractions))), knn_fractions, color='red', size=5, line_alpha=0)
 
-    gp = gridplot([[p1, p3], [p2, p4], [None, p5]])
+    gp = gridplot([[p1, p3], [p2, p4], [knn_statbox, p5]])
     #gp = gridplot([[p1]])
     tt = TapTool()
     tt.callback = OpenURL(url="@image_url")
@@ -169,7 +185,7 @@ if __name__ == "__main__":
 
     keys_sorted = list(sorted(features.keys()))
     print ("There are {} images in the dataset".format(len(keys_sorted)))
-    umap_slice(keys_sorted[0:10], features, cluster, clinical, args.out_dir)
+    umap_slice(keys_sorted[0:2], features, cluster, clinical, args.out_dir)
 
     #umap_slice(['TCGA-21-5787-01A-01-TS1'], features, cluster, args.out_dir)
     #umap_slice(['TCGA-43-8115-01A-01-BS1', 'TCGA-34-8456-01A-01-BS1', 'TCGA-68-A59J-01A-02-TSB'], features, cluster, args.out_dir)
