@@ -2,14 +2,18 @@
 
 import argparse
 import operator
+import random
+from scipy.stats import spearmanr
 
 import pandas
+from scipy.spatial import distance
 from sklearn.neighbors import NearestNeighbors
 import os
 import pickle
 from itertools import accumulate
 from pathlib import Path
 from bokeh.models import OpenURL, TapTool
+from bokeh.models.widgets import Paragraph
 
 import numpy as np
 import pandas as pd
@@ -106,6 +110,22 @@ def compute_knc(high_dimensional_points, low_dimensional_points, cluster_labels,
 
     return knn_fractions
 
+def compute_cpd(high_dimensional_points, low_dimensional_points, sample_size=1000):
+    points = random.sample(range(len(high_dimensional_points)), sample_size if len(high_dimensional_points) > sample_size else len(high_dimensional_points))
+    dists_high = [0] * (len(points) * (len(points) -1))
+    dists_low = [0] * (len(points) * (len(points) - 1))
+    index = 0
+    for i,p in enumerate(points):
+        for j,q in enumerate(points):
+            if i == j:
+                continue
+            dists_high[index] = distance.euclidean(high_dimensional_points[i], high_dimensional_points[j])
+            dists_low[index] = distance.euclidean(low_dimensional_points[i], low_dimensional_points[j])
+            index += 1
+    return spearmanr(dists_high, dists_low)
+
+
+
 
 def umap_slice(names, features, cluster, clinical, out_dir):
     values = [[x[0] for x in features[name]] for name in names]
@@ -126,6 +146,7 @@ def umap_slice(names, features, cluster, clinical, out_dir):
     # #1
     knn_fractions = compute_knn(features_flattened, mapper.embedding_, k=10)
     knc_fractions = compute_knc(features_flattened, mapper.embedding_, cluster_labels, k=10)
+    cpd = compute_cpd(features_flattened, mapper.embedding_, sample_size=1000)
 
     #umap_projection = reducer.fit_transform(features_flattened)
     slices = list(accumulate([0] + [len(y) for y in values], operator.add))
@@ -150,25 +171,15 @@ def umap_slice(names, features, cluster, clinical, out_dir):
     ensure_dir_exists(out_html)
     output_file(out_html, title="Conditional SSL UMAP")
     p1 = umap_plot.interactive(mapper, labels=names_labels, hover_data=hover_data, point_size=7, hover_tips=TOOLTIPS, title="Slide")
+    if len(names) > 5: p1.legend.visible = False
     p2 = umap_plot.interactive(mapper, labels=gender_labels, hover_data=hover_data, point_size=7, hover_tips=TOOLTIPS, title="Gender")
     p3 = umap_plot.interactive(mapper, labels=institution_labels, hover_data=hover_data, point_size=7, hover_tips=TOOLTIPS, title="Instiution")
     p4 = umap_plot.interactive(mapper, labels=race_labels, hover_data=hover_data, point_size=7, hover_tips=TOOLTIPS, title="Race")
     p5 = umap_plot.interactive(mapper, labels=cluster_labels, hover_data=hover_data, point_size=7, hover_tips=TOOLTIPS, title="GMM Cluster")
-    df = pandas.DataFrame({
-        "KNN": [np.mean(knn_fractions)]
-       })
-    # Print knn_fraction with 4 decimals
-    knn_statbox = figure(title="KNN stats: mean {:.4f}".format(np.mean(knn_fractions)), y_range = (0, 1))
-    knn_statbox.xaxis[0].axis_label = 'slide'
-    knn_statbox.yaxis[0].axis_label = 'Fraction'
-    knn_statbox.circle(list(range(len(knn_fractions))), knn_fractions, color='red', size=5, line_alpha=0)
 
-    knc_statbox = figure(title="KNC stats: mean {:.4f}".format(np.mean(knc_fractions)), y_range = (0, 1))
-    knc_statbox.xaxis[0].axis_label = 'slide'
-    knc_statbox.yaxis[0].axis_label = 'Fraction'
-    knc_statbox.circle(list(range(len(knc_fractions))), knc_fractions, color='red', size=5, line_alpha=0)
+    stat_box = Paragraph(text="""CPD: {:.4f} (pvalue {:.4f})<br />KNC mean {:.4f}<br />KNN mean {:.4f}""".format(cpd[0], cpd[1], np.mean(knc_fractions), np.mean(knn_fractions)))
 
-    gp = gridplot([[p1, p3], [p2, p4], [None, p5], [knn_statbox, knc_statbox]])
+    gp = gridplot([[p1, p3], [p2, p4], [stat_box, p5]])
     #gp = gridplot([[p1]])
     tt = TapTool()
     tt.callback = OpenURL(url="@image_url")
@@ -211,7 +222,7 @@ if __name__ == "__main__":
 
     keys_sorted = list(sorted(features.keys()))
     print ("There are {} images in the dataset".format(len(keys_sorted)))
-    umap_slice(keys_sorted[0:2], features, cluster, clinical, args.out_dir)
+    umap_slice(keys_sorted[0:40], features, cluster, clinical, args.out_dir)
 
     #umap_slice(['TCGA-21-5787-01A-01-TS1'], features, cluster, args.out_dir)
     #umap_slice(['TCGA-43-8115-01A-01-BS1', 'TCGA-34-8456-01A-01-BS1', 'TCGA-68-A59J-01A-02-TSB'], features, cluster, args.out_dir)
