@@ -222,7 +222,9 @@ if __name__ == "__main__":
 
     keys_sorted = list(sorted(features.keys()))
     print ("There are {} images in the dataset".format(len(keys_sorted)))
-    umap_slice(keys_sorted[0:40], features, cluster, clinical, args.out_dir)
+    #umap_slice(keys_sorted[8:16], features, cluster, clinical, args.out_dir)
+    keys_randomized = random.sample(keys_sorted, len(keys_sorted))
+    umap_slice(keys_randomized[8:14], features, cluster, clinical, args.out_dir)
 
     #umap_slice(['TCGA-21-5787-01A-01-TS1'], features, cluster, args.out_dir)
     #umap_slice(['TCGA-43-8115-01A-01-BS1', 'TCGA-34-8456-01A-01-BS1', 'TCGA-68-A59J-01A-02-TSB'], features, cluster, args.out_dir)

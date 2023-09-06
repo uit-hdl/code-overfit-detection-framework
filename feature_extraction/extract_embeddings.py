@@ -4,7 +4,6 @@ import sys
 
 import numpy as np
 from monai.data import DataLoader, Dataset
-from sklearn.model_selection import train_test_split
 
 sys.path.append('./')
 
@@ -41,7 +40,7 @@ def get_embeddings_bagging(feature_extractor, dl, do_outcomes):
             bag_idx = d['slide_id']
             tile_idx = d['tile_id']
 
-            feat = feature_extractor(img_batch) 
+            feat = feature_extractor(img_batch.to(device))
 
             for f,bag,tile in zip(feat, bag_idx, tile_idx):
                 embedding_dict[bag].append((f[np.newaxis, :].cpu().numpy(), tile))
@@ -122,24 +121,63 @@ transformations = mt.Compose(
         mt.LoadImaged("image", image_only=True),
         mt.EnsureChannelFirstd("image"),
         mt.ToTensord("image", track_meta=False),
+        # doesnt work?
+        # mt.ToDeviceD(keys="image", device=device),
     ])
 
 # train_data, test_data = train_test_split(all_data, test_size=0.1, random_state=42)
 # # note that we split the train data again, not the entire dataset
 # train_data, validation_data = train_test_split(train_data, test_size=0.1, random_state=42)
-ds_train = Dataset(train_data, transformations)
-ds_val = Dataset(val_data, transformations)
-ds_test = Dataset(test_data, transformations)
-
-dl_train = DataLoader(ds_train, batch_size=256, num_workers=torch.cuda.device_count(), shuffle=False)
-dl_val = DataLoader(ds_val, batch_size=256, num_workers=torch.cuda.device_count(), shuffle=False)
-dl_test = DataLoader(ds_test, batch_size=256, num_workers=torch.cuda.device_count(), shuffle=False)
-
 model_name = condssl.builder.MoCo.__name__
 data_dir_name = [s for s in args.src_dir.split(os.sep) if s][-1].replace("_", "")
 
-for name, dl in list(zip(['train', 'val', 'test'], [dl_train, dl_val, dl_test]))[2:]:
+for name, data in list(zip(['train', 'val', 'test'], [train_data, val_data, test_data]))[2:]:
     print(name)
+    number_of_unique_inst = len(set([d['slide_id'].split("-")[1] for d in data]))
+    data = data[:1000]
+    dl = DataLoader(dataset=Dataset(data, transformations), batch_size=128, num_workers=torch.cuda.device_count(), shuffle=False)
+
+    # Get number of unique slides in dl
+    # Approach below doesn't work: the results are random from the model. So, let's just use the GMM approach instead
+    # slide_extractor = InceptionV4(num_classes=128)
+    # load_model(slide_extractor, args.feature_extractor)
+    # slide_extractor.last_linear = nn.Linear(1536, number_of_unique_inst) # the linear layer removes our dependency/link to the key encoder
+    # slide_extractor.to('cuda')
+    # feature_extractor = nn.DataParallel(feature_extractor, device_ids=device_ids)
+    # slide_embedding, _ = get_embeddings_bagging(slide_extractor, dl, False)
+    # TODO: use GMM to decide this. For fuzzy memberships, maybe knn?
+
+
+    institution_guess = [(np.argmax(x[0]), x[1]) for y in slide_embedding.values() for x in y]
+    # I want to know how many slides from the same institution that end up in the same bag
+    # count how many slides are from each institution
+    gt_institution_count = defaultdict(int)
+    institution_count = defaultdict(lambda: defaultdict(dict))
+    for (i,slide) in institution_guess:
+        institution = os.path.dirname(slide).split("-")[1]
+        if institution not in institution_count[i]:
+            institution_count[i][institution] = 0
+        institution_count[i][institution] += 1
+
+        gt_institution_count[institution] += 1
+    print(institution_count)
+    print(gt_institution_count)
+    overlap_count = defaultdict(lambda: defaultdict(int))
+    for bag,d in institution_count.items():
+        for inst_l,count_l in d.items():
+            for inst_r, count_r in d.items():
+                if inst_l == inst_r:
+                    continue
+                overlap_count[inst_l][inst_r] += min(count_l, count_r)
+
+    overlap_percent = defaultdict(lambda: {})
+    for inst_l,d in overlap_count.items():
+        for inst_r, count in d.items():
+            if gt_institution_count[inst_r] < gt_institution_count[inst_l]:
+                overlap_percent[inst_l][inst_r] = count / gt_institution_count[inst_r]
+            else:
+                overlap_percent[inst_l][inst_r] = overlap_count[inst_r][inst_l] / gt_institution_count[inst_l]
+
     embedding_dict, outcomes_dict = get_embeddings_bagging(feature_extractor, dl, args.do_outcomes)
     embedding_dest_path = os.path.join(args.out_dir, model_name,  "embeddings", f"{name}_{data_dir_name}_embedding.pkl")
     ensure_dir_exists(embedding_dest_path)
