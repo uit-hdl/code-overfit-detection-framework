@@ -17,6 +17,7 @@ from tqdm import tqdm
 from network.inception_v4 import InceptionV4
 from pathlib import Path
 import monai.transforms as mt
+from sklearn.mixture import GaussianMixture
 
 if torch.cuda.is_available():
     device = 'cuda'
@@ -54,9 +55,9 @@ def get_embeddings_bagging(feature_extractor, dl, do_outcomes):
     # ... {0: {'recurrence': 0, 'slide_id': ['TCGA-   ...
     return embedding_dict, outcomes_dict
 
-def load_model(net, model_dir):
+def load_model(net, model_path):
     # original
-    checkpoint = torch.load(model_dir)
+    checkpoint = torch.load(model_path)
     model_state_dict = {k.replace("encoder_q.", ""): v for k, v in checkpoint['state_dict'].items() if
                         "encoder_q" in k}
     net.load_state_dict(model_state_dict)
@@ -66,8 +67,7 @@ def load_model(net, model_dir):
 parser = argparse.ArgumentParser(description='Extract embeddings ')
 
 parser.add_argument('--feature_extractor', default='./pretrained/checkpoint.pth.tar', type=str, help='path to feature extractor, which will extract features from tiles')
-parser.add_argument('--subtype_model', default='./pretrained/checkpoint.pth.tar', type=str, help='path to subtype model, which will differentiate tumor and normal')
-parser.add_argument('--src_dir', type=str, help='path to preprocessed slide images')
+parser.add_argument('--src_dir', default='/Data/TCGA_LUSC/preprocessed/by_class/lung_scc', type=str, help='path to preprocessed slide images')
 parser.add_argument('--outcomes', default=False, type=bool, action=argparse.BooleanOptionalAction,
                     metavar='O', help='whether to consider outcomes or not', dest='do_outcomes')
 parser.add_argument('--out_dir', default='./out', type=str, help='path to save extracted embeddings')
@@ -89,11 +89,6 @@ feature_extractor = nn.DataParallel(feature_extractor, device_ids=device_ids)
 # https://github.com/NYUMedML/conditional_ssl_hist/issues/3
 # ... FIXME: but that model (above) is just trained on labeled SLIDES, not tiles. So I might as well just use annotation info referenced in annotations/README.md??
 # ah, but it would work on CPTAC, for which I don't know if there are annotations?
-
-# subtype_model = InceptionV4(num_classes=2).to('cuda')
-# cancer_subtype_model_load = torch.load(args.subtype_model)
-# subtype_model.load_state_dict(cancer_subtype_model_load)
-# subtype_model = nn.DataParallel(subtype_model, device_ids=device_ids)
 
 all_data = []
 number_of_slides = len(glob.glob(f"{args.src_dir}{os.sep}*"))
@@ -133,51 +128,7 @@ data_dir_name = [s for s in args.src_dir.split(os.sep) if s][-1].replace("_", ""
 
 for name, data in list(zip(['train', 'val', 'test'], [train_data, val_data, test_data]))[2:]:
     print(name)
-    number_of_unique_inst = len(set([d['slide_id'].split("-")[1] for d in data]))
-    data = data[:1000]
     dl = DataLoader(dataset=Dataset(data, transformations), batch_size=128, num_workers=torch.cuda.device_count(), shuffle=False)
-
-    # Get number of unique slides in dl
-    # Approach below doesn't work: the results are random from the model. So, let's just use the GMM approach instead
-    # slide_extractor = InceptionV4(num_classes=128)
-    # load_model(slide_extractor, args.feature_extractor)
-    # slide_extractor.last_linear = nn.Linear(1536, number_of_unique_inst) # the linear layer removes our dependency/link to the key encoder
-    # slide_extractor.to('cuda')
-    # feature_extractor = nn.DataParallel(feature_extractor, device_ids=device_ids)
-    # slide_embedding, _ = get_embeddings_bagging(slide_extractor, dl, False)
-    # TODO: use GMM to decide this. For fuzzy memberships, maybe knn?
-
-
-    institution_guess = [(np.argmax(x[0]), x[1]) for y in slide_embedding.values() for x in y]
-    # I want to know how many slides from the same institution that end up in the same bag
-    # count how many slides are from each institution
-    gt_institution_count = defaultdict(int)
-    institution_count = defaultdict(lambda: defaultdict(dict))
-    for (i,slide) in institution_guess:
-        institution = os.path.dirname(slide).split("-")[1]
-        if institution not in institution_count[i]:
-            institution_count[i][institution] = 0
-        institution_count[i][institution] += 1
-
-        gt_institution_count[institution] += 1
-    print(institution_count)
-    print(gt_institution_count)
-    overlap_count = defaultdict(lambda: defaultdict(int))
-    for bag,d in institution_count.items():
-        for inst_l,count_l in d.items():
-            for inst_r, count_r in d.items():
-                if inst_l == inst_r:
-                    continue
-                overlap_count[inst_l][inst_r] += min(count_l, count_r)
-
-    overlap_percent = defaultdict(lambda: {})
-    for inst_l,d in overlap_count.items():
-        for inst_r, count in d.items():
-            if gt_institution_count[inst_r] < gt_institution_count[inst_l]:
-                overlap_percent[inst_l][inst_r] = count / gt_institution_count[inst_r]
-            else:
-                overlap_percent[inst_l][inst_r] = overlap_count[inst_r][inst_l] / gt_institution_count[inst_l]
-
     embedding_dict, outcomes_dict = get_embeddings_bagging(feature_extractor, dl, args.do_outcomes)
     embedding_dest_path = os.path.join(args.out_dir, model_name,  "embeddings", f"{name}_{data_dir_name}_embedding.pkl")
     ensure_dir_exists(embedding_dest_path)

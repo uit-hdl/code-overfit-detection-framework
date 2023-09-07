@@ -176,6 +176,8 @@ def umap_slice(names, features, cluster, clinical, out_dir):
     p3 = umap_plot.interactive(mapper, labels=institution_labels, hover_data=hover_data, point_size=7, hover_tips=TOOLTIPS, title="Instiution")
     p4 = umap_plot.interactive(mapper, labels=race_labels, hover_data=hover_data, point_size=7, hover_tips=TOOLTIPS, title="Race")
     p5 = umap_plot.interactive(mapper, labels=cluster_labels, hover_data=hover_data, point_size=7, hover_tips=TOOLTIPS, title="GMM Cluster")
+    for plot in [p1, p2, p3, p4, p5]:
+        plot.legend.location = "top_left"
 
     stat_box = Paragraph(text="""CPD: {:.4f} (pvalue {:.4f})<br />KNC mean {:.4f}<br />KNN mean {:.4f}""".format(cpd[0], cpd[1], np.mean(knc_fractions), np.mean(knn_fractions)))
 
@@ -223,8 +225,13 @@ if __name__ == "__main__":
     keys_sorted = list(sorted(features.keys()))
     print ("There are {} images in the dataset".format(len(keys_sorted)))
     #umap_slice(keys_sorted[8:16], features, cluster, clinical, args.out_dir)
-    keys_randomized = random.sample(keys_sorted, len(keys_sorted))
-    umap_slice(keys_randomized[8:14], features, cluster, clinical, args.out_dir)
+
+    #keys_chosen = [k for k in keys_sorted if k.split("-")[1] in ["66", "63"]]
+    keys_chosen = [k for k in keys_sorted if k.split("-")[1] in ["94", "63"]]
+    umap_slice(keys_chosen, features, cluster, clinical, args.out_dir)
+
+    #keys_randomized = random.sample(keys_sorted, len(keys_sorted))
+    #umap_slice(keys_randomized[8:14], features, cluster, clinical, args.out_dir)
 
     #umap_slice(['TCGA-21-5787-01A-01-TS1'], features, cluster, args.out_dir)
     #umap_slice(['TCGA-43-8115-01A-01-BS1', 'TCGA-34-8456-01A-01-BS1', 'TCGA-68-A59J-01A-02-TSB'], features, cluster, args.out_dir)
