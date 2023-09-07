@@ -160,7 +160,7 @@ def train(train_loader, val_loader, model, criterion, optimizer, max_epochs, lr,
                 'state_dict': model.state_dict(),
                 'optimizer' : optimizer.state_dict(),
             }, model_filename)
-    save_data_to_csv(accuracy_values, os.path.join(out_path, "data", f"accuracy_{model.__class__.__name__}.csv"), "accuracy")
+    save_data_to_csv(accuracy1_values, os.path.join(out_path, "data", f"accuracy_{model.__class__.__name__}.csv"), "accuracy")
     save_data_to_csv(epoch_loss_values, os.path.join(out_path, "data", f"loss_{model.__class__.__name__}.csv"), "loss")
 
 def find_data(data_dir, batch_size, batch_slide_num, workers, is_profiling):
@@ -237,7 +237,7 @@ def find_data(data_dir, batch_size, batch_slide_num, workers, is_profiling):
 
     all_data = []
     number_of_slides = len(glob.glob(f"{args.data_dir}{os.sep}*"))
-    splits = [int(number_of_slides * 0.8), int(number_of_slides * 0.1), int(number_of_slides * 0.1)]
+    splits = [int(number_of_slides * 0.01), int(number_of_slides * 0.1), int(number_of_slides * 0.1)]
     def add_dir(directory):
         all_data = []
         for filename in glob.glob(f"{directory}{os.sep}**{os.sep}*", recursive=True):
@@ -272,6 +272,10 @@ def find_data(data_dir, batch_size, batch_slide_num, workers, is_profiling):
 
 if __name__ == '__main__':
     args = parser.parse_args()
+
+    if args.batch_slide_num > args.batch_size:
+        print("Looks like you mistook m for n: batch_slide_num has to be less than batch_size")
+        sys.exit(1)
 
     if not torch.cuda.is_available():
         print('No GPU device available')

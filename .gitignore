@@ -1,5 +1,6 @@
 train_model/train_venv
 venv/
+docker_output/
 .idea/
 feature_extraction/cluster_env/
 pretrained/run2a/
