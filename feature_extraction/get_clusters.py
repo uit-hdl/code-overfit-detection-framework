@@ -227,7 +227,9 @@ if __name__ == "__main__":
     #umap_slice(keys_sorted[8:16], features, cluster, clinical, args.out_dir)
 
     #keys_chosen = [k for k in keys_sorted if k.split("-")[1] in ["66", "63"]]
-    keys_chosen = [k for k in keys_sorted if k.split("-")[1] in ["94", "63"]]
+    #keys_chosen = [k for k in keys_sorted if k.split("-")[1] in ["94", "63"]]
+    #keys_chosen = [k for k in keys_sorted if k.split("-")[1] in ["43", "21"]]
+    keys_chosen = [k for k in keys_sorted if k.split("-")[1] in ["96", "94", "58"]]
     umap_slice(keys_chosen, features, cluster, clinical, args.out_dir)
 
     #keys_randomized = random.sample(keys_sorted, len(keys_sorted))
