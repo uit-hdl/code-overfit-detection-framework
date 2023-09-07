@@ -95,7 +95,7 @@ def save_data_to_csv(data, filename, label):
             csvwriter.writerow([e,l])
 
 
-def train(train_loader, val_loader, model, criterion, optimizer, max_epochs, lr, cos, schedule, out_path, is_profiling):
+def train(train_loader, val_loader, model, criterion, optimizer, max_epochs, lr, cos, schedule, out_path, is_profiling, condition, m, n):
     epoch_loss_values = []
     accuracy1_values = []
     accuracy5_values = []
@@ -107,7 +107,7 @@ def train(train_loader, val_loader, model, criterion, optimizer, max_epochs, lr,
     for epoch in range(1, max_epochs + 1):
         epoch_start = time.time()
         print("-" * 10)
-        print(f"epoch {epoch + 1}/{max_epochs}")
+        print(f"epoch {epoch}/{max_epochs}")
         model.train()
         epoch_loss = 0
         acc5 = 0
@@ -152,7 +152,7 @@ def train(train_loader, val_loader, model, criterion, optimizer, max_epochs, lr,
         print(f"epoch {epoch} average loss: {epoch_loss:.4f}")
 
         if 0 == 0:
-            model_filename = os.path.join(out_path, 'model', 'checkpoint_{}_{}_{:04d}.pth.tar'.format(model_name, data_dir_name, epoch))
+            model_filename = os.path.join(out_path, 'model', 'checkpoint_{}_{}_{:04d}_{}_m{}_n{}.pth.tar'.format(model_name, data_dir_name, epoch, condition, m, n))
             ensure_dir_exists(model_filename)
             torch.save({
                 'epoch': epoch,
@@ -163,7 +163,7 @@ def train(train_loader, val_loader, model, criterion, optimizer, max_epochs, lr,
     save_data_to_csv(accuracy_values, os.path.join(out_path, "data", f"accuracy_{model.__class__.__name__}.csv"), "accuracy")
     save_data_to_csv(epoch_loss_values, os.path.join(out_path, "data", f"loss_{model.__class__.__name__}.csv"), "loss")
 
-def find_data(src_dir, batch_size, batch_slide_num, workers, is_profiling):
+def find_data(data_dir, batch_size, batch_slide_num, workers, is_profiling):
     class MySampler(Sampler):
         ''' 
         Conditional sampler that will generate batches made out of `batch_size` with at least `batch_slide_num` tiles from each slide
@@ -236,7 +236,7 @@ def find_data(src_dir, batch_size, batch_slide_num, workers, is_profiling):
     )
 
     all_data = []
-    number_of_slides = len(glob.glob(f"{args.src_dir}{os.sep}*"))
+    number_of_slides = len(glob.glob(f"{args.data_dir}{os.sep}*"))
     splits = [int(number_of_slides * 0.8), int(number_of_slides * 0.1), int(number_of_slides * 0.1)]
     def add_dir(directory):
         all_data = []
@@ -244,11 +244,11 @@ def find_data(src_dir, batch_size, batch_slide_num, workers, is_profiling):
             if os.path.isfile(filename):
                 slide_id = os.path.basename(filename.split(os.sep)[-2])
                 tile_id = os.path.basename(filename.split(os.sep)[-1])
-                all_data.append({"image": filename, "tile_id": tile_id, "slide_id": slide_id})
+                all_data.append({"q": filename, "k": filename, 'filename': filename, "tile_id": tile_id, "slide_id": slide_id})
         return all_data
 
     train_data, val_data, test_data = [], [], []
-    for i, directory in enumerate(glob.glob(f"{args.src_dir}{os.sep}*")):
+    for i, directory in enumerate(glob.glob(f"{args.data_dir}{os.sep}*")):
         if i < splits[0]:
             train_data += add_dir(directory)
         elif i < splits[0] + splits[1]:
@@ -257,7 +257,7 @@ def find_data(src_dir, batch_size, batch_slide_num, workers, is_profiling):
             test_data += add_dir(directory)
 
     if not train_data:
-        raise RuntimeError(f"Found no data in {src_dir}")
+        raise RuntimeError(f"Found no data in {args.data_dir}")
 
     ds_train = Dataset(train_data, transformations)
     ds_val = Dataset(val_data, transformations)
@@ -316,4 +316,4 @@ if __name__ == '__main__':
     out_path = os.path.join(args.out_dir, model_name, data_dir_name)
 
     criterion = nn.CrossEntropyLoss().cuda()
-    train(dl_train, dl_val, model, criterion, optimizer, args.epochs, args.lr, args.cos, args.schedule, out_path, args.is_profiling)
+    train(dl_train, dl_val, model, criterion, optimizer, args.epochs, args.lr, args.cos, args.schedule, out_path, args.is_profiling, args.condition, args.batch_slide_num, args.batch_size)
