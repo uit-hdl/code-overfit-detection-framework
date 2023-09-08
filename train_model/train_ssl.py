@@ -95,7 +95,8 @@ def save_data_to_csv(data, filename, label):
             csvwriter.writerow([e,l])
 
 
-def train(train_loader, val_loader, model, criterion, optimizer, max_epochs, lr, cos, schedule, out_path, is_profiling, condition, m, n):
+
+def train(train_loader, val_loader, model, criterion, optimizer, max_epochs, lr, cos, schedule, out_path, model_filename, is_profiling):
     epoch_loss_values = []
     accuracy1_values = []
     accuracy5_values = []
@@ -152,16 +153,17 @@ def train(train_loader, val_loader, model, criterion, optimizer, max_epochs, lr,
         print(f"epoch {epoch} average loss: {epoch_loss:.4f}")
 
         if 0 == 0:
-            model_filename = os.path.join(out_path, 'model', 'checkpoint_{}_{}_{:04d}_{}_m{}_n{}.pth.tar'.format(model_name, data_dir_name, epoch, condition, m, n))
-            ensure_dir_exists(model_filename)
+            model_savename = model_filename.replace("#NUM#", "{:04d}".format(epoch))
+            ensure_dir_exists(model_savename)
             torch.save({
                 'epoch': epoch,
                 'arch': 'x64',
                 'state_dict': model.state_dict(),
                 'optimizer' : optimizer.state_dict(),
-            }, model_filename)
-    save_data_to_csv(accuracy1_values, os.path.join(out_path, "data", f"accuracy_{model.__class__.__name__}.csv"), "accuracy")
-    save_data_to_csv(epoch_loss_values, os.path.join(out_path, "data", f"loss_{model.__class__.__name__}.csv"), "loss")
+            }, model_savename)
+
+    save_data_to_csv(accuracy1_values, os.path.join(out_path, "data", os.path.basename(model_savename).replace("checkpoint_", "accuracy_").replace(".pth.tar", ".csv")), "accuracy")
+    save_data_to_csv(epoch_loss_values, os.path.join(out_path, "data", os.path.basename(model_savename).replace("checkpoint_", "loss_").replace(".pth.tar", ".csv")), "loss")
 
 def find_data(data_dir, batch_size, batch_slide_num, workers, is_profiling):
     class MySampler(Sampler):
@@ -316,8 +318,9 @@ if __name__ == '__main__':
         optimizer.load_state_dict(checkpoint['optimizer'])
 
     model_name = condssl.builder.MoCo.__name__
-    data_dir_name = args.data_dir.split(os.sep)[-1]
+    data_dir_name = list(filter(None, args.data_dir.split(os.sep)))[-1]
     out_path = os.path.join(args.out_dir, model_name, data_dir_name)
+    model_filename = os.path.join(out_path, 'model', 'checkpoint_{}_{}_#NUM#_{}_m{}_n{}.pth.tar'.format(model_name, data_dir_name, args.condition, args.batch_size, args.batch_slide_num))
 
     criterion = nn.CrossEntropyLoss().cuda()
-    train(dl_train, dl_val, model, criterion, optimizer, args.epochs, args.lr, args.cos, args.schedule, out_path, args.is_profiling, args.condition, args.batch_slide_num, args.batch_size)
+    train(dl_train, dl_val, model, criterion, optimizer, args.epochs, args.lr, args.cos, args.schedule, out_path, model_filename, args.is_profiling)
