@@ -58,7 +58,7 @@ class MoCo(nn.Module):
     @torch.no_grad()
     def _dequeue_and_enqueue(self, keys):
         # gather keys before updating queue
-        keys = concat_all_gather(keys)
+        # keys = concat_all_gather(keys)
 
         batch_size = keys.shape[0]
 
@@ -80,16 +80,17 @@ class MoCo(nn.Module):
         """
         # gather from all gpus
         batch_size_this = x.shape[0]
-        x_gather = concat_all_gather(x)
+        # x_gather = concat_all_gather(x)
+        x_gather = x
         batch_size_all = x_gather.shape[0]
 
-        num_gpus = batch_size_all // batch_size_this
+        # num_gpus = batch_size_all // batch_size_this
 
         # random shuffle index
-        idx_shuffle = torch.randperm(batch_size_all).cuda()
+        # idx_shuffle = torch.randperm(batch_size_all).cuda()
 
         # broadcast to all gpus
-        torch.distributed.broadcast(idx_shuffle, src=0)
+        # torch.distributed.broadcast(idx_shuffle, src=0)
 
         # index for restoring
         idx_unshuffle = torch.argsort(idx_shuffle)
@@ -107,7 +108,8 @@ class MoCo(nn.Module):
         """
         # gather from all gpus
         batch_size_this = x.shape[0]
-        x_gather = concat_all_gather(x)
+        # x_gather = concat_all_gather(x)
+        x_gather = x
         batch_size_all = x_gather.shape[0]
 
         num_gpus = batch_size_all // batch_size_this
@@ -136,13 +138,13 @@ class MoCo(nn.Module):
             self._momentum_update_key_encoder()  # update the key encoder
 
             # shuffle for making use of BN
-            im_k, idx_unshuffle = self._batch_shuffle_ddp(im_k)
+            # im_k, idx_unshuffle = self._batch_shuffle_ddp(im_k)
 
             k = self.encoder_k(im_k)  # keys: NxC
             k = nn.functional.normalize(k, dim=1)
 
             # undo shuffle
-            k = self._batch_unshuffle_ddp(k, idx_unshuffle)
+            # k = self._batch_unshuffle_ddp(k, idx_unshuffle)
 
 
         if self.condition:

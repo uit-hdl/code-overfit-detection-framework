@@ -1,3 +1,16 @@
+train_model/train_venv
+venv/
+docker_output/
+.idea/
+feature_extraction/cluster_env/
+pretrained/run2a/
+pretrained/checkpoint/
+pretrained/venv
+pretrained/venv_v2
+output_from_training.txt
+raw_data_preprocessed
+doc_for_figure
+umap_out
 *.log
 .~lock.*#
 __pycache__/

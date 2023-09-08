@@ -1,124 +1,141 @@
+import glob
+import os
 import sys
-sys.path.append('./')
-import argparse
+
 import numpy as np
+from monai.data import DataLoader, Dataset
+
+sys.path.append('./')
+
+import condssl.builder
+import argparse
 import pickle
 import torch
 import torch.nn as nn
-import os
-import cv2
-from torchvision import transforms
 from collections import defaultdict
 from tqdm import tqdm
-import pandas as pd
-from PIL import Image
-import shelve
-from dataset.dataloader import TCGA_CPTAC_Bag_Dataset
 from network.inception_v4 import InceptionV4
+from pathlib import Path
+import monai.transforms as mt
+from sklearn.mixture import GaussianMixture
 
 if torch.cuda.is_available():
     device = 'cuda'
 else:
-    device = 'cpu'
+    raise RuntimeError("cuda not found, use different comp :-(")
 print(device)
 
-def get_embeddings_bagging(feature_extractor, subtype_model, data_set):
+def ensure_dir_exists(path):
+    dest_dir = os.path.dirname(path)
+    if not os.path.exists(dest_dir):
+        Path(dest_dir).mkdir(parents=True, exist_ok=True)
+
+def get_embeddings_bagging(feature_extractor, dl, do_outcomes):
     embedding_dict = defaultdict(list)
     outcomes_dict = defaultdict(list)
     feature_extractor.eval()
-    data_loader = torch.utils.data.DataLoader(data_set, batch_size=256, shuffle=False, num_workers=torch.cuda.device_count())
+    #subtype_model.eval()
     with torch.no_grad():
-        count = 1
-        for batch in tqdm(data_loader, position=0, leave=True):
-            count += 1
-            # bag idx is same as slide_id. 0 is first slide, 1 is second, etc
-            img_batch, _, bag_idx = batch
-            # feat = feature_extractor(img_batch.to(device)).cpu()
+        for d in tqdm(dl, position=0, leave=True, desc="processing batch"):
+            img_batch = d['image']
+            bag_idx = d['slide_id']
+            tile_idx = d['tile_id']
 
-            # for each image (256 in each batch), 1536 output neurons. This is Inception-C model from original moco paper
-            feat_out = feature_extractor(img_batch.to(device)) 
-            subtype_model.eval()
-            subtype_prob = subtype_model(img_batch)
-            # For each image, binary has tumor or not
-            subtype_pred = torch.argmax(subtype_prob, dim=1) # fo
-            # Convert to boolean
-            tumor_idx = (subtype_pred != 0).cpu().numpy()
-            # Feat and bag_idx now has images with tumors, those that didn't are excluded
-            feat = feat_out[tumor_idx].cpu().numpy()
-            bag_idx = bag_idx[tumor_idx]
-            # For each image in current batch that has tumors
-            for i in range(len(bag_idx)):
-                # Append all tensor values from tile (feat[i]) into embedding_dict which is indexed by slide
-                embedding_dict[bag_idx[i].item()].append(feat[i][np.newaxis,:])
-                slide_id = data_set.idx2slide[bag_idx[i].item()]
-                if "TCGA" in slide_id:
-                    case_id = '-'.join(slide_id.split('-', 3)[:3])
-                else:
-                    case_id = slide_id.rsplit('-', 1)[0]
-                # Yes, this line will execute redundantly
-                outcomes_dict[bag_idx[i].item()] = annotations[case_id]
-        for k in embedding_dict:
+            feat = feature_extractor(img_batch.to(device))
+
+            for f,bag,tile in zip(feat, bag_idx, tile_idx):
+                embedding_dict[bag].append((f[np.newaxis, :].cpu().numpy(), tile))
+        # The next for loop is more about making tensors into numpy arrays. We prune away the first dimension which doesn't need to exist
+        # it is not merging all tiles from slides
+        for slide_id in embedding_dict:
             # flatten the array: np.concatenate(np.array([[1,2],[3,4]]), axis=0) = array([1, 2, 3, 4])
-            embedding_dict[k] = np.concatenate(embedding_dict[k], axis=0)
+            embedding_dict[slide_id] = list(zip(np.concatenate([x[0] for x in embedding_dict[slide_id]], axis=0), [x[1] for x in embedding_dict[slide_id]]))
     # Embedding dict now has all tensors for each tiles with tumour, grouped by slide
     # Outcomes_dict has annotation info for all slides with tumorous tile, e.g.
     # ... {0: {'recurrence': 0, 'slide_id': ['TCGA-   ...
     return embedding_dict, outcomes_dict
 
-def load_pretrained(net, model_dir):
-
+def load_model(net, model_path):
     # original
-    checkpoint = torch.load(model_dir)
-    model_state_dict = {k.replace("module.encoder_q.", ""): v for k, v in checkpoint['state_dict'].items() if
+    checkpoint = torch.load(model_path)
+    model_state_dict = {k.replace("encoder_q.", ""): v for k, v in checkpoint['state_dict'].items() if
                         "encoder_q" in k}
     net.load_state_dict(model_state_dict)
     net.last_linear = nn.Identity() # the linear layer removes our dependency/link to the key encoder
     # i.e. we can write net(input) instead of net.encoder_q(input)
 
-    # new 
-
-    # loading in a pretrained compatible format
-    # checkpoint = torch.load(model_dir)
-    # net.last_linear = nn.Identity() # the linear layer removes our dependency/link to the key encoder
-    # net.load_state_dict(checkpoint)
-
 parser = argparse.ArgumentParser(description='Extract embeddings ')
 
-parser.add_argument('--feature_extractor_dir', default='./pretrained/checkpoint.pth.tar', type=str)
-parser.add_argument('--subtype_model_dir', default='./subtype_cls/checkpoint.pth.tar', type=str)
-parser.add_argument('--root_dir', type=str)
-parser.add_argument('--split_dir', type=str)
-parser.add_argument('--out_dir', type=str)
+parser.add_argument('--feature_extractor', default='./pretrained/checkpoint.pth.tar', type=str, help='path to feature extractor, which will extract features from tiles')
+parser.add_argument('--src_dir', default='/Data/TCGA_LUSC/preprocessed/by_class/lung_scc', type=str, help='path to preprocessed slide images')
+parser.add_argument('--outcomes', default=False, type=bool, action=argparse.BooleanOptionalAction,
+                    metavar='O', help='whether to consider outcomes or not', dest='do_outcomes')
+parser.add_argument('--out_dir', default='./out', type=str, help='path to save extracted embeddings')
 
 args = parser.parse_args()
 
-tcga_annotation = pickle.load(open('./TCGA/recurrence_annotation.pkl', 'rb'))
 # cptac_annotation = pickle.load(open('../CPTAC/recurrence_annotation.pkl', 'rb'))
 # annotations = {**tcga_annotation, **cptac_annotation}
-annotations = {**tcga_annotation}
+if args.do_outcomes:
+    annotations = {**pickle.load(open('./TCGA/recurrence_annotation.pkl', 'rb'))}
 feature_extractor = InceptionV4(num_classes=128)
-load_pretrained(feature_extractor, args.feature_extractor_dir)
+load_model(feature_extractor, args.feature_extractor)
 feature_extractor.to('cuda')
 device_ids = [0]
 feature_extractor = nn.DataParallel(feature_extractor, device_ids=device_ids)
 
-subtype_model = InceptionV4(num_classes=2).to('cuda')
-cancer_subtype_model_load = torch.load(args.subtype_model_dir)
-# FIXME: I have no idea what I'm doing?
-subtype_model.last_linear = nn.Identity()
-subtype_model.load_state_dict(cancer_subtype_model_load)
-subtype_model = nn.DataParallel(subtype_model, device_ids=device_ids)
+# FIXME: broken: turns out I was supposed to use a different model, based off paper https://www.nature.com/articles/s41591-018-0177-5
+# Need to replicate https://github.com/ncoudray/DeepPATH/tree/master, based on advice from
+# https://github.com/NYUMedML/conditional_ssl_hist/issues/3
+# ... FIXME: but that model (above) is just trained on labeled SLIDES, not tiles. So I might as well just use annotation info referenced in annotations/README.md??
+# ah, but it would work on CPTAC, for which I don't know if there are annotations?
 
+all_data = []
+number_of_slides = len(glob.glob(f"{args.src_dir}{os.sep}*"))
+splits = [int(number_of_slides * 0.8), int(number_of_slides * 0.1), int(number_of_slides * 0.1)]
+def add_dir(directory):
+    all_data = []
+    for filename in glob.glob(f"{directory}{os.sep}**{os.sep}*", recursive=True):
+        if os.path.isfile(filename):
+            slide_id = os.path.basename(filename.split(os.sep)[-2])
+            tile_id = os.path.basename(filename.split(os.sep)[-1])
+            all_data.append({"image": filename, "tile_id": filename, "slide_id": slide_id})
+    return all_data
 
-train_dataset = TCGA_CPTAC_Bag_Dataset(args.root_dir, args.split_dir, 'train')
-val_dataset = TCGA_CPTAC_Bag_Dataset(args.root_dir, args.split_dir, 'val')
-test_dataset = TCGA_CPTAC_Bag_Dataset(args.root_dir, args.split_dir, 'test')
+train_data, val_data, test_data = [], [], []
+for i, directory in enumerate(glob.glob(f"{args.src_dir}{os.sep}*")):
+    if i < splits[0]:
+        train_data += add_dir(directory)
+    elif i < splits[0] + splits[1]:
+        val_data += add_dir(directory)
+    else:
+        test_data += add_dir(directory)
 
-with torch.no_grad():
-    names = ['train', 'val', 'test']
-    for name, data_set in zip(names, [train_dataset, val_dataset, test_dataset]):
-        print(name)
-        embedding_dict, outcomes_dict = get_embeddings_bagging(feature_extractor, subtype_model, data_set)
-        pickle.dump(embedding_dict, open("{}/{}_embedding.pkl".format(args.out_dir, name), 'wb'), protocol=4)
-        pickle.dump((outcomes_dict), open("{}/{}_outcomes.pkl".format(args.out_dir, name), 'wb'), protocol=4)
+transformations = mt.Compose(
+    [
+        mt.LoadImaged("image", image_only=True),
+        mt.EnsureChannelFirstd("image"),
+        mt.ToTensord("image", track_meta=False),
+        # doesnt work?
+        # mt.ToDeviceD(keys="image", device=device),
+    ])
 
+# train_data, test_data = train_test_split(all_data, test_size=0.1, random_state=42)
+# # note that we split the train data again, not the entire dataset
+# train_data, validation_data = train_test_split(train_data, test_size=0.1, random_state=42)
+model_name = condssl.builder.MoCo.__name__
+data_dir_name = [s for s in args.src_dir.split(os.sep) if s][-1].replace("_", "")
+
+for name, data in list(zip(['train', 'val', 'test'], [train_data, val_data, test_data]))[2:]:
+    print(name)
+    dl = DataLoader(dataset=Dataset(data, transformations), batch_size=128, num_workers=torch.cuda.device_count(), shuffle=False)
+    embedding_dict, outcomes_dict = get_embeddings_bagging(feature_extractor, dl, args.do_outcomes)
+    embedding_dest_path = os.path.join(args.out_dir, model_name,  "embeddings", f"{name}_{data_dir_name}_embedding.pkl")
+    ensure_dir_exists(embedding_dest_path)
+    pickle.dump(embedding_dict, open(embedding_dest_path, 'wb'), protocol=4)
+    if args.do_outcomes:
+        ensure_dir_exists(os.path.join(args.out_dir, model_name, data_dir_name, "outcomes"))
+        outcomes_dest_path = os.path.join(args.out_dir, model_name, "outcomes", f"{name}_{data_dir_name}_outcomes.pkl")
+        pickle.dump((outcomes_dict), open(outcomes_dest_path, 'wb'), protocol=4)
+    else:
+        print("Not dumping outcomes: args.do_outcomes is False")

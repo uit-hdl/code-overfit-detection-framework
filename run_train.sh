@@ -1,15 +1,24 @@
 #!/usr/bin/env bash
 
-set -xe
-
-while getopts e:n:m: flag
+while getopts e:w:n:m:o:s:c: flag
 do
     case "${flag}" in
         e) epoch=${OPTARG};;
         n) n=${OPTARG};;
         m) m=${OPTARG};;
+        w) w=${OPTARG};;
+        s) s=${OPTARG};;
+        c) c=${OPTARG};;
+        o) o=${OPTARG};;
         *) true;;
     esac
 done
 
-torchrun ./train_ssl.py --data_dir /Data/winter_school/data_dir/ --split_dir my_split_dir/ --batch_slide_num "${n}" --cos --out_dir my_output/ --gpu 0 --epochs "${epoch}" --batch-size "${m}" --moco-t 0.07 --moco-m 0.999
+set -xe
+python ./train_model/train_ssl.py \
+	--data-dir "${s:-/data/lung_scc/}" \
+	--batch_slide_num "${n:-4}" --cos \
+	--out-dir "${o:-/output}" --epochs "${epoch:-100}" --batch-size "${m:-64}" \
+       	--moco-t 0.07 --moco-m 0.999 \
+        --condition "${c:-True}" \
+      	--workers "${w:-16}"
