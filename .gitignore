@@ -1,3 +1,5 @@
+*.sqlite
+*.nsys-rep
 train_model/train_venv
 venv/
 docker_output/

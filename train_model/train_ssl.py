@@ -104,6 +104,8 @@ def train(train_loader, val_loader, model, criterion, optimizer, max_epochs, lr,
     epoch_times = []
     total_start = time.time()
     set_track_meta(True)
+    model_savename = ""
+    step = 0
 
     for epoch in range(1, max_epochs + 1):
         epoch_start = time.time()
@@ -123,19 +125,25 @@ def train(train_loader, val_loader, model, criterion, optimizer, max_epochs, lr,
         for step in range(1, len(train_loader) + 1):
             step_start = time.time()
             # profiling: train dataload
-            with nvtx.annotate("dataload", color="red") if is_profiling else no_profiling:
+            # Download https://developer.nvidia.com/gameworksdownload#?dn=nsight-systems-2023-3 to visualize
+            with nvtx.annotate("my_dataload", color="red") if is_profiling else no_profiling:
                 # rng_train_dataload = nvtx.start_range(message="dataload", color="red")
                 batch_data = next(train_loader_iterator)
                 images_q, images_k = batch_data['q'].cuda(), batch_data['k'].cuda()
-            output, target = model(im_q=images_q, im_k=images_k)
-            loss = criterion(output, target)
-            acc1, acc5 = accuracy(output, target, topk=(1, 5))
-            acc1, acc5 = acc1[0], acc5[0]
+            with nvtx.annotate("forward", color="green") if is_profiling else no_profiling:
+                output, target = model(im_q=images_q, im_k=images_k)
+                loss = criterion(output, target)
+
+            with nvtx.annotate("accuracy", color="blue") if is_profiling else no_profiling:
+                acc1, acc5 = accuracy(output, target, topk=(1, 5))
+                acc1, acc5 = acc1[0], acc5[0]
 
             # compute gradient and do SGD step
             optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+            with nvtx.annotate("backward_loss", color="yellow") if is_profiling else no_profiling:
+                loss.backward()
+            with nvtx.annotate("update_optimizer", color="pink") if is_profiling else no_profiling:
+                optimizer.step()
 
             epoch_loss += loss.item()
             acc5 += acc5
@@ -168,14 +176,15 @@ def train(train_loader, val_loader, model, criterion, optimizer, max_epochs, lr,
 
 def find_data(data_dir, batch_size, batch_slide_num, workers, is_profiling):
     class MySampler(Sampler):
-        ''' 
+        """
         Conditional sampler that will generate batches made out of `batch_size` with at least `batch_slide_num` tiles from each slide
         E.g. if `batch_slide_num` is 4 and `batch_size is 32, there will be 8 slides with 4 tiles each in one batch
 
         Note: Don't pass in a MONAI dataset object here: the default iterator performs transformations right away
         this is very slow, and we only need the filenames to generate the indices
-        '''
+        """
         def __init__(self, data_source, batch_size, batch_slide_num):
+            super().__init__(data_source)
             self.data_source = data_source
             self.batch_size = batch_size
             self.batch_slide_num = batch_slide_num
@@ -239,8 +248,8 @@ def find_data(data_dir, batch_size, batch_slide_num, workers, is_profiling):
     )
 
     all_data = []
-    number_of_slides = len(glob.glob(f"{args.data_dir}{os.sep}*"))
-    splits = [int(number_of_slides * 0.01), int(number_of_slides * 0.1), int(number_of_slides * 0.1)]
+    number_of_slides = len(glob.glob(f"{data_dir}{os.sep}*"))
+    splits = [int(number_of_slides * 0.008), int(number_of_slides * 0.1), int(number_of_slides * 0.1)]
     def add_dir(directory):
         all_data = []
         for filename in glob.glob(f"{directory}{os.sep}**{os.sep}*", recursive=True):
@@ -251,7 +260,7 @@ def find_data(data_dir, batch_size, batch_slide_num, workers, is_profiling):
         return all_data
 
     train_data, val_data, test_data = [], [], []
-    for i, directory in enumerate(glob.glob(f"{args.data_dir}{os.sep}*")):
+    for i, directory in enumerate(glob.glob(f"{data_dir}{os.sep}*")):
         if i < splits[0]:
             train_data += add_dir(directory)
         elif i < splits[0] + splits[1]:
@@ -260,7 +269,7 @@ def find_data(data_dir, batch_size, batch_slide_num, workers, is_profiling):
             test_data += add_dir(directory)
 
     if not train_data:
-        raise RuntimeError(f"Found no data in {args.data_dir}")
+        raise RuntimeError(f"Found no data in {data_dir}")
 
     ds_train = Dataset(train_data, transformations)
     ds_val = Dataset(val_data, transformations)
@@ -273,7 +282,7 @@ def find_data(data_dir, batch_size, batch_slide_num, workers, is_profiling):
     print("Dataset Created ...")
     return dl_train, dl_val, dl_test
 
-if __name__ == '__main__':
+def main():
     args = parser.parse_args()
 
     if args.batch_slide_num > args.batch_size:
@@ -325,3 +334,6 @@ if __name__ == '__main__':
 
     criterion = nn.CrossEntropyLoss().cuda()
     train(dl_train, dl_val, model, criterion, optimizer, args.epochs, args.lr, args.cos, args.schedule, out_path, model_filename, args.is_profiling)
+
+if __name__ == '__main__':
+    main()
