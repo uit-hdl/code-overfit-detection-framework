@@ -288,7 +288,7 @@ class InceptionV4_compat(nn.Module):
 
 class InceptionV4(nn.Module):
 
-    def __init__(self, num_classes=1001):
+    def __init__(self, num_classes=1001, do_checkpoint=False):
         super(InceptionV4, self).__init__()
         # Special attributs
         self.input_space = None
@@ -321,6 +321,7 @@ class InceptionV4(nn.Module):
             Inception_C()
         )
         self.last_linear = nn.Linear(1536, num_classes)
+        self.do_checkpoint = do_checkpoint
 
     def logits(self, features):
         #Allows image of any size to be processed
@@ -331,9 +332,11 @@ class InceptionV4(nn.Module):
         return x
 
     def forward(self, input):
-        x = checkpoint_sequential(self.features, 4, input)
-        #x = self.features(input)
-        x = self.logits(x)
+        if self.do_checkpoint:
+            x = checkpoint_sequential(self.features, 4, input)
+        else:
+            x = self.features(input)
+            x = self.logits(x)
         return x
 
 

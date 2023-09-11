@@ -16,7 +16,7 @@ import torch.backends.cudnn as cudnn
 import torch.nn as nn
 import torchvision.transforms as transforms
 from monai.data import DataLoader, Dataset, set_track_meta, CacheDataset, PersistentDataset, SmartCacheDataset, ImageDataset, CacheNTransDataset
-from torch.utils.data import Sampler
+from torch.utils.data import Sampler, DistributedSampler
 
 sys.path.append("../")
 import condssl.builder
@@ -32,6 +32,7 @@ no_profiling = contextlib.nullcontext()
 
 from itertools import zip_longest
 
+
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
 # parser.add_argument('data', metavar='DIR',
 #                     help='path to dataset')
@@ -42,9 +43,9 @@ parser.add_argument('--epochs', default=200, type=int, metavar='N',
                     help='number of total epochs to run')
 parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
                     help='manual epoch number (useful on restarts)')
-parser.add_argument('-b', '--batch-size', default=1, type=int,
+parser.add_argument('-b', '--batch-size', default=128, type=int,
                     metavar='N',
-                    help='mini-batch size (default: 256), this is the total '
+                    help='mini-batch size (default: 128), this is the total '
                          'batch size of all GPUs on the current node when '
                          'using Data Parallel or Distributed Data Parallel')
 parser.add_argument('--lr', '--learning-rate', default=0.03, type=float,
@@ -64,6 +65,23 @@ parser.add_argument('--resume', default='', type=str, metavar='PATH',
                     help='path to latest checkpoint (default: none)')
 parser.add_argument('--seed', default=None, type=int,
                     help='seed for initializing training. ')
+parser.add_argument('--world-size', default=-1, type=int,
+                    help='number of nodes for distributed training')
+parser.add_argument('--rank', default=-1, type=int,
+                    help='node rank for distributed training')
+parser.add_argument('--dist-url', default='tcp://224.66.41.62:23456', type=str,
+                    help='url used to set up distributed training')
+parser.add_argument('--dist-backend', default='nccl', type=str,
+                    help='distributed backend')
+parser.add_argument('--gpu', default=None, type=int,
+                    help='GPU id to use.')
+parser.add_argument('--multiprocessing-distributed', action='store_true',
+                    help='Use multi-processing distributed training to launch '
+                         'N processes per node, which has N GPUs. This is the '
+                         'fastest way to use PyTorch for either single node or '
+                         'multi node data parallel training')
+parser.add_argument("--local_rank", type=int, default=0)
+
 
 # moco specific configs:
 parser.add_argument('--moco-dim', default=128, type=int,
@@ -99,7 +117,7 @@ def save_data_to_csv(data, filename, label):
 
 
 
-def train(train_loader, val_loader, model, criterion, optimizer, max_epochs, lr, cos, schedule, out_path, model_filename, is_profiling):
+def train(train_loader, val_loader, model, criterion, optimizer, max_epochs, lr, cos, schedule, out_path, model_filename, is_profiling, is_distributed):
     epoch_loss_values = []
     accuracy1_values = []
     accuracy5_values = []
@@ -126,6 +144,8 @@ def train(train_loader, val_loader, model, criterion, optimizer, max_epochs, lr,
         # steps are 1-indexed for printing and calculation purposes
         #for i, d in enumerate(train_loader):
         for step in range(1, len(train_loader) + 1):
+            if is_distributed:
+                train_loader.batch_sampler.set_epoch(epoch)
             with Range("Step"):
                 step_start = time.time()
                 # profiling: train dataload
@@ -184,8 +204,9 @@ def add_dir(directory):
             all_data.append({"q": filename, "k": filename, 'filename': filename})
     return all_data
 
-def find_data(data_dir, batch_size, batch_slide_num, workers, is_profiling):
-    class MySampler(Sampler):
+def find_data(data_dir, batch_size, batch_slide_num, workers, is_profiling, is_distributed):
+    inheritSampler = DistributedSampler if is_distributed else Sampler
+    class MySampler(inheritSampler):
         """
         Conditional sampler that will generate batches made out of `batch_size` with at least `batch_slide_num` tiles from each slide
         E.g. if `batch_slide_num` is 4 and `batch_size is 32, there will be 8 slides with 4 tiles each in one batch
@@ -201,7 +222,6 @@ def find_data(data_dir, batch_size, batch_slide_num, workers, is_profiling):
 
         def __iter__(self):
             with Range("MySampler") if is_profiling else no_profiling:
-                random.seed(42)
                 tile_chunks = []
 
                 slide2tiles = defaultdict(list)
@@ -303,6 +323,10 @@ def find_data(data_dir, batch_size, batch_slide_num, workers, is_profiling):
     ds_val = Dataset(val_data, val_transformations)
     ds_test = Dataset(test_data, val_transformations)
 
+    if is_distributed:
+        train_sampler = torch.utils.data.distributed.DistributedSampler(ds_train)
+    else:
+        train_sampler = None
     dl_train = DataLoader(ds_train, batch_sampler=MySampler(train_data, batch_size, batch_slide_num), num_workers=workers)
     dl_val = DataLoader(ds_val, batch_size=batch_size, num_workers=workers, shuffle=False)
     dl_test = DataLoader(ds_test, batch_size=batch_size, num_workers=workers, shuffle=False)
@@ -338,7 +362,12 @@ def main():
     print(f"root dir for MONAI is: {root_dir}")
 
     print('Create dataset')
-    dl_train, dl_val, dl_test = find_data(args.data_dir, args.batch_size, args.batch_slide_num, args.workers, args.is_profiling)
+    if args.dist_url == "env://" and args.world_size == -1:
+        args.world_size = int(os.environ["WORLD_SIZE"])
+    is_distributed = args.world_size > 1 or args.multiprocessing_distributed
+    if is_distributed:
+        torch.distributed.init_process_group(args.dist_backend)
+    dl_train, dl_val, dl_test = find_data(args.data_dir, args.batch_size, args.batch_slide_num, args.workers, args.is_profiling, is_distributed)
     print("Dataset Created ...")
 
     if args.seed is not None:
@@ -353,8 +382,10 @@ def main():
 
     print("=> creating model '{}'".format('x64'))
     model = condssl.builder.MoCo(
-        InceptionV4, args.moco_dim, args.moco_k, args.moco_m, args.moco_t, args.mlp, condition=args.condition)
+        InceptionV4, args.moco_dim, args.moco_k, args.moco_m, args.moco_t, args.mlp, condition=args.condition, do_checkpoint=not is_distributed)
     model = model.cuda()
+    if is_distributed:
+        model = torch.nn.parallel.DistributedDataParallel(model)
     optimizer = torch.optim.SGD(model.parameters(), args.lr,
                                 momentum=args.momentum,
                                 weight_decay=args.weight_decay)
@@ -373,7 +404,7 @@ def main():
     model_filename = os.path.join(out_path, 'model', 'checkpoint_{}_{}_#NUM#_{}_m{}_n{}.pth.tar'.format(model_name, data_dir_name, args.condition, args.batch_size, args.batch_slide_num))
 
     criterion = nn.CrossEntropyLoss().cuda()
-    train(dl_train, dl_val, model, criterion, optimizer, args.epochs, args.lr, args.cos, args.schedule, out_path, model_filename, args.is_profiling)
+    train(dl_train, dl_val, model, criterion, optimizer, args.epochs, args.lr, args.cos, args.schedule, out_path, model_filename, args.is_profiling, is_distributed)
 
 if __name__ == '__main__':
     #torch.multiprocessing.set_start_method('spawn')
