@@ -331,8 +331,8 @@ class InceptionV4(nn.Module):
         return x
 
     def forward(self, input):
-        #x = checkpoint_sequential(self.features, 4, input)
-        x = self.features(input)
+        x = checkpoint_sequential(self.features, 4, input)
+        #x = self.features(input)
         x = self.logits(x)
         return x
 

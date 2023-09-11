@@ -7,13 +7,15 @@ import sys
 import time
 import warnings
 from collections import defaultdict
+
+import monai.utils
 from sklearn.model_selection import train_test_split
 
 import monai.transforms as mt
 import torch.backends.cudnn as cudnn
 import torch.nn as nn
 import torchvision.transforms as transforms
-from monai.data import DataLoader, Dataset, set_track_meta, CacheDataset
+from monai.data import DataLoader, Dataset, set_track_meta, CacheDataset, PersistentDataset, SmartCacheDataset, ImageDataset, CacheNTransDataset
 from torch.utils.data import Sampler
 
 sys.path.append("../")
@@ -23,7 +25,8 @@ import condssl.loader
 from network.inception_v4 import InceptionV4
 from train_util import *
 import nvtx
-from monai.utils.nvtx import Range
+import monai.utils
+from monai.utils import Range
 import contextlib
 no_profiling = contextlib.nullcontext()
 
@@ -123,34 +126,34 @@ def train(train_loader, val_loader, model, criterion, optimizer, max_epochs, lr,
         # steps are 1-indexed for printing and calculation purposes
         #for i, d in enumerate(train_loader):
         for step in range(1, len(train_loader) + 1):
-            step_start = time.time()
-            # profiling: train dataload
-            # Download https://developer.nvidia.com/gameworksdownload#?dn=nsight-systems-2023-3 to visualize
-            with nvtx.annotate("my_dataload", color="red") if is_profiling else no_profiling:
-                # rng_train_dataload = nvtx.start_range(message="dataload", color="red")
-                batch_data = next(train_loader_iterator)
-                images_q, images_k = batch_data['q'].cuda(), batch_data['k'].cuda()
-            with nvtx.annotate("forward", color="green") if is_profiling else no_profiling:
-                output, target = model(im_q=images_q, im_k=images_k)
-                loss = criterion(output, target)
+            with Range("Step"):
+                step_start = time.time()
+                # profiling: train dataload
+                # Download https://developer.nvidia.com/gameworksdownload#?dn=nsight-systems-2023-3 to visualize
+                with Range("Dataload") if is_profiling else no_profiling:
+                    batch_data = next(train_loader_iterator)
+                    images_q, images_k = batch_data['q'].cuda(), batch_data['k'].cuda()
+                with Range("forward") if is_profiling else no_profiling:
+                    output, target = model(im_q=images_q, im_k=images_k)
+                    loss = criterion(output, target)
 
-            with nvtx.annotate("accuracy", color="blue") if is_profiling else no_profiling:
-                acc1, acc5 = accuracy(output, target, topk=(1, 5))
-                acc1, acc5 = acc1[0], acc5[0]
+                with Range("accuracy") if is_profiling else no_profiling:
+                    acc1, acc5 = accuracy(output, target, topk=(1, 5))
+                    acc1, acc5 = acc1[0], acc5[0]
 
-            # compute gradient and do SGD step
-            optimizer.zero_grad()
-            with nvtx.annotate("backward_loss", color="yellow") if is_profiling else no_profiling:
-                loss.backward()
-            with nvtx.annotate("update_optimizer", color="pink") if is_profiling else no_profiling:
-                optimizer.step()
+                # compute gradient and do SGD step
+                optimizer.zero_grad()
+                with Range("backward_loss") if is_profiling else no_profiling:
+                    loss.backward()
+                with Range("update_optimizer") if is_profiling else no_profiling:
+                    optimizer.step()
 
-            epoch_loss += loss.item()
-            acc5 += acc5
-            acc1 += acc1
-            print(
-                    f"{step}/{len(train_loader)}, train_loss: {loss.item():.4f} acc1: {acc1:.2f} acc5: {acc5:.2f} step time: {(time.time() - step_start):.4f}"
-            )
+                epoch_loss += loss.item()
+                acc5 += acc5
+                acc1 += acc1
+                print(
+                        f"{step}/{len(train_loader)}, train_loss: {loss.item():.4f} acc1: {acc1:.2f} acc5: {acc5:.2f} step time: {(time.time() - step_start):.4f}"
+                )
         # Verify this is not off by one lol
         epoch_loss /= step
         epoch_loss_values.append(epoch_loss)
@@ -174,6 +177,13 @@ def train(train_loader, val_loader, model, criterion, optimizer, max_epochs, lr,
     save_data_to_csv(accuracy1_values, os.path.join(out_path, "data", os.path.basename(model_savename).replace("checkpoint_", "accuracy_").replace(".pth.tar", ".csv")), "accuracy")
     save_data_to_csv(epoch_loss_values, os.path.join(out_path, "data", os.path.basename(model_savename).replace("checkpoint_", "loss_").replace(".pth.tar", ".csv")), "loss")
 
+def add_dir(directory):
+    all_data = []
+    for filename in glob.glob(f"{directory}{os.sep}**{os.sep}*", recursive=True):
+        if os.path.isfile(filename):
+            all_data.append({"q": filename, "k": filename, 'filename': filename})
+    return all_data
+
 def find_data(data_dir, batch_size, batch_slide_num, workers, is_profiling):
     class MySampler(Sampler):
         """
@@ -190,39 +200,42 @@ def find_data(data_dir, batch_size, batch_slide_num, workers, is_profiling):
             self.batch_slide_num = batch_slide_num
 
         def __iter__(self):
-            random.seed(42)
-            tile_chunks = []
+            with Range("MySampler") if is_profiling else no_profiling:
+                random.seed(42)
+                tile_chunks = []
 
-            slide2tiles = defaultdict(list)
-            for i,d in enumerate(self.data_source):
-                filename = d['filename']
-                slide_id = os.path.basename(filename.split(os.sep)[-2])
-                slide2tiles[slide_id].append(i)
+                slide2tiles = defaultdict(list)
+                for i,d in enumerate(self.data_source):
+                    filename = d['filename']
+                    slide_id = os.path.basename(filename.split(os.sep)[-2])
+                    slide2tiles[slide_id].append(i)
 
-            cut_off_indices = []
+                cut_off_indices = []
 
-            # Generate chunks of indices. If one slide has indices slide2tiles['slide'] = [1 .. 10] the result can be like
-            # tile_chunks = [[1 .. 4], [ 1 .. 8 ]]
-            # cut_off_indices = [ 9, 10 ]
-            for slide,tiles in slide2tiles.items():
-                indices = [tiles[i:i + self.batch_slide_num] for i in range(0, len(tiles), self.batch_slide_num)]
-                # Prune if a chunk created above is less than `batch_slide_num`
-                if len(indices[-1]) < self.batch_slide_num:
-                    cut_off_indices.append(indices[-1])
-                    indices = indices[:-1]
-                if indices:
-                    random.shuffle(indices)
-                    tile_chunks.append(indices)
+                # Generate chunks of indices. If one slide has indices slide2tiles['slide'] = [1 .. 10] the result can be like
+                # tile_chunks = [[1 .. 4], [ 1 .. 8 ]]
+                # cut_off_indices = [ 9, 10 ]
+                for slide,tiles in slide2tiles.items():
+                    indices = [tiles[i:i + self.batch_slide_num] for i in range(0, len(tiles), self.batch_slide_num)]
+                    # Prune if a chunk created above is less than `batch_slide_num`
+                    if len(indices[-1]) < self.batch_slide_num:
+                        cut_off_indices.append(indices[-1])
+                        indices = indices[:-1]
+                    if indices:
+                        random.shuffle(indices)
+                        tile_chunks.append(indices)
 
-            random.shuffle(tile_chunks)
+                random.shuffle(tile_chunks)
 
-            # flatten the list so we can shuffle around chunks
-            tile_chunks = [item for sublist in tile_chunks for item in sublist]
-            random.shuffle(tile_chunks)
+                # flatten the list so we can shuffle around chunks
+                tile_chunks = [item for sublist in tile_chunks for item in sublist]
+                random.shuffle(tile_chunks)
 
-            chunks_per_batch = self.batch_size // self.batch_slide_num
-            for chunk in [tile_chunks[i:i + chunks_per_batch] for i in range(0, len(tile_chunks), chunks_per_batch)]:
-                yield [item for sublist in chunk for item in sublist]
+                chunks_per_batch = self.batch_size // self.batch_slide_num
+                ret = []
+                for chunk in [tile_chunks[i:i + chunks_per_batch] for i in range(0, len(tile_chunks), chunks_per_batch)]:
+                    ret.append([item for sublist in chunk for item in sublist])
+                return iter(ret)
 
         def __len__(self):
             return len(self.data_source) // (self.batch_size * self.batch_slide_num)
@@ -230,10 +243,12 @@ def find_data(data_dir, batch_size, batch_slide_num, workers, is_profiling):
     print('Creating dataset')
     grayer = transforms.Grayscale(num_output_channels=3)
     cropper = transforms.RandomResizedCrop(299, scale=(0.2, 1.))
-    jitterer = transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)
+    jitterer = transforms.ColorJitter(brightness=4, contrast=0.4, saturation=0.4, hue=0.01)
+
 
     def range_func(x, y):
-        return Range(x)(y) if is_profiling else y
+        #return y
+        return Range(x, methods="__call__")(y) if is_profiling else y
     transformations = mt.Compose(
         [
             range_func("LoadImage", mt.LoadImaged(["q", "k"], image_only=True)),
@@ -243,21 +258,30 @@ def find_data(data_dir, batch_size, batch_slide_num, workers, is_profiling):
             range_func("Grayscale", mt.RandLambdad(["q", "k"], grayer, prob=0.2)),
             range_func("Flip0", mt.RandFlipd(["q", "k"], prob=0.5, spatial_axis=0)),
             range_func("Flip1", mt.RandFlipd(["q", "k"], prob=0.5, spatial_axis=1)),
-            mt.ToTensord(["q", "k"], track_meta=False),
+            range_func("ToTensor", mt.ToTensord(["q", "k"], track_meta=False)),
+            range_func("EnsureType", mt.EnsureTyped(["q", "k"], track_meta=False)),
+            # TODO: test this
+            #range_func("ToDeviced", mt.ToDeviced(["q", "k"], device="cuda:0")),
         ]
     )
 
-    all_data = []
+    val_transformations = mt.Compose(
+        [
+            mt.LoadImaged(["q", "k"], image_only=True),
+            mt.EnsureChannelFirstd(["q", "k"]),
+            mt.Lambdad(["q", "k"], cropper),
+            mt.RandLambdad(["q", "k"], jitterer, prob=0.8),
+            mt.RandLambdad(["q", "k"], grayer, prob=0.2),
+            mt.RandFlipd(["q", "k"], prob=0.5, spatial_axis=0),
+            mt.RandFlipd(["q", "k"], prob=0.5, spatial_axis=1),
+            mt.ToTensord(["q", "k"], track_meta=False),
+            # TODO: test this
+            #range_func("ToDeviced", mt.ToDeviced(["q", "k"], device="cuda:0")),
+        ]
+    )
+
     number_of_slides = len(glob.glob(f"{data_dir}{os.sep}*"))
-    splits = [int(number_of_slides * 0.008), int(number_of_slides * 0.1), int(number_of_slides * 0.1)]
-    def add_dir(directory):
-        all_data = []
-        for filename in glob.glob(f"{directory}{os.sep}**{os.sep}*", recursive=True):
-            if os.path.isfile(filename):
-                slide_id = os.path.basename(filename.split(os.sep)[-2])
-                tile_id = os.path.basename(filename.split(os.sep)[-1])
-                all_data.append({"q": filename, "k": filename, 'filename': filename, "tile_id": tile_id, "slide_id": slide_id})
-        return all_data
+    splits = [int(number_of_slides * 0.3), int(number_of_slides * 0.1), int(number_of_slides * 0.1)]
 
     train_data, val_data, test_data = [], [], []
     for i, directory in enumerate(glob.glob(f"{data_dir}{os.sep}*")):
@@ -271,13 +295,29 @@ def find_data(data_dir, batch_size, batch_slide_num, workers, is_profiling):
     if not train_data:
         raise RuntimeError(f"Found no data in {data_dir}")
 
+    #ds_train = PersistentDataset(train_data, transformations, cache_dir="/var/cache/monai")
+    #ds_train = CacheNTransDataset(train_data, transformations, cache_n_trans=7, cache_dir="/var/cache/monai")
+    #ds_train = CacheDataset(train_data, transformations)
     ds_train = Dataset(train_data, transformations)
-    ds_val = Dataset(val_data, transformations)
-    ds_test = Dataset(test_data, transformations)
+    #ds_val = Dataset(val_data, transformations)
+    ds_val = Dataset(val_data, val_transformations)
+    ds_test = Dataset(test_data, val_transformations)
 
     dl_train = DataLoader(ds_train, batch_sampler=MySampler(train_data, batch_size, batch_slide_num), num_workers=workers)
     dl_val = DataLoader(ds_val, batch_size=batch_size, num_workers=workers, shuffle=False)
     dl_test = DataLoader(ds_test, batch_size=batch_size, num_workers=workers, shuffle=False)
+
+    # first_sample = monai.utils.first(dl_train)
+    # if first_sample is None:
+    #     raise ValueError("First sample is None!")
+    # for d in ["q", "k"]:
+    #     print(
+    #         f"[{d}] \n"
+    #         f"  {d} shape: {first_sample[d].shape}\n"
+    #         f"  {d} type:  {type(first_sample[d])}\n"
+    #         f"  {d} dtype: {first_sample[d].dtype}"
+    #     )
+    #del first_sample
 
     print("Dataset Created ...")
     return dl_train, dl_val, dl_test
@@ -336,4 +376,5 @@ def main():
     train(dl_train, dl_val, model, criterion, optimizer, args.epochs, args.lr, args.cos, args.schedule, out_path, model_filename, args.is_profiling)
 
 if __name__ == '__main__':
+    #torch.multiprocessing.set_start_method('spawn')
     main()
