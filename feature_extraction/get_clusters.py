@@ -229,6 +229,7 @@ if __name__ == "__main__":
     #keys_chosen = [k for k in keys_sorted if k.split("-")[1] in ["66", "63"]]
     #keys_chosen = [k for k in keys_sorted if k.split("-")[1] in ["94", "63"]]
     #keys_chosen = [k for k in keys_sorted if k.split("-")[1] in ["43", "21"]]
+    # TODO: would be sick if I could get a preview of the whole WSI on top in the page
     keys_chosen = [k for k in keys_sorted if k.split("-")[1] in ["96", "94", "58"]]
     umap_slice(keys_chosen, features, cluster, clinical, args.out_dir)
 
