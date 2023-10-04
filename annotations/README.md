@@ -1,8 +1,9 @@
 # Clinical
+## TCGA
 Download "clinical" from https://portal.gdc.cancer.gov/projects/TCGA-LUSC as a tsv file
 
 
-# Slide label (tumor vs normal)
+### Slide label (tumor vs normal)
 
 Real links for dataset (TCGA LUSC tissue slides):
 * https://portal.gdc.cancer.gov/repository?filters={"op"%3A"and"%2C"content"%3A[{"content"%3A{"field"%3A"cases.case_id"%2C"value"%3A["set_id%3AQg2H84kBPtUv30ofTHho"]}%2C"op"%3A"IN"}%2C{"op"%3A"in"%2C"content"%3A{"field"%3A"files.data_format"%2C"value"%3A["svs"]}}%2C{"op"%3A"in"%2C"content"%3A{"field"%3A"files.experimental_strategy"%2C"value"%3A["Tissue Slide"]}}]}
@@ -18,3 +19,6 @@ for file in /Data/TCGA_LUSC/preprocessed/TCGA/tiles/*; do command grep $(basenam
 _class/lung_scc/ || cp -r ${file} /Data/TCGA_LUSC/preprocessed/by_class/lung_n; done
 ```
 
+
+## CPTAC
+Annotations: download "clinical", then "clinical.tsv": [https://portal.gdc.cancer.gov/projects/CPTAC-3](https://portal.gdc.cancer.gov/projects/CPTAC-3) 
