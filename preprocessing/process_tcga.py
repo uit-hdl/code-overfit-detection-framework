@@ -49,7 +49,6 @@ annotation = {}
 for d in ds:
     patient_id = d['patient']
     clinicalRow = clinicalTable.loc[patient_id].to_dict()
-    followupRow = followUpTable.loc[patient_id].to_dict()
 
     recurrence_free_days = followUpTable.loc[patient_id]['new_tumor_event_dx_days_to'] if patient_id in followUpTable.index else ''
     recurrence_free_days = int(recurrence_free_days) if recurrence_free_days.isnumeric() else None
