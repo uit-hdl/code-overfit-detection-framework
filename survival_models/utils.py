@@ -29,7 +29,7 @@ def get_metrics(train_df, test_df, est):
     except:
         print('no five year records')
     preds = est.predict(test_df.drop(columns=['outcome','day']))
-    # TODO: wtf? how was the line below ever supposed to make sense?
+    # TODO: wtf? how was the line below ever supposed to make sense? from upstream/main
     # metrics['C-index'] = concordance_index_censored(y_train, y_test, preds)[0]
     metrics['C-index'] = concordance_index_censored([x[0] for x in y_test], [x[1] for x in y_test], preds)[0]
     return metrics
@@ -97,14 +97,12 @@ def load_data(data_dir, cluster_dir, normalize='mean', cls=1):
     else:
         n_clusters = cluster.n_clusters
     files = os.listdir(data_dir)
-    # TODO: get some magic here
-    import ipdb; ipdb.set_trace()
-    train_features = pickle.load(open(os.path.join(data_dir, 'train_embedding.pkl'), 'rb'))
-    train_outcomes = pickle.load(open(os.path.join(data_dir, 'train_outcomes.pkl'), 'rb'))
-    val_features = pickle.load(open(os.path.join(data_dir, 'val_embedding.pkl'), 'rb'))
-    val_outcomes = pickle.load(open(os.path.join(data_dir, 'val_outcomes.pkl'), 'rb'))
-    test_features = pickle.load(open(os.path.join(data_dir, 'test_embedding.pkl'), 'rb'))
-    test_outcomes = pickle.load(open(os.path.join(data_dir, 'test_outcomes.pkl'), 'rb'))
+    train_features = pickle.load(open(os.path.join(data_dir, list(filter(lambda s: "train" in s and "embedding" in s, files))[0]), 'rb'))
+    train_outcomes = pickle.load(open(os.path.join(data_dir, list(filter(lambda s: "train" in s and "outcomes" in s, files))[0]), 'rb'))
+    val_features = pickle.load(open(os.path.join(data_dir, list(filter(lambda s: "val" in s and "embedding" in s, files))[0]), 'rb'))
+    val_outcomes = pickle.load(open(os.path.join(data_dir, list(filter(lambda s: "val" in s and "outcomes" in s, files))[0]), 'rb'))
+    test_features = pickle.load(open(os.path.join(data_dir, list(filter(lambda s: "test" in s and "embedding" in s, files))[0]), 'rb'))
+    test_outcomes = pickle.load(open(os.path.join(data_dir, list(filter(lambda s: "test" in s and "outcomes" in s, files))[0]), 'rb'))
 
     train_tcga_flag = np.array([])
     val_tcga_flag = np.array([])
@@ -115,9 +113,9 @@ def load_data(data_dir, cluster_dir, normalize='mean', cls=1):
     val_cluster = label_cluster(val_features, cluster)
     test_cluster = label_cluster(test_features, cluster)
 
-    train_data = transform(train_features, train_cluster, train_outcomes, train_tcga_flag,  n_clusters, normalize, demo=False)
-    val_data = transform(val_features, val_cluster, val_outcomes, val_tcga_flag, n_clusters, normalize, demo=False)
-    test_data = transform(test_features, test_cluster, test_outcomes, test_tcga_flag, n_clusters, normalize, demo=False)
+    train_data = transform(train_features, train_cluster, train_outcomes, n_clusters, normalize, demo=False)
+    val_data = transform(val_features, val_cluster, val_outcomes, n_clusters, normalize, demo=False)
+    test_data = transform(test_features, test_cluster, test_outcomes, n_clusters, normalize, demo=False)
 
     return train_data, val_data, test_data
 
@@ -129,7 +127,7 @@ def counter(arr, n):
     return [count[i] for i in range(n)]
 
 
-def transform(features, cluster, outcomes, tcga_flag, n_clusters, normalize='count', cls=1, weight=None, demo=None):
+def transform(features, cluster, outcomes, n_clusters, normalize='count', cls=1, weight=None, demo=None):
     count_list = []
     outcome_list = []
     recur_day_list = []
@@ -173,5 +171,4 @@ def transform(features, cluster, outcomes, tcga_flag, n_clusters, normalize='cou
             'followup_day': np.array(followup_day_list),
             'outcome': outcome_list,
             'demo': demo_list,
-            'tcga': np.array(tcga_flag_list),
             }

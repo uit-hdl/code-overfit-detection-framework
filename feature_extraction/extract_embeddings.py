@@ -47,6 +47,7 @@ def get_embeddings_bagging(feature_extractor, dl, do_outcomes):
     outcomes_dict = defaultdict(list)
     feature_extractor.eval()
     #subtype_model.eval()
+    i = 0
     with torch.no_grad():
         for d in tqdm(dl, position=0, leave=True, desc="processing batch"):
             img_batch = d['image']
@@ -134,7 +135,7 @@ data_dir_name = list(filter(None, args.src_dir.split(os.sep)))[-1]
 
 for name, data in list(zip(['train', 'val', 'test'], [train_data, val_data, test_data])):
     print(name)
-    dl = DataLoader(dataset=Dataset(data, transformations), batch_size=128, num_workers=torch.cuda.device_count(), shuffle=False)
+    dl = DataLoader(dataset=Dataset(data, transformations), batch_size=256, num_workers=torch.cuda.device_count(), shuffle=False)
     embedding_dict, outcomes_dict = get_embeddings_bagging(feature_extractor, dl, args.do_outcomes)
     embedding_dest_path = os.path.join(args.out_dir, model_name,  data_dir_name, "embeddings", f"{name}_{data_dir_name}_embedding.pkl")
     ensure_dir_exists(embedding_dest_path)
