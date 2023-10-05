@@ -19,6 +19,18 @@ from pathlib import Path
 import monai.transforms as mt
 from sklearn.mixture import GaussianMixture
 
+parser = argparse.ArgumentParser(description='Extract embeddings ')
+
+parser.add_argument('--feature_extractor', default='./pretrained/checkpoint.pth.tar', type=str, help='path to feature extractor, which will extract features from tiles')
+parser.add_argument('--tcga_annotation_file', default='./out/annotation/recurrence_annotation_tcga.pkl', type=str, help='path to TCGA annotations')
+parser.add_argument('--cptac_annotation_file', default='./out/annotation/recurrence_annotation_cptac.pkl', type=str, help='path to CPTAC annotations')
+parser.add_argument('--src_dir', default='/Data/TCGA_LUSC/preprocessed/by_class/lung_scc', type=str, help='path to preprocessed slide images')
+parser.add_argument('--outcomes', default=False, type=bool, action=argparse.BooleanOptionalAction,
+                    metavar='O', help='whether to consider outcomes or not', dest='do_outcomes')
+parser.add_argument('--out_dir', default='./out', type=str, help='path to save extracted embeddings')
+
+args = parser.parse_args()
+
 if torch.cuda.is_available():
     device = 'cuda'
 else:
@@ -64,20 +76,14 @@ def load_model(net, model_path):
     net.last_linear = nn.Identity() # the linear layer removes our dependency/link to the key encoder
     # i.e. we can write net(input) instead of net.encoder_q(input)
 
-parser = argparse.ArgumentParser(description='Extract embeddings ')
-
-parser.add_argument('--feature_extractor', default='./pretrained/checkpoint.pth.tar', type=str, help='path to feature extractor, which will extract features from tiles')
-parser.add_argument('--src_dir', default='/Data/TCGA_LUSC/preprocessed/by_class/lung_scc', type=str, help='path to preprocessed slide images')
-parser.add_argument('--outcomes', default=False, type=bool, action=argparse.BooleanOptionalAction,
-                    metavar='O', help='whether to consider outcomes or not', dest='do_outcomes')
-parser.add_argument('--out_dir', default='./out', type=str, help='path to save extracted embeddings')
-
-args = parser.parse_args()
-
 # cptac_annotation = pickle.load(open('../CPTAC/recurrence_annotation.pkl', 'rb'))
 # annotations = {**tcga_annotation, **cptac_annotation}
 if args.do_outcomes:
-    annotations = {**pickle.load(open('./TCGA/recurrence_annotation.pkl', 'rb'))}
+    tcga_annotation = pickle.load(open(args.tcga_annotation_file, 'rb')) if os.path.exists(args.tcga_annotation_file) else {}
+    cptac_annotation = pickle.load(open(args.cptac_annotation_file, 'rb')) if os.path.exists(args.cptac_annotation_file) else {}
+    annotations = {**tcga_annotation, **cptac_annotation}
+
+annotations = {**tcga_annotation, **cptac_annotation}
 feature_extractor = InceptionV4(num_classes=128)
 load_model(feature_extractor, args.feature_extractor)
 feature_extractor.to('cuda')
@@ -124,18 +130,17 @@ transformations = mt.Compose(
 # # note that we split the train data again, not the entire dataset
 # train_data, validation_data = train_test_split(train_data, test_size=0.1, random_state=42)
 model_name = condssl.builder.MoCo.__name__
-data_dir_name = [s for s in args.src_dir.split(os.sep) if s][-1].replace("_", "")
+data_dir_name = list(filter(None, args.src_dir.split(os.sep)))[-1]
 
-for name, data in list(zip(['train', 'val', 'test'], [train_data, val_data, test_data]))[2:]:
+for name, data in list(zip(['train', 'val', 'test'], [train_data, val_data, test_data])):
     print(name)
     dl = DataLoader(dataset=Dataset(data, transformations), batch_size=128, num_workers=torch.cuda.device_count(), shuffle=False)
     embedding_dict, outcomes_dict = get_embeddings_bagging(feature_extractor, dl, args.do_outcomes)
-    embedding_dest_path = os.path.join(args.out_dir, model_name,  "embeddings", f"{name}_{data_dir_name}_embedding.pkl")
+    embedding_dest_path = os.path.join(args.out_dir, model_name,  data_dir_name, "embeddings", f"{name}_{data_dir_name}_embedding.pkl")
     ensure_dir_exists(embedding_dest_path)
     pickle.dump(embedding_dict, open(embedding_dest_path, 'wb'), protocol=4)
     if args.do_outcomes:
-        ensure_dir_exists(os.path.join(args.out_dir, model_name, data_dir_name, "outcomes"))
-        outcomes_dest_path = os.path.join(args.out_dir, model_name, "outcomes", f"{name}_{data_dir_name}_outcomes.pkl")
+        outcomes_dest_path = os.path.join(args.out_dir, model_name, data_dir_name, "embeddings", f"{name}_{data_dir_name}_outcomes.pkl")
         pickle.dump((outcomes_dict), open(outcomes_dest_path, 'wb'), protocol=4)
     else:
         print("Not dumping outcomes: args.do_outcomes is False")

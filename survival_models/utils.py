@@ -7,7 +7,7 @@ from collections import defaultdict
 from tqdm import tqdm
 
 
-def get_metics(train_df, test_df, est):
+def get_metrics(train_df, test_df, est):
     metrics = {}
     y_train = np.array([tuple((bool(row[0]), row[1])) for row in zip(train_df['outcome'], train_df['day'])],
          dtype=[('outcome', 'bool'), ('day', '<f4')])
@@ -96,6 +96,9 @@ def load_data(data_dir, cluster_dir, normalize='mean', cls=1):
         n_clusters = len(cluster.weights_)
     else:
         n_clusters = cluster.n_clusters
+    files = os.listdir(data_dir)
+    # TODO: get some magic here
+    import ipdb; ipdb.set_trace()
     train_features = pickle.load(open(os.path.join(data_dir, 'train_embedding.pkl'), 'rb'))
     train_outcomes = pickle.load(open(os.path.join(data_dir, 'train_outcomes.pkl'), 'rb'))
     val_features = pickle.load(open(os.path.join(data_dir, 'val_embedding.pkl'), 'rb'))
