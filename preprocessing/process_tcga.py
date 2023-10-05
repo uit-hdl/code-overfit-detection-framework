@@ -9,6 +9,7 @@ from monai.data import Dataset
 
 parser = argparse.ArgumentParser(description='Process TCGA')
 
+# I removed duplicates from the clinical file in Excel
 parser.add_argument('--clinical_path', default='./annotations/TCGA/clinical_tcga.tsv', type=str)
 parser.add_argument('--follow_up_path', default='./annotations/TCGA/nationwidechildrens.org_clinical_follow_up_v1.0_lusc.txt', type=str)
 parser.add_argument('--wsi_path', default='/terrahome/TCGA_LUSC/', type=str)
