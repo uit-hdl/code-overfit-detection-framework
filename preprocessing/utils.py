@@ -1,10 +1,11 @@
 import cv2
 import sys
 import os
-from openslide import OpenSlide
+#from openslide import OpenSlide
+from pathlib import Path
 from PIL import Image
 import numpy as np
-import staintools
+#import staintools
 
 
 def getGradientMagnitude(im):
@@ -46,4 +47,10 @@ def wsi_to_tiles(idx, wsi, refer_img, s, tiles_dir):
                 img_tmp.save(tile_path + "/" + str(x) + "_" + str(y) + '.jpg', 'JPEG', optimize=True, quality=94)
                 count += 1
     sys.stdout.write('End task %d with %d tiles\n' % (idx, count))
+
+def ensure_dir_exists(path):
+    dest_dir = os.path.dirname(path)
+    if not os.path.exists(dest_dir):
+        Path(dest_dir).mkdir(parents=True, exist_ok=True)
+        print(f"mkdir: '{dest_dir}'")
 
