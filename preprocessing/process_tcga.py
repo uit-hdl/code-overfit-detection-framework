@@ -56,14 +56,14 @@ for d in ds:
         print("no recurrence information for patient %s" % patient_id)
     annotation[patient_id] = {'recurrence': clinicalRow['days_to_recurrence'].isnumeric(),
                               'stage': clinicalRow['ajcc_pathologic_stage'],
-                              'survival_days': clinicalRow['days_to_death'] if clinicalRow['days_to_death'].isnumeric() else None,
+                              'survival_days': int(clinicalRow['days_to_death']) if clinicalRow['days_to_death'].isnumeric() else None,
                               'survival': True if clinicalRow['vital_status'].lower() == 'alive' else False,
                               'recurrence_free_days': recurrence_free_days,
-                              'age':clinicalRow['age_at_diagnosis'],
-                              'gender':clinicalRow['gender'],
+                              'age': int(clinicalRow['age_at_diagnosis']),
+                              'gender': clinicalRow['gender'],
                               # XXX: original code uses annotation[case_id]['followup_days'] = pd.to_numeric(followupTable.last_contact_days_to, errors='coerce').loc[case_id]
                               # not sure which one would be correct
-                              'followup_days':clinicalRow['days_to_last_follow_up'],
+                              'followup_days': int(clinicalRow['days_to_last_follow_up'] if clinicalRow['days_to_last_follow_up'] else None),
                               'patient_id': patient_id}
 out_file = os.path.join(os.path.join(args.out_dir, 'annotation', 'recurrence_annotation_tcga.pkl'))
 ensure_dir_exists(out_file)

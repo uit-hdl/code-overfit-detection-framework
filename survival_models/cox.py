@@ -39,7 +39,7 @@ else:
 
 train_data, val_data, test_data = utils.load_data(args.embeddings_dir, args.cluster_path, normalize=args.normalize)
 
-train_df, val_df, test_df = utils.preprocess_data(train_data, val_data, test_data)
+train_df, val_df, test_df = utils.preprocess_data(train_data, val_data, test_data, n_clusters)
 # if data_source == 'TCGA':
 # test_df = test_df.loc[test_df['tcga_flag']==1.0]
 # elif data_source =='CPTAC':

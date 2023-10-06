@@ -11,7 +11,7 @@ parser = argparse.ArgumentParser(description='Process CTPAC')
 
 parser.add_argument('--followup_path', default='./annotations/CPTAC/clinical.csv', type=str)
 parser.add_argument('--wsi_path', default='/terrahome/CPTAC_LSCC/', type=str)
-parser.add_argument('--refer_img', default='./preprocess/colorstandard.png', type=str)
+parser.add_argument('--refer_img', default='./preprocessing/colorstandard.png', type=str)
 parser.add_argument('--s', default=0.9, type=float, help='The proportion of tissues')
 parser.add_argument('--out_dir', default='./out', type=str, help='path to save extracted tiles')
 args = parser.parse_args()
@@ -36,6 +36,8 @@ for slide_id in ds:
     tile_path = os.path.join(args.out_dir, 'CPTAC', 'tiles', os.path.basename(slide_id['patient']))
     if not os.path.exists(tile_path):
         Path(tile_path).mkdir(parents=True, exist_ok=True)
+    wsi_to_tiles(slide_id['filename'], tile_path, args.refer_img, args.s)
+
 
 # Get annotation
 annotation = {}
@@ -46,12 +48,12 @@ for d in ds:
     did_recur = clinicalRow['days_to_recurrence'] is not None or clinicalRow['days_to_recurrence'] != "'--"
     annotation[patient_id] = {'recurrence': did_recur,
                            'stage': clinicalRow['ajcc_pathologic_stage'],
-                           'survival_days': clinicalRow['days_to_death'] if clinicalRow['days_to_death'] != "'--" else None,
+                           'survival_days': int(clinicalRow['days_to_death']) if clinicalRow['days_to_death'] != "'--" else None,
                            'survival': True if clinicalRow['vital_status'] == 'alive' else False,
-                           'recurrence_free_days': clinicalRow['days_to_recurrence'] if did_recur else None,
-                           'age':clinicalRow['age_at_diagnosis'],
+                           'recurrence_free_days': int(clinicalRow['days_to_recurrence'] if did_recur else None),
+                           'age': int(clinicalRow['age_at_diagnosis']),
                            'gender':clinicalRow['gender'],
-                           'followup_days':clinicalRow['days_to_last_follow_up'],
+                           'followup_days': int(clinicalRow['days_to_last_follow_up']),
                           'patient_id': patient_id}
 out_file = os.path.join(os.path.join(args.out_dir, 'annotation', 'recurrence_annotation_cptac.pkl'))
 ensure_dir_exists(out_file)

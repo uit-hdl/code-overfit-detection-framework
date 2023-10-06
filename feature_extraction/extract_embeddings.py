@@ -42,7 +42,7 @@ def ensure_dir_exists(path):
     if not os.path.exists(dest_dir):
         Path(dest_dir).mkdir(parents=True, exist_ok=True)
 
-def get_embeddings_bagging(feature_extractor, dl, do_outcomes):
+def get_embeddings_bagging(feature_extractor, dl, do_outcomes, annotations):
     embedding_dict = defaultdict(list)
     outcomes_dict = defaultdict(list)
     feature_extractor.eval()
@@ -58,6 +58,8 @@ def get_embeddings_bagging(feature_extractor, dl, do_outcomes):
 
             for f,bag,tile in zip(feat, bag_idx, tile_idx):
                 embedding_dict[bag].append((f[np.newaxis, :].cpu().numpy(), tile))
+                slide_id = "-".join(bag.split("-")[0:3])
+                outcomes_dict[slide_id] = annotations[slide_id] if do_outcomes else []
         # The next for loop is more about making tensors into numpy arrays. We prune away the first dimension which doesn't need to exist
         # it is not merging all tiles from slides
         for slide_id in embedding_dict:
@@ -77,14 +79,12 @@ def load_model(net, model_path):
     net.last_linear = nn.Identity() # the linear layer removes our dependency/link to the key encoder
     # i.e. we can write net(input) instead of net.encoder_q(input)
 
-# cptac_annotation = pickle.load(open('../CPTAC/recurrence_annotation.pkl', 'rb'))
-# annotations = {**tcga_annotation, **cptac_annotation}
+annotations = {}
 if args.do_outcomes:
     tcga_annotation = pickle.load(open(args.tcga_annotation_file, 'rb')) if os.path.exists(args.tcga_annotation_file) else {}
     cptac_annotation = pickle.load(open(args.cptac_annotation_file, 'rb')) if os.path.exists(args.cptac_annotation_file) else {}
     annotations = {**tcga_annotation, **cptac_annotation}
 
-annotations = {**tcga_annotation, **cptac_annotation}
 feature_extractor = InceptionV4(num_classes=128)
 load_model(feature_extractor, args.feature_extractor)
 feature_extractor.to('cuda')
@@ -136,7 +136,7 @@ data_dir_name = list(filter(None, args.src_dir.split(os.sep)))[-1]
 for name, data in list(zip(['train', 'val', 'test'], [train_data, val_data, test_data])):
     print(name)
     dl = DataLoader(dataset=Dataset(data, transformations), batch_size=256, num_workers=torch.cuda.device_count(), shuffle=False)
-    embedding_dict, outcomes_dict = get_embeddings_bagging(feature_extractor, dl, args.do_outcomes)
+    embedding_dict, outcomes_dict = get_embeddings_bagging(feature_extractor, dl, args.do_outcomes, annotations)
     embedding_dest_path = os.path.join(args.out_dir, model_name,  data_dir_name, "embeddings", f"{name}_{data_dir_name}_embedding.pkl")
     ensure_dir_exists(embedding_dest_path)
     pickle.dump(embedding_dict, open(embedding_dest_path, 'wb'), protocol=4)
