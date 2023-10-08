@@ -105,7 +105,8 @@ parser.add_argument('--data-dir', default='./data/', type=str,
 parser.add_argument('--out-dir', default='./models/', type=str,
                     help='path to output directory')
 parser.add_argument('--batch_slide_num', default=4, type=int)
-parser.add_argument('--condition', default=True, type=bool)
+parser.add_argument('--condition', default=True, type=bool, action=argparse.BooleanOptionalAction,
+                    metavar='C', help='whether to use conditional sampling or not', dest='condition')
 
 def save_data_to_csv(data, filename, label):
     ensure_dir_exists(filename)
