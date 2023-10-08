@@ -10,7 +10,7 @@ from pathlib import Path
 
 parser = argparse.ArgumentParser(description='Compute overlaps')
 
-parser.add_argument('--embeddings_path', default='./out/MoCo/embeddings/test_lungscc_embedding.pkl', type=str, help="location of embedding pkl from feature_extraction.py")
+parser.add_argument('--embeddings_path', default='./out/MoCo/lung_scc/embeddings/test_lung_scc_embedding.pkl', type=str, help="location of embedding pkl from feature_extraction.py")
 parser.add_argument('--out_dir', default='./out', type=str, help='path to save computed overlaps')
 
 def ensure_dir_exists(path):
@@ -24,15 +24,19 @@ args = parser.parse_args()
 if __name__ == "__main__":
     features = pickle.load(open(args.embeddings_path, 'rb'))
     number_of_unique_inst = len(set(map(lambda s: s.split("-")[1], features.keys())))
+    # FIXME: here and below: currently just looking at slides, not institutions
+    number_of_unique_inst = len(set(features.keys()))
 
     cluster_dst = os.path.join(args.out_dir, 'cluster', f'gmm_{number_of_unique_inst}.pkl')
     if os.path.exists(cluster_dst):
         cluster = pickle.load(open(cluster_dst, 'rb'))
     else:
+        print("Making gmm model...")
         cluster = GaussianMixture(n_components=number_of_unique_inst, random_state=9001)
         cluster = cluster.fit([item[0] for sublist in features.values() for item in sublist])
         ensure_dir_exists(cluster_dst)
         pickle.dump(cluster, open(cluster_dst, 'wb'))
+        print("Model gmm model complete!")
 
     # Get number of unique slides in dl
     # Approach below doesn't work: the results are random from the model. So, let's just use the GMM approach instead
@@ -50,7 +54,9 @@ if __name__ == "__main__":
     gt_institution_count = defaultdict(int)
     institution_count = defaultdict(lambda: defaultdict(dict))
     for (i,slide) in institution_guess:
-        institution = os.path.dirname(slide).split("-")[1]
+        # FIXME: here's the "below"
+        #institution = os.path.dirname(slide).split("-")[1]
+        institution = os.path.dirname(slide)
         if institution not in institution_count[i]:
             institution_count[i][institution] = 0
         institution_count[i][institution] += 1

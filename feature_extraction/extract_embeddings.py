@@ -133,7 +133,7 @@ transformations = mt.Compose(
 model_name = condssl.builder.MoCo.__name__
 data_dir_name = list(filter(None, args.src_dir.split(os.sep)))[-1]
 
-for name, data in list(zip(['train', 'val', 'test'], [train_data, val_data, test_data])):
+for name, data in list(zip(['train', 'val', 'test'], [train_data, val_data, test_data]))[2:]:
     print(name)
     dl = DataLoader(dataset=Dataset(data, transformations), batch_size=256, num_workers=torch.cuda.device_count(), shuffle=False)
     embedding_dict, outcomes_dict = get_embeddings_bagging(feature_extractor, dl, args.do_outcomes, annotations)
