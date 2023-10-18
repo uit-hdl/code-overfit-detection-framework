@@ -44,17 +44,29 @@ followUpTable['recurrence'] = ((followUpTable['new_tumor_event_dx_indicator'] ==
 followUpTable = followUpTable.sort_values(['bcr_patient_barcode', 'form_completion_date']).drop_duplicates('bcr_patient_barcode', keep='last')
 followUpTable = followUpTable.set_index('bcr_patient_barcode')
 clinicalTable = pd.read_csv(args.clinical_path, sep='\t').set_index('case_submitter_id')
+new_tumor_event_types = ['Distant Metastasis', 'Distant Metastasis|New Primary Tumor', 'Locoregional Recurrence', 'Locoregional Recurrence|Distant Metastasis', 'New Primary Tumor', 'new_neoplasm_event_type']
 # Get annotation
 annotation = {}
 for d in ds:
     patient_id = d['patient']
     clinicalRow = clinicalTable.loc[patient_id].to_dict()
 
+    recurrence =  clinicalRow['days_to_recurrence'].isnumeric() or \
+            patient_id in followUpTable.index and \
+            (followUpTable.loc[patient_id]['tumor_status'] == 'WITH TUMOR' \
+            or followUpTable.loc[patient_id]['new_tumor_event_type'] in new_tumor_event_types) \
+            
+
     recurrence_free_days = followUpTable.loc[patient_id]['new_tumor_event_dx_days_to'] if patient_id in followUpTable.index else ''
     recurrence_free_days = int(recurrence_free_days) if recurrence_free_days.isnumeric() else None
-    if not recurrence_free_days:
-        print("no recurrence information for patient %s" % patient_id)
-    annotation[patient_id] = {'recurrence': clinicalRow['days_to_recurrence'].isnumeric(),
+    # if not recurrence_free_days:
+    #     print("no recurrence information for patient %s" % patient_id)
+    if recurrence and not recurrence_free_days:
+        print("something fucky with patient %s" % patient_id)
+    annotation[patient_id] = {
+                              # FIXME: always 0
+                              # 'recurrence': clinicalRow['days_to_recurrence'].isnumeric(), # FIXME: always zero?
+                              'recurrence': recurrence,
                               'stage': clinicalRow['ajcc_pathologic_stage'],
                               'survival_days': int(clinicalRow['days_to_death']) if clinicalRow['days_to_death'].isnumeric() else None,
                               'survival': True if clinicalRow['vital_status'].lower() == 'alive' else False,
@@ -63,7 +75,7 @@ for d in ds:
                               'gender': clinicalRow['gender'],
                               # XXX: original code uses annotation[case_id]['followup_days'] = pd.to_numeric(followupTable.last_contact_days_to, errors='coerce').loc[case_id]
                               # not sure which one would be correct
-                              'followup_days': int(clinicalRow['days_to_last_follow_up'] if clinicalRow['days_to_last_follow_up'] else None),
+                              'followup_days': int(clinicalRow['days_to_last_follow_up'] if clinicalRow['days_to_last_follow_up'] != "'--" else None),
                               'patient_id': patient_id}
 out_file = os.path.join(os.path.join(args.out_dir, 'annotation', 'recurrence_annotation_tcga.pkl'))
 ensure_dir_exists(out_file)

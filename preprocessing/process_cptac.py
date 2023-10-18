@@ -36,7 +36,7 @@ for slide_id in ds:
     tile_path = os.path.join(args.out_dir, 'CPTAC', 'tiles', os.path.basename(slide_id['patient']))
     if not os.path.exists(tile_path):
         Path(tile_path).mkdir(parents=True, exist_ok=True)
-    wsi_to_tiles(slide_id['filename'], tile_path, args.refer_img, args.s)
+        wsi_to_tiles(slide_id['filename'], tile_path, args.refer_img, args.s)
 
 
 # Get annotation
@@ -44,16 +44,21 @@ annotation = {}
 #for case_id in clinicalTable.index:
 for d in ds:
     patient_id = d['patient']
+    if not patient_id in clinicalTable.index:
+        #print("Could not find patient id %s, skipping" % patient_id)
+        continue
+    else:
+        print ("Found patient id %s" % patient_id)
     clinicalRow = clinicalTable.loc[patient_id].to_dict()
     did_recur = clinicalRow['days_to_recurrence'] is not None or clinicalRow['days_to_recurrence'] != "'--"
     annotation[patient_id] = {'recurrence': did_recur,
                            'stage': clinicalRow['ajcc_pathologic_stage'],
                            'survival_days': int(clinicalRow['days_to_death']) if clinicalRow['days_to_death'] != "'--" else None,
                            'survival': True if clinicalRow['vital_status'] == 'alive' else False,
-                           'recurrence_free_days': int(clinicalRow['days_to_recurrence'] if did_recur else None),
-                           'age': int(clinicalRow['age_at_diagnosis']),
+                           'recurrence_free_days': int(clinicalRow['days_to_recurrence']) if did_recur and clinicalRow['days_to_recurrence'].isnumeric() else None,
+                           'age': int(clinicalRow['age_at_diagnosis']) if clinicalRow['age_at_diagnosis'].isnumeric() else None,
                            'gender':clinicalRow['gender'],
-                           'followup_days': int(clinicalRow['days_to_last_follow_up']),
+                           'followup_days': int(clinicalRow['days_to_last_follow_up'].replace(".0", "")) if clinicalRow['days_to_last_follow_up'].isnumeric() else None,
                           'patient_id': patient_id}
 out_file = os.path.join(os.path.join(args.out_dir, 'annotation', 'recurrence_annotation_cptac.pkl'))
 ensure_dir_exists(out_file)

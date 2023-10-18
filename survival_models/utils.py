@@ -49,7 +49,7 @@ def preprocess_data(train_data, val_data, test_data, n_clusters):
                                                                                                              'outcome'])
     train_df = train_df[(train_df['recur'].notna() | train_df['followup'].notna())]
     train_df['day'] = train_df['recur']
-    import ipdb; ipdb.set_trace()
+    # import ipdb; ipdb.set_trace()
     train_df.loc[train_df['recur'].isna(), 'day'] = train_df.loc[train_df['recur'].isna(), 'followup']
     train_df = train_df.drop(columns=['recur', 'followup'])
     train_df = train_df[train_df['day'] > 0]
@@ -172,7 +172,8 @@ def transform(features, cluster, outcomes, n_clusters, normalize='count', cls=1,
         outcome_list.append(outcomes[slide_id]['recurrence'])
         recur_day_list.append(int(outcomes[slide_id]['recurrence_free_days']) if outcomes[slide_id]['recurrence_free_days'] else None)
         followup_day_list.append(int(outcomes[slide_id]['followup_days']) if (outcomes[slide_id]['followup_days'] and outcomes[slide_id]['followup_days'].isnumeric()) else None)
-    count_list, outcome_list = np.array(count_list), np.array(outcome_list)
+    count_list = np.array(count_list)
+    outcome_list = np.array(outcome_list)
     count_list = count_list.astype(np.float)
 
     if normalize == 'mean':

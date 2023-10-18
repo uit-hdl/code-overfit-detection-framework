@@ -133,7 +133,8 @@ def umap_slice(names, features, cluster, clinical, out_dir):
     cluster_labels = [item for sublist in cluster_labels for item in sublist]
     tile_names = [[x[1] for x in features[name]] for name in names]
     file_root = os.path.abspath("/").replace(os.sep, "/")
-    tile_names = ["file:///" + file_root + x for x in np.concatenate(tile_names, axis=0)]
+    #tile_names = ["file:///" + file_root + x for x in np.concatenate(tile_names, axis=0)]
+    tile_names = ["file:///" + "C:/" + x for x in np.concatenate(tile_names, axis=0)]
     features_flattened = np.concatenate(values, axis=0)
     umap_projection = reducer.fit_transform(features_flattened)
     mapper = reducer.fit(features_flattened)
@@ -178,12 +179,12 @@ def umap_slice(names, features, cluster, clinical, out_dir):
     counts_2 = [0.58, 1, 0.024]
     counts_3 = [0.0, 0.24, 1]
 
-    source = ColumnDataSource(data=dict(slides=names_labels, counts_1=counts_1, counts_2=counts_2, counts_3=counts_3))
+    source = ColumnDataSource(data=dict(slides=names, counts_1=counts_1, counts_2=counts_2, counts_3=counts_3))
     columns = [
         TableColumn(field="slides", title="Slide"),
-        TableColumn(field="counts_1", title=names_labels[0]),
-        TableColumn(field="counts_2", title=names_labels[1]),
-        TableColumn(field="counts_3", title=names_labels[2]),
+        TableColumn(field="counts_1", title=names[0]),
+        TableColumn(field="counts_2", title=names[1]),
+        TableColumn(field="counts_3", title=names[2]),
     ]
     data_table = DataTable(source=source, columns=columns, width=400, height=280, index_position=None)
 

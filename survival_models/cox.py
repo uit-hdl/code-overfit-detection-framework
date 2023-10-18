@@ -56,6 +56,7 @@ alpha = alpha_list[0]
 val_results = []
 
 for i, alpha in enumerate(alpha_list):
+    import ipdb; ipdb.set_trace()
     est = CoxPHSurvivalAnalysis(alpha=alpha).fit(train_df.drop(columns=['outcome','day']), y_train)
     # val_metrics = utils.get_metrics(train_df, val_df, est)
     val_metrics = utils.get_metrics(train_df, val_df, est)
