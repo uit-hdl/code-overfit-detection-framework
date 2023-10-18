@@ -11,7 +11,7 @@ parser = argparse.ArgumentParser(description='Process TCGA')
 
 # I removed duplicates from the clinical file in Excel
 parser.add_argument('--clinical_path', default='./annotations/TCGA/clinical_tcga.tsv', type=str)
-parser.add_argument('--follow_up_path', default='./annotations/TCGA/nationwidechildrens.org_clinical_follow_up_v1.0_lusc.txt', type=str)
+parser.add_argument('--follow_up_path', default='./annotations/TCGA/nationwidechildrens.org_clinical_follow_up_v1.0_lusc.tsv', type=str)
 parser.add_argument('--wsi_path', default='/terrahome/TCGA_LUSC/', type=str)
 parser.add_argument('--refer_img', default='./preprocess/colorstandard.png', type=str)
 parser.add_argument('--s', default=0.9, type=float, help='The proportion of tissues')
@@ -63,6 +63,8 @@ for d in ds:
     #     print("no recurrence information for patient %s" % patient_id)
     if recurrence and not recurrence_free_days:
         print("something fucky with patient %s" % patient_id)
+
+    followup_days = int(clinicalRow['days_to_last_follow_up']) if (clinicalRow['days_to_last_follow_up'] and clinicalRow['days_to_last_follow_up'].isnumeric()) else None
     annotation[patient_id] = {
                               # FIXME: always 0
                               # 'recurrence': clinicalRow['days_to_recurrence'].isnumeric(), # FIXME: always zero?
@@ -71,11 +73,11 @@ for d in ds:
                               'survival_days': int(clinicalRow['days_to_death']) if clinicalRow['days_to_death'].isnumeric() else None,
                               'survival': True if clinicalRow['vital_status'].lower() == 'alive' else False,
                               'recurrence_free_days': recurrence_free_days,
-                              'age': int(clinicalRow['age_at_diagnosis']),
+                              'age': int(clinicalRow['age_at_diagnosis']) if clinicalRow['age_at_diagnosis'].isnumeric() else None,
                               'gender': clinicalRow['gender'],
                               # XXX: original code uses annotation[case_id]['followup_days'] = pd.to_numeric(followupTable.last_contact_days_to, errors='coerce').loc[case_id]
                               # not sure which one would be correct
-                              'followup_days': int(clinicalRow['days_to_last_follow_up'] if clinicalRow['days_to_last_follow_up'] != "'--" else None),
+                              'followup_days': followup_days,
                               'patient_id': patient_id}
 out_file = os.path.join(os.path.join(args.out_dir, 'annotation', 'recurrence_annotation_tcga.pkl'))
 ensure_dir_exists(out_file)
