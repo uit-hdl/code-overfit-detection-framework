@@ -51,18 +51,14 @@ for d in ds:
     patient_id = d['patient']
     clinicalRow = clinicalTable.loc[patient_id].to_dict()
 
-    recurrence =  clinicalRow['days_to_recurrence'].isnumeric() or \
-            patient_id in followUpTable.index and \
-            (followUpTable.loc[patient_id]['tumor_status'] == 'WITH TUMOR' \
-            or followUpTable.loc[patient_id]['new_tumor_event_type'] in new_tumor_event_types) \
+    recurrence = clinicalRow['days_to_recurrence'].isnumeric() or followUpTable.loc[patient_id]['recurrence'] if patient_id in followUpTable.index else False
             
-
     recurrence_free_days = followUpTable.loc[patient_id]['new_tumor_event_dx_days_to'] if patient_id in followUpTable.index else ''
     recurrence_free_days = int(recurrence_free_days) if recurrence_free_days.isnumeric() else None
     # if not recurrence_free_days:
     #     print("no recurrence information for patient %s" % patient_id)
     if recurrence and not recurrence_free_days:
-        print("something fucky with patient %s" % patient_id)
+        print("something fucky with patient %s: reccurence %s, free_days %s" % (patient_id, recurrence, recurrence_free_days))
 
     followup_days = int(clinicalRow['days_to_last_follow_up']) if (clinicalRow['days_to_last_follow_up'] and clinicalRow['days_to_last_follow_up'].isnumeric()) else None
     annotation[patient_id] = {
