@@ -8,7 +8,6 @@ from tqdm import tqdm
 
 
 def get_metrics(train_df, test_df, est):
-    metrics = {}
     y_train = np.array([tuple((bool(row[0]), row[1])) for row in zip(train_df['outcome'], train_df['day'])],
                        dtype=[('outcome', 'bool'), ('day', '<f4')])
     y_test = np.array([tuple((bool(row[0]), row[1])) for row in zip(test_df['outcome'], test_df['day'])],
@@ -20,20 +19,20 @@ def get_metrics(train_df, test_df, est):
     except:
         print('no five year records')
     preds = [fn(4) for fn in survs]
-    import ipdb; ipdb.set_trace()
     times, score = brier_score(y_train, y_test, preds, 4)
-    metrics['Brier_2yr'] = score[0]
+    brier2y = score[0]
+    brier5y = None
     try:
         preds = [fn(10) for fn in survs]
         times, score = brier_score(y_train, y_test, preds, 10)
-        metrics['Brier_5yr'] = score[0]
+        brier5y = score[0]
     except:
         print('no five year records')
     preds = est.predict(test_df.drop(columns=['outcome', 'day']))
     # TODO: wtf? how was the line below ever supposed to make sense? from upstream/main
     # metrics['C-index'] = concordance_index_censored(y_train, y_test, preds)[0]
-    metrics['C-index'] = concordance_index_censored([x[0] for x in y_test], [x[1] for x in y_test], preds)[0]
-    return metrics
+    c_index = concordance_index_censored([x[0] for x in y_test], [x[1] for x in y_test], preds)[0]
+    return brier2y, brier5y, c_index
 
 
 def preprocess_data(train_data, val_data, test_data, n_clusters):
@@ -97,9 +96,10 @@ def label_cluster(feature, cluster):
     # need to
 
     i = 0
-    for slide, tiles_in_feature_space in tqdm(feature.items()):
-        # if i > 30:
-        #     break
+    for slide, tiles_in_feature_space in tqdm(feature.items(), desc='labeling clusters'):
+        # FIXME: TODO: this is a hack to get the first 30 slides
+        if i > 30:
+            break
         i += 1
         if cluster_method == 'GaussianMixture':
             #clusters[slide] = cluster.predict([x[0] for x in tiles_in_feature_space])
@@ -170,11 +170,10 @@ def transform(features, cluster, outcomes, n_clusters, normalize='count', cls=1,
             #count_list.append(counter(cluster[int(cluster_id)], n_clusters))
 
         outcome_list.append(outcomes[slide_id]['recurrence'])
-        recur_day_list.append(int(outcomes[slide_id]['recurrence_free_days']) if outcomes[slide_id]['recurrence_free_days'] else None)
-        followup_day_list.append(int(outcomes[slide_id]['followup_days']) if (outcomes[slide_id]['followup_days'] and outcomes[slide_id]['followup_days'].isnumeric()) else None)
-    count_list = np.array(count_list)
+        recur_day_list.append(outcomes[slide_id]['recurrence_free_days'])
+        followup_day_list.append(outcomes[slide_id]['followup_days'])
+    count_list = np.array(count_list, dtype=np.float)
     outcome_list = np.array(outcome_list)
-    count_list = count_list.astype(np.float)
 
     if normalize == 'mean':
         cluster_features = (count_list.T / count_list.sum(axis=1)).T

@@ -1,14 +1,11 @@
 import sys
 sys.path.append('../')
-from lifelines import CoxPHFitter
-from lifelines.utils import concordance_index
 import pickle
+from pathlib import Path
+import csv
 # import  utils
 import os
-import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-from sklearn.metrics import brier_score_loss
 from survival_models import utils
 from sksurv.linear_model import CoxPHSurvivalAnalysis
 import argparse
@@ -56,19 +53,21 @@ alpha = alpha_list[0]
 val_results = []
 
 for i, alpha in enumerate(alpha_list):
-    import ipdb; ipdb.set_trace()
     est = CoxPHSurvivalAnalysis(alpha=alpha).fit(train_df.drop(columns=['outcome','day']), y_train)
     # val_metrics = utils.get_metrics(train_df, val_df, est)
-    val_metrics = utils.get_metrics(train_df, val_df, est)
-    val_results.append(val_metrics['C-index'])
+    _, _, val_c_index = utils.get_metrics(train_df, val_df, est)
+    val_results.append(val_c_index)
 
 alpha = alpha_list[np.argmax(val_results)]
 est = CoxPHSurvivalAnalysis(alpha=alpha).fit(train_df.drop(columns=['outcome','day']), y_train)
-test_metrics = utils.get_metrics(train_df, test_df, est)
-print(test_metrics)
+brier2y, brier5y, c_index = utils.get_metrics(train_df, test_df, est)
+# write to csv file
 
-survival_out_file = os.path.join(args.out_dir, "test_results.pkl")
+
+survival_out_file = os.path.join(args.out_dir, "test_%s_results.csv" % Path(args.cluster_path).stem)
 ensure_dir_exists(survival_out_file)
-pickle.dump({"setting": os.path.join(args.out_dir, args.cluster_path),
-            "test_results": test_metrics},
-            open(survival_out_file, 'wb'))
+with open(survival_out_file, "w", encoding='UTF8') as f:
+    writer = csv.writer(f)
+    writer.writerow(["Brier2y", "Brier5y", "C-index"])
+    writer.writerow([brier2y, brier5y, c_index])
+print("Wrote results to %s" % survival_out_file)

@@ -25,7 +25,7 @@ parser.add_argument('--feature_extractor', default='./pretrained/checkpoint.pth.
 parser.add_argument('--tcga_annotation_file', default='./out/annotation/recurrence_annotation_tcga.pkl', type=str, help='path to TCGA annotations')
 parser.add_argument('--cptac_annotation_file', default='./out/annotation/recurrence_annotation_cptac.pkl', type=str, help='path to CPTAC annotations')
 parser.add_argument('--src_dir', default='/Data/TCGA_LUSC/preprocessed/by_class/lung_scc', type=str, help='path to preprocessed slide images')
-parser.add_argument('--outcomes', default=False, type=bool, action=argparse.BooleanOptionalAction,
+parser.add_argument('--outcomes', default=True, type=bool, action=argparse.BooleanOptionalAction,
                     metavar='O', help='whether to consider outcomes or not', dest='do_outcomes')
 parser.add_argument('--out_dir', default='./out', type=str, help='path to save extracted embeddings')
 
@@ -83,7 +83,9 @@ annotations = {}
 if args.do_outcomes:
     tcga_annotation = pickle.load(open(args.tcga_annotation_file, 'rb')) if os.path.exists(args.tcga_annotation_file) else {}
     cptac_annotation = pickle.load(open(args.cptac_annotation_file, 'rb')) if os.path.exists(args.cptac_annotation_file) else {}
-    annotations = {**tcga_annotation, **cptac_annotation}
+    # TODO: CPTAC
+    #annotations = {**tcga_annotation, **cptac_annotation}
+    annotations = {**tcga_annotation}
 
 feature_extractor = InceptionV4(num_classes=128)
 load_model(feature_extractor, args.feature_extractor)
@@ -133,7 +135,7 @@ transformations = mt.Compose(
 model_name = condssl.builder.MoCo.__name__
 data_dir_name = list(filter(None, args.src_dir.split(os.sep)))[-1]
 
-for name, data in list(zip(['train', 'val', 'test'], [train_data, val_data, test_data]))[2:]:
+for name, data in list(zip(['train', 'val', 'test'], [train_data, val_data, test_data]))[0:]:
     print(name)
     dl = DataLoader(dataset=Dataset(data, transformations), batch_size=256, num_workers=torch.cuda.device_count(), shuffle=False)
     embedding_dict, outcomes_dict = get_embeddings_bagging(feature_extractor, dl, args.do_outcomes, annotations)
