@@ -61,7 +61,6 @@ for i, alpha in enumerate(alpha_list):
 alpha = alpha_list[np.argmax(val_results)]
 est = CoxPHSurvivalAnalysis(alpha=alpha).fit(train_df.drop(columns=['outcome','day']), y_train)
 brier2y, brier5y, c_index = utils.get_metrics(train_df, test_df, est)
-# write to csv file
 
 
 survival_out_file = os.path.join(args.out_dir, "test_%s_results.csv" % Path(args.cluster_path).stem)
@@ -71,3 +70,6 @@ with open(survival_out_file, "w", encoding='UTF8') as f:
     writer.writerow(["Brier2y", "Brier5y", "C-index"])
     writer.writerow([brier2y, brier5y, c_index])
 print("Wrote results to %s" % survival_out_file)
+# print content of survival_out_file
+with open(survival_out_file, "r", encoding='UTF8') as f:
+    print(f.read())

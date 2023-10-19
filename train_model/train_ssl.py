@@ -97,9 +97,7 @@ parser.add_argument('--mlp', action='store_true',
                     help='use mlp head')
 parser.add_argument('--aug-plus', action='store_true',
                     help='use moco v2 data augmentation')
-parser.add_argument('--cos', action='store_true',
-                    help='use cosine lr schedule')
-
+parser.add_argument('--cos', action='store_true', default=True, help='use cosine lr schedule')
 parser.add_argument('--data-dir', default='./data/', type=str,
                     help='path to source directory')
 parser.add_argument('--out-dir', default='./models/', type=str,
@@ -302,7 +300,7 @@ def find_data(data_dir, batch_size, batch_slide_num, workers, is_profiling, is_d
     )
 
     number_of_slides = len(glob.glob(f"{data_dir}{os.sep}*"))
-    splits = [int(number_of_slides * 0.3), int(number_of_slides * 0.1), int(number_of_slides * 0.1)]
+    splits = [int(number_of_slides * 0.7), int(number_of_slides * 0.1), int(number_of_slides * 0.2)]
 
     train_data, val_data, test_data = [], [], []
     for i, directory in enumerate(glob.glob(f"{data_dir}{os.sep}*")):
@@ -329,8 +327,8 @@ def find_data(data_dir, batch_size, batch_slide_num, workers, is_profiling, is_d
     else:
         train_sampler = None
     dl_train = DataLoader(ds_train, batch_sampler=MySampler(train_data, batch_size, batch_slide_num), num_workers=workers)
-    dl_val = DataLoader(ds_val, batch_size=batch_size, num_workers=workers, shuffle=False)
-    dl_test = DataLoader(ds_test, batch_size=batch_size, num_workers=workers, shuffle=False)
+    dl_val = DataLoader(ds_val, batch_size=batch_size, num_workers=workers, shuffle=True)
+    dl_test = DataLoader(ds_test, batch_size=batch_size, num_workers=workers, shuffle=True)
 
     # first_sample = monai.utils.first(dl_train)
     # if first_sample is None:

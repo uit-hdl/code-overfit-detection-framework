@@ -95,17 +95,12 @@ def label_cluster(feature, cluster):
     cluster_method = type(cluster).__name__
     # need to
 
-    i = 0
     for slide, tiles_in_feature_space in tqdm(feature.items(), desc='labeling clusters'):
-        # FIXME: TODO: this is a hack to get the first 30 slides
-        if i > 30:
-            break
-        i += 1
         if cluster_method == 'GaussianMixture':
             #clusters[slide] = cluster.predict([x[0] for x in tiles_in_feature_space])
             clusters[slide] = cluster.predict_proba([x[0] for x in tiles_in_feature_space])
         else:
-            pass
+            raise NotImplementedError("Only GaussianMixture is supported")
             # clusters[c] = cluster.predict(feature[int(k)])
     return clusters
 

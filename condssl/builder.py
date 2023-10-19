@@ -149,7 +149,6 @@ class MoCo(nn.Module):
 
         if self.condition:
             # conditional ssl
-            import ipdb; ipdb.set_trace()
             # FIXME: replace with torch.matmul(q, k)???
             logits = torch.mm(q, k.T) / self.T
             labels = torch.arange(logits.shape[0], dtype=torch.long).cuda()
