@@ -28,6 +28,7 @@ class MoCo(nn.Module):
         # k: key encoder:
         ''' More- over, as the dictionary keys come from the preceding several mini-batches, a slowly progressing key encoder, implemented as a momentum-based moving average of the query encoder, is proposed to maintain consistency
         '''
+        # TODO: do_checkpoint ruins something
         self.encoder_q = base_encoder(num_classes=dim, do_checkpoint=do_checkpoint)
         self.encoder_k = base_encoder(num_classes=dim, do_checkpoint=do_checkpoint)
         
@@ -148,8 +149,6 @@ class MoCo(nn.Module):
 
 
         if self.condition:
-            # conditional ssl
-            # FIXME: replace with torch.matmul(q, k)???
             logits = torch.mm(q, k.T) / self.T
             labels = torch.arange(logits.shape[0], dtype=torch.long).cuda()
             return logits, labels
