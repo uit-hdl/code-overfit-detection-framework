@@ -328,7 +328,8 @@ def find_data(data_dir, batch_size, batch_slide_num, workers, is_profiling, is_d
         train_sampler = None
     dl_train = DataLoader(ds_train, batch_sampler=MySampler(train_data, batch_size, batch_slide_num), num_workers=workers)
     dl_val = DataLoader(ds_val, batch_size=batch_size, num_workers=workers, shuffle=True)
-    dl_test = DataLoader(ds_test, batch_size=batch_size, num_workers=workers, shuffle=True)
+    #dl_test = DataLoader(ds_test, batch_size=batch_size, num_workers=workers, shuffle=True)
+    dl_test = None
 
     # first_sample = monai.utils.first(dl_train)
     # if first_sample is None:
