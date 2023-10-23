@@ -2,7 +2,13 @@
 
 #conda activate conditional_ssl_hist
 
-SRC_DIR="${HOME}/TCGA_LUSC/preprocessed/TCGA/tiles/"
+if [[ -z "${1}" ]]
+then
+  SRC_DIR="${HOME}/TCGA_LUSC/preprocessed/TCGA/tiles/"
+else
+  SRC_DIR="${1}"
+fi
+    
 mkdir analysis_out/
 
 for model in out/MoCo/tiles/model/*.tar
