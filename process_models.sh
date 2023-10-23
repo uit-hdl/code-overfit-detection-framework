@@ -8,7 +8,7 @@ then
 else
   SRC_DIR="${1}"
 fi
-    
+
 mkdir analysis_out/
 
 for model in out/MoCo/tiles/model/*.tar
