@@ -18,6 +18,7 @@ import torchvision.transforms as transforms
 from monai.data import DataLoader, Dataset, set_track_meta, CacheDataset, PersistentDataset, SmartCacheDataset, ImageDataset, CacheNTransDataset
 from torch.utils.data import Sampler, DistributedSampler
 
+import samplers
 sys.path.append("../")
 import condssl.builder
 import condssl.loader
@@ -103,6 +104,7 @@ parser.add_argument('--data-dir', default='./data/', type=str,
 parser.add_argument('--out-dir', default='./models/', type=str,
                     help='path to output directory')
 parser.add_argument('--batch_slide_num', default=4, type=int)
+parser.add_argument('--batch_inst_num', default=0, type=int)
 parser.add_argument('--condition', default=True, type=bool, action=argparse.BooleanOptionalAction,
                     metavar='C', help='whether to use conditional sampling or not', dest='condition')
 
@@ -203,62 +205,7 @@ def add_dir(directory):
             all_data.append({"q": filename, "k": filename, 'filename': filename})
     return all_data
 
-def find_data(data_dir, batch_size, batch_slide_num, workers, is_profiling, is_conditional, is_distributed):
-    inheritSampler = DistributedSampler if is_distributed else Sampler
-    class MySampler(inheritSampler):
-        """
-        Conditional sampler that will generate batches made out of `batch_size` with at least `batch_slide_num` tiles from each slide
-        E.g. if `batch_slide_num` is 4 and `batch_size is 32, there will be 8 slides with 4 tiles each in one batch
-
-        Note: Don't pass in a MONAI dataset object here: the default iterator performs transformations right away
-        this is very slow, and we only need the filenames to generate the indices
-        """
-        def __init__(self, data_source, batch_size, batch_slide_num):
-            super().__init__(data_source)
-            self.data_source = data_source
-            self.batch_size = batch_size
-            self.batch_slide_num = batch_slide_num
-
-        def __iter__(self):
-            with Range("MySampler") if is_profiling else no_profiling:
-                tile_chunks = []
-
-                slide2tiles = defaultdict(list)
-                for i,d in enumerate(self.data_source):
-                    filename = d['filename']
-                    slide_id = os.path.basename(filename.split(os.sep)[-2])
-                    slide2tiles[slide_id].append(i)
-
-                cut_off_indices = []
-
-                # Generate chunks of indices. If one slide has indices slide2tiles['slide'] = [1 .. 10] the result can be like
-                # tile_chunks = [[1 .. 4], [ 1 .. 8 ]]
-                # cut_off_indices = [ 9, 10 ]
-                for slide,tiles in slide2tiles.items():
-                    indices = [tiles[i:i + self.batch_slide_num] for i in range(0, len(tiles), self.batch_slide_num)]
-                    # Prune if a chunk created above is less than `batch_slide_num`
-                    if len(indices[-1]) < self.batch_slide_num:
-                        cut_off_indices.append(indices[-1])
-                        indices = indices[:-1]
-                    if indices:
-                        random.shuffle(indices)
-                        tile_chunks.append(indices)
-
-                random.shuffle(tile_chunks)
-
-                # flatten the list so we can shuffle around chunks
-                tile_chunks = [item for sublist in tile_chunks for item in sublist]
-                random.shuffle(tile_chunks)
-
-                chunks_per_batch = self.batch_size // self.batch_slide_num
-                ret = []
-                for chunk in [tile_chunks[i:i + chunks_per_batch] for i in range(0, len(tile_chunks), chunks_per_batch)]:
-                    ret.append([item for sublist in chunk for item in sublist])
-                return iter(ret)
-
-        def __len__(self):
-            return len(self.data_source) // (self.batch_size * self.batch_slide_num)
-
+def find_data(data_dir, batch_size, batch_slide_num, batch_inst_num, workers, is_profiling, is_conditional, is_distributed):
     print('Creating dataset')
     grayer = transforms.Grayscale(num_output_channels=3)
     cropper = transforms.RandomResizedCrop(299, scale=(0.2, 1.))
@@ -326,7 +273,7 @@ def find_data(data_dir, batch_size, batch_slide_num, workers, is_profiling, is_c
         train_sampler = torch.utils.data.distributed.DistributedSampler(ds_train)
     else:
         train_sampler = None
-    dl_train = DataLoader(ds_train, batch_sampler=MySampler(train_data, batch_size, batch_slide_num) if is_conditional else None, num_workers=workers)
+    dl_train = DataLoader(ds_train, batch_sampler=samplers.MySampler(train_data, batch_size, batch_slide_num, batch_inst_num) if is_conditional else None, num_workers=workers)
     dl_val = DataLoader(ds_val, batch_size=batch_size, num_workers=workers, shuffle=True)
     #dl_test = DataLoader(ds_test, batch_size=batch_size, num_workers=workers, shuffle=True)
     dl_test = None
@@ -352,8 +299,9 @@ def main():
     if args.batch_slide_num > args.batch_size:
         print("Looks like you mistook m for n: batch_slide_num has to be less than batch_size")
         sys.exit(1)
-    if not args.conditional:
-        print("Conditional sampling false: setting batch_slide_num to 0")
+    if not args.condition:
+        print("Conditional sampling false: setting batch_slide_num and batch_inst_num to 0")
+        args.batch_inst_num = 0
         args.batch_slide_num = 0
     if not torch.cuda.is_available():
         print('No GPU device available')
@@ -369,7 +317,7 @@ def main():
     is_distributed = args.world_size > 1 or args.multiprocessing_distributed
     if is_distributed:
         torch.distributed.init_process_group(args.dist_backend)
-    dl_train, dl_val, dl_test = find_data(args.data_dir, args.batch_size, args.batch_slide_num, args.workers, args.is_profiling, args.condition, is_distributed)
+    dl_train, dl_val, dl_test = find_data(args.data_dir, args.batch_size, args.batch_slide_num, args.batch_inst_num, args.workers, args.is_profiling, args.condition, is_distributed)
     print("Dataset Created ...")
 
     if args.seed is not None:
@@ -404,7 +352,7 @@ def main():
     model_name = condssl.builder.MoCo.__name__
     data_dir_name = list(filter(None, args.data_dir.split(os.sep)))[-1]
     out_path = os.path.join(args.out_dir, model_name, data_dir_name)
-    model_filename = os.path.join(out_path, 'model', 'checkpoint_{}_{}_#NUM#_{}_m{}_n{}.pth.tar'.format(model_name, data_dir_name, args.condition, args.batch_size, args.batch_slide_num))
+    model_filename = os.path.join(out_path, 'model', 'checkpoint_{}_{}_#NUM#_{}_m{}_n{}_o{}.pth.tar'.format(model_name, data_dir_name, args.condition, args.batch_size, args.batch_slide_num, args.batch_inst_num))
 
     criterion = nn.CrossEntropyLoss().cuda()
     train(dl_train, dl_val, model, criterion, optimizer, args.epochs, args.lr, args.cos, args.schedule, out_path, model_filename, args.is_profiling, is_distributed)
