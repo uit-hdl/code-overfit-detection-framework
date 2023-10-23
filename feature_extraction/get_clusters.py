@@ -17,7 +17,7 @@ from bokeh.models.widgets import Paragraph, Div, DataTable, TableColumn
 
 import numpy as np
 import pandas as pd
-import umap.plot
+import umap
 from bokeh.layouts import gridplot
 from bokeh.plotting import output_file, save, figure
 from bokeh.models import Whisker
@@ -38,8 +38,6 @@ reducer = umap.UMAP(random_state=42)
 
 parser.add_argument('--embeddings_path', default='./out/MoCo/lung_scc/embeddings/test_lung_scc_embedding.pkl', type=str, help="location of embedding pkl from feature_extraction.py")
 parser.add_argument('--clinical_path', default='./annotations/TCGA/clinical.tsv', type=str, help="location of file containing clinical data")
-parser.add_argument('--cluster', default=False, type=bool, action=argparse.BooleanOptionalAction,
-                    metavar='O', help='whether to cluster or not', dest='do_cluster')
 parser.add_argument('--n_cluster', default=50, type=int)
 parser.add_argument('--out_dir', default='./out', type=str)
 
@@ -129,6 +127,8 @@ def compute_cpd(high_dimensional_points, low_dimensional_points, sample_size=100
 
 def umap_slice(names, features, cluster, clinical, out_dir):
     values = [[x[0] for x in features[name]] for name in names]
+    if not all(values):
+        raise RuntimeError("One of the keys did not lead anywhere!")
     cluster_labels = [cluster.predict(y) for y in values]
     cluster_labels = [item for sublist in cluster_labels for item in sublist]
     tile_names = [[x[1] for x in features[name]] for name in names]
@@ -211,7 +211,7 @@ if __name__ == "__main__":
         cluster = pickle.load(open(cluster_dst, 'rb'))
         print("Loaded cluster from {}".format(cluster_dst))
     else:
-        print("Making cluster...")
+        print("Making gmm cluster...")
         cluster = GaussianMixture(n_components=args.n_cluster, random_state=42).fit([item[0] for sublist in features.values() for item in sublist])
         ensure_dir_exists(cluster_dst)
         pickle.dump(cluster, open(cluster_dst, 'wb'))
@@ -229,18 +229,7 @@ if __name__ == "__main__":
 
     # TODO: get back the original embedding with the model found in deep2
     keys_chosen = [k for k in keys_sorted if k.split("-")[1] in ["96", "94", "58"]]
-    # keys_chosen.remove("TCGA-18-3409-01A-01-BS1") # good candidate
-    # keys_chosen.remove("TCGA-18-3411-01A-01-TS1") # no
-    # keys_chosen.remove("TCGA-18-3414-01A-01-TS1") # maybe
-    # keys_chosen.remove("TCGA-18-3415-01A-01-BS1") # maybe, better
-    # keys_chosen.remove("TCGA-18-3421-01A-01-TS1") # yuck
-    ##keys_chosen.remove("TCGA-18-4086-01A-01-BS1") #nah
-    x1='TCGA-NK-A5CT-01A-03-TSC'
-    x2='TCGA-60-2697-01A-01-TS1'
-    x3='TCGA-66-2759-01A-01-TS1'
-    #x1='TCGA-60-2711-01A-01-TS1'
-    keys_chosen = [x1, x2, x3]
-    umap_slice(keys_chosen, features, cluster, clinical, args.out_dir)
+    umap_slice(keys_chosen[5:-1], features, cluster, clinical, args.out_dir)
 
     #keys_randomized = random.sample(keys_sorted, len(keys_sorted))
     #umap_slice(keys_randomized[8:14], features, cluster, clinical, args.out_dir)
