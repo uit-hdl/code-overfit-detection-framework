@@ -203,7 +203,7 @@ def add_dir(directory):
             all_data.append({"q": filename, "k": filename, 'filename': filename})
     return all_data
 
-def find_data(data_dir, batch_size, batch_slide_num, workers, is_profiling, is_distributed):
+def find_data(data_dir, batch_size, batch_slide_num, workers, is_profiling, is_conditional, is_distributed):
     inheritSampler = DistributedSampler if is_distributed else Sampler
     class MySampler(inheritSampler):
         """
@@ -326,7 +326,7 @@ def find_data(data_dir, batch_size, batch_slide_num, workers, is_profiling, is_d
         train_sampler = torch.utils.data.distributed.DistributedSampler(ds_train)
     else:
         train_sampler = None
-    dl_train = DataLoader(ds_train, batch_sampler=MySampler(train_data, batch_size, batch_slide_num), num_workers=workers)
+    dl_train = DataLoader(ds_train, batch_sampler=MySampler(train_data, batch_size, batch_slide_num) if is_conditional else None, num_workers=workers)
     dl_val = DataLoader(ds_val, batch_size=batch_size, num_workers=workers, shuffle=True)
     #dl_test = DataLoader(ds_test, batch_size=batch_size, num_workers=workers, shuffle=True)
     dl_test = None
@@ -352,7 +352,9 @@ def main():
     if args.batch_slide_num > args.batch_size:
         print("Looks like you mistook m for n: batch_slide_num has to be less than batch_size")
         sys.exit(1)
-
+    if not args.conditional:
+        print("Conditional sampling false: setting batch_slide_num to 0")
+        args.batch_slide_num = 0
     if not torch.cuda.is_available():
         print('No GPU device available')
         sys.exit(1)
@@ -367,7 +369,7 @@ def main():
     is_distributed = args.world_size > 1 or args.multiprocessing_distributed
     if is_distributed:
         torch.distributed.init_process_group(args.dist_backend)
-    dl_train, dl_val, dl_test = find_data(args.data_dir, args.batch_size, args.batch_slide_num, args.workers, args.is_profiling, is_distributed)
+    dl_train, dl_val, dl_test = find_data(args.data_dir, args.batch_size, args.batch_slide_num, args.workers, args.is_profiling, args.condition, is_distributed)
     print("Dataset Created ...")
 
     if args.seed is not None:
@@ -381,6 +383,7 @@ def main():
                       'from checkpoints.')
 
     print("=> creating model '{}'".format('x64'))
+    print("condition: {}".format(args.condition))
     model = condssl.builder.MoCo(
         InceptionV4, args.moco_dim, args.moco_k, args.moco_m, args.moco_t, args.mlp, condition=args.condition, do_checkpoint=not is_distributed)
     model = model.cuda()

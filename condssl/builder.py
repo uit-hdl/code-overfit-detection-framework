@@ -148,6 +148,7 @@ class MoCo(nn.Module):
             # k = self._batch_unshuffle_ddp(k, idx_unshuffle)
 
 
+        # TODO: why does the model need to know about conditionals?
         if self.condition:
             logits = torch.mm(q, k.T) / self.T
             labels = torch.arange(logits.shape[0], dtype=torch.long).cuda()
