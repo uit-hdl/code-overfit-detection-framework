@@ -164,17 +164,54 @@ def umap_slice(names, features, cluster, clinical):
                                })
     return mapper, data, knn_fractions, knc_fractions, cpd
 
+def plot_umap_scatter(mapper, data, data_key, title):
+    p = umap_plot.interactive(mapper, labels=data[data_key], hover_data=data, point_size=7, hover_tips=TOOLTIPS, title=title)
+    embedding = mapper.embedding_
+    """https://github.com/bokeh/bokeh/blob/d37c647d170cc4b03a13db1a944372724b00c171/examples/server/app/selection_histogram.py#L4"""
+    hhist, hedges = np.histogram(embedding[:, 0], bins=10)
+    hzeros = np.zeros(len(hedges)-1)
+    hmax = max(hhist)*1.1
+    LINE_ARGS = dict(color="#3A5785", line_color=None)
+
+    ph = figure(toolbar_location=None, width=p.width, height=200, x_range=p.x_range,
+                y_range=(-hmax, hmax), min_border=10, min_border_left=50, y_axis_location="right")
+    ph.xgrid.grid_line_color = None
+    ph.yaxis.major_label_orientation = np.pi / 4
+    ph.background_fill_color = "#fafafa"
+
+    ph.quad(bottom=0, left=hedges[:-1], right=hedges[1:], top=hhist, color="white", line_color="#3A5785")
+    hh1 = ph.quad(bottom=0, left=hedges[:-1], right=hedges[1:], top=hzeros, alpha=0.5, **LINE_ARGS)
+    hh2 = ph.quad(bottom=0, left=hedges[:-1], right=hedges[1:], top=hzeros, alpha=0.1, **LINE_ARGS)
+
+    vhist, vedges = np.histogram(embedding[:, 1], bins=10)
+    vzeros = np.zeros(len(vedges) - 1)
+    vmax = max(vhist) * 1.1
+
+    pv = figure(toolbar_location=None, width=200, height=p.height, x_range=(-vmax, vmax),
+                y_range=p.y_range, min_border=10, y_axis_location="right")
+    pv.ygrid.grid_line_color = None
+    pv.xaxis.major_label_orientation = np.pi / 4
+    pv.background_fill_color = "#fafafa"
+
+    pv.quad(left=0, bottom=vedges[:-1], top=vedges[1:], right=vhist, color="white", line_color="#3A5785")
+    vh1 = pv.quad(left=0, bottom=vedges[:-1], top=vedges[1:], right=vzeros, alpha=0.5, **LINE_ARGS)
+    vh2 = pv.quad(left=0, bottom=vedges[:-1], top=vedges[1:], right=vzeros, alpha=0.1, **LINE_ARGS)
+
+    return p, pv, ph
+
+
 def plot_data(mapper, data, names, knn, knc, cpd, thumbnail_path, out_dir):
     out_html = os.path.join(out_dir, "web", "condssl_out.html")
     ensure_dir_exists(out_html)
     output_file(out_html, title="Conditional SSL UMAP")
-    p1 = umap_plot.interactive(mapper, labels=data['slide'], hover_data=data, point_size=7, hover_tips=TOOLTIPS, title="Slide")
+
+    p1, pv1, ph1 = plot_umap_scatter(mapper, data, 'slide', "Slide")
+    p2, pv2, ph2 = plot_umap_scatter(mapper, data, 'gender', "Gender")
+    p3, pv3, ph3 = plot_umap_scatter(mapper, data, 'institution', "Institution")
+    p4, pv4, ph4 = plot_umap_scatter(mapper, data, 'race', "Race")
+    p5, pv5, ph5 = plot_umap_scatter(mapper, data, 'cluster_id', "GMM Cluster")
     if len(names) > 5:
         p1.legend.visible = False
-    p2 = umap_plot.interactive(mapper, labels=data['gender'], hover_data=data, point_size=7, hover_tips=TOOLTIPS, title="Gender")
-    p3 = umap_plot.interactive(mapper, labels=data['institution'], hover_data=data, point_size=7, hover_tips=TOOLTIPS, title="Instiution")
-    p4 = umap_plot.interactive(mapper, labels=data['race'], hover_data=data, point_size=7, hover_tips=TOOLTIPS, title="Race")
-    p5 = umap_plot.interactive(mapper, labels=data['cluster_id'], hover_data=data, point_size=7, hover_tips=TOOLTIPS, title="GMM Cluster")
     for plot in [p1, p2, p3, p4, p5]:
         plot.legend.location = "top_left"
 
@@ -223,8 +260,8 @@ def plot_data(mapper, data, names, knn, knc, cpd, thumbnail_path, out_dir):
     image_thumbnail = Div(text=image_links)
     #img_plot = figure(title="Thumbnails")
 
-    gp = layout([[image_thumbnail], [p1, p3], [p2, p4], [stat_box, p5], [data_table]])
-    #gp = gridplot([[p1]])
+    #gp = layout([[image_thumbnail], [p1, p3], [p2, p4], [stat_box, p5], [data_table]])
+    gp = layout([[image_thumbnail], [p1, pv1], [ph1], [p3, pv3], [ph3], [stat_box], [data_table]])
     tt = TapTool()
     tt.callback = OpenURL(url="@image_url")
     p1.tools.append(tt)
