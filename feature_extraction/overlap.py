@@ -3,7 +3,6 @@ import monai.transforms as mt
 import argparse
 import pickle
 from collections import defaultdict
-from tqdm import tqdm
 from pathlib import Path
 from sklearn.mixture import GaussianMixture
 from pathlib import Path

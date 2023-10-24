@@ -18,7 +18,7 @@ from bokeh.models.widgets import Paragraph, Div, DataTable, TableColumn
 import numpy as np
 import pandas as pd
 import umap
-from bokeh.layouts import gridplot
+from bokeh.layouts import gridplot, row, layout
 from bokeh.plotting import output_file, save, figure
 from bokeh.models import Whisker
 from sklearn.mixture import GaussianMixture
@@ -38,6 +38,7 @@ reducer = umap.UMAP(random_state=42)
 
 parser.add_argument('--embeddings_path', default='./out/MoCo/lung_scc/embeddings/test_lung_scc_embedding.pkl', type=str, help="location of embedding pkl from feature_extraction.py")
 parser.add_argument('--clinical_path', default='./annotations/TCGA/clinical.tsv', type=str, help="location of file containing clinical data")
+parser.add_argument('--thumbnail_path', default='/Data/TCGA_LUSC/thumbnails', type=str, help="location of directory containing thumbnails")
 parser.add_argument('--n_cluster', default=50, type=int)
 parser.add_argument('--out_dir', default='./out', type=str)
 
@@ -125,7 +126,7 @@ def compute_cpd(high_dimensional_points, low_dimensional_points, sample_size=100
 
 
 
-def umap_slice(names, features, cluster, clinical, out_dir):
+def umap_slice(names, features, cluster, clinical):
     values = [[x[0] for x in features[name]] for name in names]
     if not all(values):
         raise RuntimeError("One of the keys did not lead anywhere!")
@@ -133,8 +134,7 @@ def umap_slice(names, features, cluster, clinical, out_dir):
     cluster_labels = [item for sublist in cluster_labels for item in sublist]
     tile_names = [[x[1] for x in features[name]] for name in names]
     file_root = os.path.abspath("/").replace(os.sep, "/")
-    #tile_names = ["file:///" + file_root + x for x in np.concatenate(tile_names, axis=0)]
-    tile_names = ["file:///" + "C:/" + x for x in np.concatenate(tile_names, axis=0)]
+    tile_names = ["file:///" + file_root + x for x in np.concatenate(tile_names, axis=0)]
     features_flattened = np.concatenate(values, axis=0)
     umap_projection = reducer.fit_transform(features_flattened)
     mapper = reducer.fit(features_flattened)
@@ -154,7 +154,7 @@ def umap_slice(names, features, cluster, clinical, out_dir):
     # If you want to see what the codes refer to https://gdc.cancer.gov/resources-tcga-users/tcga-code-tables/tissue-source-site-codes
     institution_labels = [case.split("-")[1] for case in case_submitter_ids]
 
-    hover_data = pd.DataFrame({'index': np.arange(len(features_flattened)),
+    data = pd.DataFrame({'index': np.arange(len(features_flattened)),
                                'cluster_id': cluster_labels,
                                'gender': gender_labels,
                                'race': race_labels,
@@ -162,16 +162,19 @@ def umap_slice(names, features, cluster, clinical, out_dir):
                                'slide': names_labels,
                                'image_url': tile_names,
                                })
+    return mapper, data, knn_fractions, knc_fractions, cpd
 
+def plot_data(mapper, data, names, knn, knc, cpd, thumbnail_path, out_dir):
     out_html = os.path.join(out_dir, "web", "condssl_out.html")
     ensure_dir_exists(out_html)
     output_file(out_html, title="Conditional SSL UMAP")
-    p1 = umap_plot.interactive(mapper, labels=names_labels, hover_data=hover_data, point_size=7, hover_tips=TOOLTIPS, title="Slide")
-    if len(names) > 5: p1.legend.visible = False
-    p2 = umap_plot.interactive(mapper, labels=gender_labels, hover_data=hover_data, point_size=7, hover_tips=TOOLTIPS, title="Gender")
-    p3 = umap_plot.interactive(mapper, labels=institution_labels, hover_data=hover_data, point_size=7, hover_tips=TOOLTIPS, title="Instiution")
-    p4 = umap_plot.interactive(mapper, labels=race_labels, hover_data=hover_data, point_size=7, hover_tips=TOOLTIPS, title="Race")
-    p5 = umap_plot.interactive(mapper, labels=cluster_labels, hover_data=hover_data, point_size=7, hover_tips=TOOLTIPS, title="GMM Cluster")
+    p1 = umap_plot.interactive(mapper, labels=data['slide'], hover_data=data, point_size=7, hover_tips=TOOLTIPS, title="Slide")
+    if len(names) > 5:
+        p1.legend.visible = False
+    p2 = umap_plot.interactive(mapper, labels=data['gender'], hover_data=data, point_size=7, hover_tips=TOOLTIPS, title="Gender")
+    p3 = umap_plot.interactive(mapper, labels=data['institution'], hover_data=data, point_size=7, hover_tips=TOOLTIPS, title="Instiution")
+    p4 = umap_plot.interactive(mapper, labels=data['race'], hover_data=data, point_size=7, hover_tips=TOOLTIPS, title="Race")
+    p5 = umap_plot.interactive(mapper, labels=data['cluster_id'], hover_data=data, point_size=7, hover_tips=TOOLTIPS, title="GMM Cluster")
     for plot in [p1, p2, p3, p4, p5]:
         plot.legend.location = "top_left"
 
@@ -188,10 +191,39 @@ def umap_slice(names, features, cluster, clinical, out_dir):
     ]
     data_table = DataTable(source=source, columns=columns, width=400, height=280, index_position=None)
 
+    stat_box = Div(text="""<p style="font-size: 500%">CPD: {:.4f} (p {:.1f})<br />KNC mean {:.4f}<br />KNN mean {:.4f}<br /></p>""".format(cpd[0], cpd[1], np.mean(knc), np.mean(knn)))
 
-    stat_box = Div(text="""<p style="font-size: 500%">CPD: {:.4f} (p {:.1f})<br />KNC mean {:.4f}<br />KNN mean {:.4f}<br /></p>""".format(cpd[0], cpd[1], np.mean(knc_fractions), np.mean(knn_fractions)))
+    image_links = """<style>
+    .top-left {
+        position: absolute;
+        bottom: 8px;
+        left: 16px;
+    }
+    .gallery {
+          --s: 400px; /* control the size */
+          display: grid;
+          gap: 10px; /* control the gap */
+          grid: auto-flow var(--s)/repeat(3,var(--s));
+          place-items: center;
+          margin: calc(var(--s)/4);
+    }
+    .gallery > img {
+      width: 100%;
+      aspect-ratio: 1;
+    }
+    </style><div class="gallery">"""
+    #thumbnails = set(map(lambda s: os.path.dirname(s).replace("preprocessed/by_class/lung_scc", "thumbnails") + ".png", tile_names))
+    for n in names:
+        tp = os.path.join(thumbnail_path, n + ".png")
+        tp = f"file:///{tp}"
+        image_links+=f"""<img src="{tp}" title="{n}"/>"""
+    image_links += "</div>"
+    if len(names) > 5:
+        image_links = ""
+    image_thumbnail = Div(text=image_links)
+    #img_plot = figure(title="Thumbnails")
 
-    gp = gridplot([[p1, p3], [p2, p4], [stat_box, p5], [data_table, None]])
+    gp = layout([[image_thumbnail], [p1, p3], [p2, p4], [stat_box, p5], [data_table]])
     #gp = gridplot([[p1]])
     tt = TapTool()
     tt.callback = OpenURL(url="@image_url")
@@ -219,21 +251,11 @@ if __name__ == "__main__":
 
     keys_sorted = list(sorted(features.keys()))
     print ("There are {} images in the dataset".format(len(keys_sorted)))
-    #umap_slice(keys_sorted[8:16], features, cluster, clinical, args.out_dir)
-
-    #keys_chosen = [k for k in keys_sorted if k.split("-")[1] in ["66", "63"]]
-    #keys_chosen = [k for k in keys_sorted if k.split("-")[1] in ["94", "63"]]
-    #keys_chosen = [k for k in keys_sorted if k.split("-")[1] in ["43", "21"]]
-    # TODO: would be sick if I could get a preview of the whole WSI on top in the page
-    # original was 96
 
     # TODO: get back the original embedding with the model found in deep2
     keys_chosen = [k for k in keys_sorted if k.split("-")[1] in ["96", "94", "58"]]
-    umap_slice(keys_chosen[5:-1], features, cluster, clinical, args.out_dir)
+    # FIXME: why does every embedding have different image sets?
+    mapper, data, knn, knc, cpd = umap_slice(keys_chosen, features, cluster, clinical)
+    plot_data(mapper, data, keys_chosen, knn, knc, cpd, args.thumbnail_path, args.out_dir)
 
     #keys_randomized = random.sample(keys_sorted, len(keys_sorted))
-    #umap_slice(keys_randomized[8:14], features, cluster, clinical, args.out_dir)
-
-    #umap_slice(['TCGA-21-5787-01A-01-TS1'], features, cluster, args.out_dir)
-    #umap_slice(['TCGA-43-8115-01A-01-BS1', 'TCGA-34-8456-01A-01-BS1', 'TCGA-68-A59J-01A-02-TSB'], features, cluster, args.out_dir)
-# umap_slice(train_features)

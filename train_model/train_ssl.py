@@ -296,8 +296,15 @@ def find_data(data_dir, batch_size, batch_slide_num, batch_inst_num, workers, is
 def main():
     args = parser.parse_args()
 
-    if args.batch_slide_num > args.batch_size:
-        print("Looks like you mistook m for n: batch_slide_num has to be less than batch_size")
+    if args.batch_slide_num > args.batch_size or args.batch_inst_num > args.batch_size:
+        print("Looks like you mistook m or n for n: batch_slide_num and batch_inst_num has to be less than batch_size")
+        sys.exit(1)
+    if args.batch_slide_num and args.batch_inst_num:
+        print("Haven't implemented support for both batch_slide_num and batch_inst_num")
+    sys.exit(1)
+    largest_batch_sampler = max(args.batch_slide_num, args.batch_inst_num)
+    if largest_batch_sampler and args.batch_size % largest_batch_sampler:
+        print(f"either of n({args.batch_slide_num}),o({args.batch_inst_num}) has to evenly divide batch_size {args.batch_size}")
         sys.exit(1)
     if not args.condition:
         print("Conditional sampling false: setting batch_slide_num and batch_inst_num to 0")
