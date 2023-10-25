@@ -174,28 +174,28 @@ def plot_umap_scatter(mapper, data, data_key, title):
     LINE_ARGS = dict(color="#3A5785", line_color=None)
 
     ph = figure(toolbar_location=None, width=p.width, height=200, x_range=p.x_range,
-                y_range=(-hmax, hmax), min_border=10, min_border_left=50, y_axis_location="right")
+                y_range=(0, hmax), min_border=10, min_border_left=50, y_axis_location="right")
     ph.xgrid.grid_line_color = None
     ph.yaxis.major_label_orientation = np.pi / 4
     ph.background_fill_color = "#fafafa"
 
     ph.quad(bottom=0, left=hedges[:-1], right=hedges[1:], top=hhist, color="white", line_color="#3A5785")
-    hh1 = ph.quad(bottom=0, left=hedges[:-1], right=hedges[1:], top=hzeros, alpha=0.5, **LINE_ARGS)
-    hh2 = ph.quad(bottom=0, left=hedges[:-1], right=hedges[1:], top=hzeros, alpha=0.1, **LINE_ARGS)
+    #hh1 = ph.quad(bottom=0, left=hedges[:-1], right=hedges[1:], top=hzeros, alpha=0.5, **LINE_ARGS)
+    #hh2 = ph.quad(bottom=0, left=hedges[:-1], right=hedges[1:], top=hzeros, alpha=0.1, **LINE_ARGS)
 
     vhist, vedges = np.histogram(embedding[:, 1], bins=10)
     vzeros = np.zeros(len(vedges) - 1)
     vmax = max(vhist) * 1.1
 
-    pv = figure(toolbar_location=None, width=200, height=p.height, x_range=(-vmax, vmax),
+    pv = figure(toolbar_location=None, width=200, height=p.height, x_range=(0, vmax),
                 y_range=p.y_range, min_border=10, y_axis_location="right")
     pv.ygrid.grid_line_color = None
     pv.xaxis.major_label_orientation = np.pi / 4
     pv.background_fill_color = "#fafafa"
 
     pv.quad(left=0, bottom=vedges[:-1], top=vedges[1:], right=vhist, color="white", line_color="#3A5785")
-    vh1 = pv.quad(left=0, bottom=vedges[:-1], top=vedges[1:], right=vzeros, alpha=0.5, **LINE_ARGS)
-    vh2 = pv.quad(left=0, bottom=vedges[:-1], top=vedges[1:], right=vzeros, alpha=0.1, **LINE_ARGS)
+    #vh1 = pv.quad(left=0, bottom=vedges[:-1], top=vedges[1:], right=vzeros, alpha=0.5, **LINE_ARGS)
+    #vh2 = pv.quad(left=0, bottom=vedges[:-1], top=vedges[1:], right=vzeros, alpha=0.1, **LINE_ARGS)
 
     return p, pv, ph
 
