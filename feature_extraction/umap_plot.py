@@ -240,5 +240,5 @@ def interactive(
 
         # bpl.show(plot)
 
-    return plot
+    return plot, data, color_key
 

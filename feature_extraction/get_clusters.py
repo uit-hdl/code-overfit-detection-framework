@@ -2,29 +2,27 @@
 
 import argparse
 import operator
-import random
-from scipy.stats import spearmanr
-
-import pandas
-from scipy.spatial import distance
-from sklearn.neighbors import NearestNeighbors
 import os
 import pickle
+import random
 from itertools import accumulate
 from pathlib import Path
-from bokeh.models import OpenURL, TapTool, ColumnDataSource
-from bokeh.models.widgets import Paragraph, Div, DataTable, TableColumn
 
 import numpy as np
 import pandas as pd
 import umap
-from bokeh.layouts import gridplot, row, layout
-from bokeh.plotting import output_file, save, figure
-from bokeh.models import Whisker
+import itertools
+from bokeh.layouts import layout
+from bokeh.models import OpenURL, TapTool, ColumnDataSource
+from bokeh.models.widgets import Div, DataTable, TableColumn
+from bokeh.palettes import Category20_20, HighContrast3
+from bokeh.plotting import output_file, save, figure, show
+from scipy.spatial import distance
+from scipy.stats import spearmanr
 from sklearn.mixture import GaussianMixture
+from sklearn.neighbors import NearestNeighbors
 
 import umap_plot
-
 
 def ensure_dir_exists(path):
     dest_dir = os.path.dirname(path)
@@ -164,52 +162,61 @@ def umap_slice(names, features, cluster, clinical):
                                })
     return mapper, data, knn_fractions, knc_fractions, cpd
 
-def plot_umap_scatter(mapper, data, data_key, title):
-    p = umap_plot.interactive(mapper, labels=data[data_key], hover_data=data, point_size=7, hover_tips=TOOLTIPS, title=title)
+def plot_umap_scatter(mapper, data, data_key, title, no_bins=10):
+    labels = data[data_key]
+    p, plot_data, color_key = umap_plot.interactive(mapper, labels=labels, hover_data=data, point_size=7, hover_tips=TOOLTIPS, title=title)
     embedding = mapper.embedding_
     """https://github.com/bokeh/bokeh/blob/d37c647d170cc4b03a13db1a944372724b00c171/examples/server/app/selection_histogram.py#L4"""
-    hhist, hedges = np.histogram(embedding[:, 0], bins=10)
+    hhist, hedges = np.histogram(embedding[:, 0], bins=no_bins)
     hzeros = np.zeros(len(hedges)-1)
     hmax = max(hhist)*1.1
     LINE_ARGS = dict(color="#3A5785", line_color=None)
 
-    ph = figure(toolbar_location=None, width=p.width, height=200, x_range=p.x_range,
-                y_range=(0, hmax), min_border=10, min_border_left=50, y_axis_location="right")
+    #ph = figure(toolbar_location=None, width=p.width, height=200, x_range=p.x_range, y_range=(0, hmax), min_border=10, min_border_left=50, y_axis_location="right")
+    #ph.quad(bottom=0, left=hedges[:-1], right=hedges[1:], top=hhist, color="white", line_color="#3A5785")
+    #hh1 = ph.quad(bottom=0, left=hedges[:-1], right=hedges[1:], top=hzeros, alpha=0.5, **LINE_ARGS)
+    #hh2 = ph.quad(bottom=0, left=hedges[:-1], right=hedges[1:], top=hzeros, alpha=0.1, **LINE_ARGS)
+    bucket_ref = list(map(str, hedges))[:-1]
+    plot_ref = {'hedges': bucket_ref}
+    unique_labels = np.unique(labels)
+    for l in unique_labels:
+        plot_ref[str(l)] = np.histogram(plot_data[plot_data[data_key] == l]["x"], bins=hedges)[0]
+    #ph = figure(x_range=bucket_ref)
+    ph = figure(toolbar_location=None, width=p.width, height=200, min_border=10, min_border_left=50, y_axis_location="right", x_range=bucket_ref)
     ph.xgrid.grid_line_color = None
     ph.yaxis.major_label_orientation = np.pi / 4
     ph.background_fill_color = "#fafafa"
+    ph.vbar_stack(list(map(str, unique_labels)), source=plot_ref, x='hedges', color=color_key)
 
-    ph.quad(bottom=0, left=hedges[:-1], right=hedges[1:], top=hhist, color="white", line_color="#3A5785")
-    #hh1 = ph.quad(bottom=0, left=hedges[:-1], right=hedges[1:], top=hzeros, alpha=0.5, **LINE_ARGS)
-    #hh2 = ph.quad(bottom=0, left=hedges[:-1], right=hedges[1:], top=hzeros, alpha=0.1, **LINE_ARGS)
-
-    vhist, vedges = np.histogram(embedding[:, 1], bins=10)
-    vzeros = np.zeros(len(vedges) - 1)
-    vmax = max(vhist) * 1.1
-
-    pv = figure(toolbar_location=None, width=200, height=p.height, x_range=(0, vmax),
-                y_range=p.y_range, min_border=10, y_axis_location="right")
+    vhist, vedges = np.histogram(embedding[:, 1], bins=no_bins)
+    bucket_ref = list(map(str, vedges))[:-1]
+    plot_ref = {'vedges': bucket_ref}
+    for l in unique_labels:
+        plot_ref[str(l)] = np.histogram(plot_data[plot_data[data_key] == l]["y"], bins=vedges)[0]
+    #pv = figure(toolbar_location=None, width=200, height=p.height, x_range=(0, vmax), y_range=p.y_range, min_border=10, y_axis_location="right")
+    pv = figure(toolbar_location=None, width=200, height=p.height, min_border=10, y_axis_location="right", y_range=bucket_ref)
     pv.ygrid.grid_line_color = None
     pv.xaxis.major_label_orientation = np.pi / 4
     pv.background_fill_color = "#fafafa"
 
-    pv.quad(left=0, bottom=vedges[:-1], top=vedges[1:], right=vhist, color="white", line_color="#3A5785")
+    #pv.quad(left=0, bottom=vedges[:-1], top=vedges[1:], right=vhist, color="white", line_color="#3A5785")
     #vh1 = pv.quad(left=0, bottom=vedges[:-1], top=vedges[1:], right=vzeros, alpha=0.5, **LINE_ARGS)
     #vh2 = pv.quad(left=0, bottom=vedges[:-1], top=vedges[1:], right=vzeros, alpha=0.1, **LINE_ARGS)
+    pv.hbar_stack(list(map(str, unique_labels)), source=plot_ref, y='vedges', color=color_key)
 
     return p, pv, ph
 
 
-def plot_data(mapper, data, names, knn, knc, cpd, thumbnail_path, out_dir):
+def plot_data(mapper, data, names, knn, knc, cpd, thumbnail_path, out_dir, no_bins):
     out_html = os.path.join(out_dir, "web", "condssl_out.html")
     ensure_dir_exists(out_html)
     output_file(out_html, title="Conditional SSL UMAP")
 
-    p1, pv1, ph1 = plot_umap_scatter(mapper, data, 'slide', "Slide")
-    p2, pv2, ph2 = plot_umap_scatter(mapper, data, 'gender', "Gender")
-    p3, pv3, ph3 = plot_umap_scatter(mapper, data, 'institution', "Institution")
-    p4, pv4, ph4 = plot_umap_scatter(mapper, data, 'race', "Race")
-    p5, pv5, ph5 = plot_umap_scatter(mapper, data, 'cluster_id', "GMM Cluster")
+    p1, pv1, ph1 = plot_umap_scatter(mapper, data, 'slide', "Slide", no_bins)
+    p2, pv2, ph2 = plot_umap_scatter(mapper, data, 'gender', "Gender", no_bins)
+    p3, pv3, ph3 = plot_umap_scatter(mapper, data, 'institution', "Institution", no_bins)
+    p4, pv4, ph4 = plot_umap_scatter(mapper, data, 'race', "Race", no_bins)
+    p5, pv5, ph5 = plot_umap_scatter(mapper, data, 'cluster_id', "GMM Cluster", no_bins)
     if len(names) > 5:
         p1.legend.visible = False
     for plot in [p1, p2, p3, p4, p5]:
@@ -301,6 +308,6 @@ if __name__ == "__main__":
         pickle_obj = {"mapper": mapper, "data": data, "knn": knn, "knc": knc, "cpd": cpd}
         pickle.dump(pickle_obj, open(pickle_out, 'wb'), protocol=4)
 
-    plot_data(mapper, data, keys_chosen, knn, knc, cpd, args.thumbnail_path, args.out_dir)
+    plot_data(mapper, data, keys_chosen, knn, knc, cpd, args.thumbnail_path, args.out_dir, 10)
 
     #keys_randomized = random.sample(keys_sorted, len(keys_sorted))
