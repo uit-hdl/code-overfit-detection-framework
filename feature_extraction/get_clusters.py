@@ -292,7 +292,15 @@ if __name__ == "__main__":
     # TODO: get back the original embedding with the model found in deep2
     keys_chosen = [k for k in keys_sorted if k.split("-")[1] in ["96", "94", "58"]]
     # FIXME: why does every embedding have different image sets?
-    mapper, data, knn, knc, cpd = umap_slice(keys_chosen, features, cluster, clinical)
+    pickle_out = os.path.join(args.out_dir, "tmp_pickle.pkl")
+    if os.path.exists(pickle_out):
+        d = pickle.load(open(pickle_out, 'rb'))
+        mapper, data, knn, knc, cpd = d["mapper"], d["data"], d["knn"], d["knc"], d["cpd"]
+    else:
+        mapper, data, knn, knc, cpd = umap_slice(keys_chosen, features, cluster, clinical)
+        pickle_obj = {"mapper": mapper, "data": data, "knn": knn, "knc": knc, "cpd": cpd}
+        pickle.dump(pickle_obj, open(pickle_out, 'wb'), protocol=4)
+
     plot_data(mapper, data, keys_chosen, knn, knc, cpd, args.thumbnail_path, args.out_dir)
 
     #keys_randomized = random.sample(keys_sorted, len(keys_sorted))
