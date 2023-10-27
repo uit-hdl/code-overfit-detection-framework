@@ -2,6 +2,8 @@
 
 import argparse
 import operator
+from collections import defaultdict
+import sys
 import os
 import pickle
 import random
@@ -119,9 +121,25 @@ def compute_cpd(high_dimensional_points, low_dimensional_points, sample_size=100
             index += 1
     return spearmanr(dists_high, dists_low)
 
-def compute_histograms(plot_data):
-    pass
+def compute_histograms_overlap(plot_data, data_key, unique_labels, no_bins):
+    _, edges = np.histogram(plot_data[["x", "y"]], bins=no_bins**2)
 
+    counts = []
+    for l in unique_labels:
+        histo_count, _ = np.histogram(plot_data[plot_data[data_key] == l][["x", "y"]], bins=edges)
+        counts.append((l, histo_count))
+    overlaps = defaultdict(lambda: defaultdict(list))
+    all_counts = np.sum([x[1] for x in counts])
+    for (label_left,count_left) in counts:
+        cc = np.array([count_left, all_counts - count_left])
+        overlaps[label_left]["all"] = np.mean(np.divide(cc.min(axis=0), cc.max(axis=0), where=cc.min(axis=0)!=0))
+        for label_right,count_right in counts:
+            if label_left == label_right:
+                continue
+            cc = np.array([count_left, count_right])
+            overlaps[label_left][label_right] = np.mean(np.divide(cc.min(axis=0), cc.max(axis=0), where=cc.min(axis=0)!=0))
+    mean_overlap = np.mean([x["all"] for x in overlaps.values()])
+    return overlaps, mean_overlap
 
 def umap_slice(names, features, cluster, clinical):
     values = [[x[0] for x in features[name]] for name in names]
@@ -187,7 +205,7 @@ def plot_umap_scatter(mapper, data, data_key, title, no_bins=10):
 
     pv.hbar_stack(list(map(str, unique_labels)), source=plot_vref, y='vedges', color=color_key)
 
-    return p, pv, ph
+    return p, pv, ph, plot_data
 
 def compute_scatter_histograms(embedding, labels, plot_data, data_key, no_bins):
     unique_labels = np.unique(labels)
@@ -208,34 +226,39 @@ def compute_scatter_histograms(embedding, labels, plot_data, data_key, no_bins):
     return plot_href, plot_vref
 
 class UmapPlot:
-    def __init__(self, mapper, data, data_key, title, number_of_keys, no_bins=10):
-        p, pv, ph = plot_umap_scatter(mapper, data, data_key, title, no_bins)
+    def __init__(self, mapper, data, data_key, title, unique_labels, no_bins):
+        self.overlaps = None
+        self.mean_overlap = 0.0
+        p, pv, ph, plot_data = plot_umap_scatter(mapper, data, data_key, title, no_bins)
         self.p = p
         self.pv = pv
         self.ph = ph
+        self.plot_data = plot_data
+        self.title = title
+        self.data_key = data_key
+        self.unique_labels = unique_labels
 
-        if number_of_keys > 5:
+        if len(self.unique_labels) > 5:
             p.legend.visible = False
 
         self.p.legend.location = "top_left"
+    def set_overlaps(self, overlaps, mean_overlap):
+        ordering = {k: i for i, k in enumerate(overlaps.keys())}
+        ordering["all"] = len(self.unique_labels)
+
+        counts = []
+        for key,d in overlaps.items():
+            dst_array = [0] * (len(self.unique_labels) + 1)
+            for key2,v in d.items():
+                dst_array[ordering[key2]] = v
+            counts.append(dst_array)
+        self.overlaps = counts
+        self.mean_overlap = mean_overlap
 
 def viz_data(mapper, data, names, knn, knc, cpd, thumbnail_path, out_dir, umap_plots):
     out_html = os.path.join(out_dir, "web", "condssl_out.html")
     ensure_dir_exists(out_html)
     output_file(out_html, title="Conditional SSL UMAP")
-
-    counts_1 = [1, 0.58, 0.0]
-    counts_2 = [0.58, 1, 0.024]
-    counts_3 = [0.0, 0.24, 1]
-
-    source = ColumnDataSource(data=dict(slides=names, counts_1=counts_1, counts_2=counts_2, counts_3=counts_3))
-    columns = [
-        TableColumn(field="slides", title="Slide"),
-        TableColumn(field="counts_1", title=names[0]),
-        TableColumn(field="counts_2", title=names[1]),
-        TableColumn(field="counts_3", title=names[2]),
-    ]
-    data_table = DataTable(source=source, columns=columns, width=400, height=280, index_position=None)
 
     stat_box = Div(text="""<p style="font-size: 500%">CPD: {:.4f} (p {:.1f})<br />KNC mean {:.4f}<br />KNN mean {:.4f}<br /></p>""".format(cpd[0], cpd[1], np.mean(knc), np.mean(knn)))
 
@@ -267,10 +290,26 @@ def viz_data(mapper, data, names, knn, knc, cpd, thumbnail_path, out_dir, umap_p
     if len(names) > 5:
         image_links = ""
     image_thumbnail = Div(text=image_links)
-    #img_plot = figure(title="Thumbnails")
+
+    data_tables = []
+    for plot in umap_plots:
+        data = dict(keys=list(map(str, plot.unique_labels)) + ["all"])
+        columns = []
+        for i,overlap in enumerate(plot.overlaps):
+            data[f"counts_{i+1}"] = list(map(lambda f: f"{f:.2%}" if f > 0.0 else "-", overlap))
+            columns.append(TableColumn(field=f"counts_{i+1}", title=str(plot.unique_labels[i])))
+        source = ColumnDataSource(data)
+        columns = [ TableColumn(field="keys", title=plot.title)] + columns
+        data_tables.append(DataTable(source=source, columns=columns, width=800, height=280, index_position=None))
+
+    mean_overlaps = "Mean overlaps (overall): <br />"
+    for plot in umap_plots:
+        mean_overlaps += """{}: {:.2%}<br />""".format(plot.title, plot.mean_overlap)
+
+    mean_overlaps_box = Div(text="""<p style="font-size: 300%">{}</p>""".format(mean_overlaps))
 
     #gp = layout([[image_thumbnail], [p1, pv1], [ph1], [p3, pv3], [ph3], [stat_box], [data_table]])
-    gp = layout([[image_thumbnail], [umap_plots[0].p, umap_plots[0].pv], [umap_plots[0].ph], [umap_plots[2].p, umap_plots[2].pv], [umap_plots[2].ph], [stat_box], [data_table]])
+    gp = layout([[image_thumbnail], [umap_plots[0].p, umap_plots[0].pv], [umap_plots[0].ph], [umap_plots[2].p, umap_plots[2].pv], [umap_plots[2].ph], [stat_box], [data_tables[0], mean_overlaps_box]])
     tt = TapTool()
     tt.callback = OpenURL(url="@image_url")
     umap_plots[0].p.tools.append(tt)
@@ -298,8 +337,8 @@ def main(clinical_path, embeddings_path, thumbnail_path, n_cluster, out_dir):
     keys_sorted = list(sorted(features.keys()))
     print ("There are {} images in the dataset".format(len(keys_sorted)))
 
-    keys_chosen = [k for k in keys_sorted if k.split("-")[1] in ["96", "94", "58"]]
-    #keys_chosen = keys_sorted[:20]
+    #keys_chosen = [k for k in keys_sorted if k.split("-")[1] in ["96", "94", "58"]]
+    keys_chosen = keys_sorted[:20]
     pickle_out = os.path.join(args.out_dir, f"tmp_pickle_{len(keys_chosen)}.pkl")
     if os.path.exists(pickle_out) and 1 == 0:
         d = pickle.load(open(pickle_out, 'rb'))
@@ -311,8 +350,13 @@ def main(clinical_path, embeddings_path, thumbnail_path, n_cluster, out_dir):
 
 
     umap_plots = []
+    no_bins = 10
     for key,title in [('slide', "Slide"), ('gender', "Gender"), ('institution', "Institution"), ('race', "Race"), ('cluster_id', "GMM Cluster")]:
-        umap_plots.append(UmapPlot(mapper, data, key, title, len(keys_chosen), 10))
+        unique_labels = np.unique(data[key])
+        plot = UmapPlot(mapper, data, key, title, unique_labels, no_bins)
+        overlaps, mean_overlap = compute_histograms_overlap(plot.plot_data, key, unique_labels, no_bins)
+        plot.set_overlaps(overlaps, mean_overlap)
+        umap_plots.append(plot)
     viz_data(mapper, data, keys_chosen, knn, knc, cpd, thumbnail_path, out_dir, umap_plots)
 
 if __name__ == "__main__":
