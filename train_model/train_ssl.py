@@ -184,7 +184,7 @@ def train(train_loader, val_loader, model, criterion, optimizer, max_epochs, lr,
         accuracy1_values.append(acc1)
         print(f"epoch {epoch} average loss: {epoch_loss:.4f}")
 
-        if 0 == 0:
+        if not epoch % 20:
             model_savename = model_filename.replace("#NUM#", "{:04d}".format(epoch))
             ensure_dir_exists(model_savename)
             torch.save({
@@ -267,7 +267,7 @@ def find_data(data_dir, batch_size, batch_slide_num, batch_inst_num, workers, is
     ds_train = Dataset(train_data, transformations)
     #ds_val = Dataset(val_data, transformations)
     ds_val = Dataset(val_data, val_transformations)
-    ds_test = Dataset(test_data, val_transformations)
+    #ds_test = Dataset(test_data, val_transformations)
 
     if is_distributed:
         train_sampler = torch.utils.data.distributed.DistributedSampler(ds_train)
@@ -276,7 +276,6 @@ def find_data(data_dir, batch_size, batch_slide_num, batch_inst_num, workers, is
     dl_train = DataLoader(ds_train, batch_sampler=samplers.MySampler(train_data, batch_size, batch_slide_num, batch_inst_num) if is_conditional else None, num_workers=workers)
     dl_val = DataLoader(ds_val, batch_size=batch_size, num_workers=workers, shuffle=True)
     #dl_test = DataLoader(ds_test, batch_size=batch_size, num_workers=workers, shuffle=True)
-    dl_test = None
 
     # first_sample = monai.utils.first(dl_train)
     # if first_sample is None:
@@ -291,7 +290,7 @@ def find_data(data_dir, batch_size, batch_slide_num, batch_inst_num, workers, is
     #del first_sample
 
     print("Dataset Created ...")
-    return dl_train, dl_val, dl_test
+    return dl_train, dl_val, None
 
 def main():
     args = parser.parse_args()
@@ -301,7 +300,7 @@ def main():
         sys.exit(1)
     if args.batch_slide_num and args.batch_inst_num:
         print("Haven't implemented support for both batch_slide_num and batch_inst_num")
-    sys.exit(1)
+        sys.exit(1)
     largest_batch_sampler = max(args.batch_slide_num, args.batch_inst_num)
     if largest_batch_sampler and args.batch_size % largest_batch_sampler:
         print(f"either of n({args.batch_slide_num}),o({args.batch_inst_num}) has to evenly divide batch_size {args.batch_size}")
