@@ -1,6 +1,7 @@
 from warnings import warn
 
 import bokeh.plotting as bpl
+from bokeh.models import MultiSelect, CustomJS
 import matplotlib.cm
 import matplotlib.colors
 import matplotlib.pyplot as plt
@@ -32,7 +33,7 @@ def interactive(
         point_size=None,
         interactive_text_search=False,
         interactive_text_search_columns=None,
-        interactive_text_search_alpha_contrast=0.95,
+        interactive_text_search_alpha_contrast=0.75,
         alpha=None,
         hover_tips=None,
         title=None,
@@ -181,6 +182,44 @@ def interactive(
     plot.grid.visible = False
     plot.axis.visible = False
 
+    if 1 == 1:
+        callback = CustomJS(
+            args = dict(
+            source=data_source,
+            matching_alpha=interactive_text_search_alpha_contrast,
+            non_matching_alpha=1 - interactive_text_search_alpha_contrast,
+            search_columns=interactive_text_search_columns,
+        ),
+        code = """
+        var data = source.data;
+        var text_search = cb_obj.value;
+
+        var search_columns_dict = {}
+        for (var col in search_columns){
+            search_columns_dict[col] = search_columns[col]
+        }
+        // Loop over columns and values
+        // If there is no match for any column for a given row, change the alpha value
+        var string_match = false;
+        for (var i = 0; i < data.x.length; i++) {
+            string_match = false
+            for (var j in search_columns_dict) {
+                if (cb_obj.value.includes(data[search_columns_dict[j]][i])) {
+                    string_match = true
+                }
+            }
+            if (string_match){
+                data['alpha'][i] = 1;//matching_alpha; // FIXME: matching_alpha doesn't work, just turns off the color
+            }else{
+                data['alpha'][i] = non_matching_alpha;
+            }
+        }
+        source.change.emit();
+        """,
+        )
+        multibox_input = MultiSelect(options=[(str(l), str(l)) for l in unique_labels])
+        multibox_input.js_on_change("value", callback)
+
     if interactive_text_search:
         text_input = TextInput(value="", title="Search:")
 
@@ -213,7 +252,6 @@ def interactive(
                 for (var col in search_columns){
                     search_columns_dict[col] = search_columns[col]
                 }
-
                 // Loop over columns and values
                 // If there is no match for any column for a given row, change the alpha value
                 var string_match = false;
@@ -225,9 +263,9 @@ def interactive(
                         }
                     }
                     if (string_match){
-                        data['alpha'][i] = matching_alpha
+                        data['alpha'][i] = 1;//matching_alpha; // FIXME: matching_alpha doesn't work, just turns off the color
                     }else{
-                        data['alpha'][i] = non_matching_alpha
+                        data['alpha'][i] = non_matching_alpha;
                     }
                 }
                 source.change.emit();
@@ -235,10 +273,9 @@ def interactive(
             )
 
             text_input.js_on_change("value", callback)
+    else:
+        text_input = None
+        multibox_input = None
 
-            plot = column(text_input, plot)
-
-        # bpl.show(plot)
-
-    return plot, data, color_key
+    return plot, data, color_key, text_input, multibox_input
 

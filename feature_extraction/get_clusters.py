@@ -15,7 +15,7 @@ import pandas as pd
 import umap
 import itertools
 from bokeh.layouts import layout
-from bokeh.models import OpenURL, TapTool, ColumnDataSource
+from bokeh.models import OpenURL, TapTool, ColumnDataSource, MultiSelect, CustomJS
 from bokeh.models.widgets import Div, DataTable, TableColumn
 from bokeh.palettes import Category20_20, HighContrast3
 from bokeh.plotting import output_file, save, figure, show
@@ -183,7 +183,7 @@ def plot_umap_scatter(mapper, data, data_key, title, no_bins=10):
     labels = data[data_key]
     unique_labels = np.unique(labels)
 
-    p, plot_data, color_key = umap_plot.interactive(mapper, labels=labels, hover_data=data, point_size=7, hover_tips=TOOLTIPS, title=title)
+    p, plot_data, color_key, text_search, multibox_input = umap_plot.interactive(mapper, labels=labels, hover_data=data, point_size=7, hover_tips=TOOLTIPS, title=title, interactive_text_search=True, interactive_text_search_columns=[data_key])
 
     plot_href, plot_vref = compute_scatter_histograms(mapper.embedding_, labels, plot_data, data_key, no_bins)
     embedding = mapper.embedding_
@@ -205,7 +205,7 @@ def plot_umap_scatter(mapper, data, data_key, title, no_bins=10):
 
     pv.hbar_stack(list(map(str, unique_labels)), source=plot_vref, y='vedges', color=color_key)
 
-    return p, pv, ph, plot_data
+    return p, pv, ph, plot_data, text_search, multibox_input
 
 def compute_scatter_histograms(embedding, labels, plot_data, data_key, no_bins):
     unique_labels = np.unique(labels)
@@ -229,7 +229,7 @@ class UmapPlot:
     def __init__(self, mapper, data, data_key, title, unique_labels, no_bins):
         self.overlaps = None
         self.mean_overlap = 0.0
-        p, pv, ph, plot_data = plot_umap_scatter(mapper, data, data_key, title, no_bins)
+        p, pv, ph, plot_data, text_search, multibox_input = plot_umap_scatter(mapper, data, data_key, title, no_bins)
         self.p = p
         self.pv = pv
         self.ph = ph
@@ -237,6 +237,8 @@ class UmapPlot:
         self.title = title
         self.data_key = data_key
         self.unique_labels = unique_labels
+        self.text_search = text_search
+        self.multibox_input = multibox_input
 
         if len(self.unique_labels) > 5:
             p.legend.visible = False
@@ -309,7 +311,7 @@ def viz_data(mapper, data, names, knn, knc, cpd, thumbnail_path, out_dir, umap_p
     mean_overlaps_box = Div(text="""<p style="font-size: 300%">{}</p>""".format(mean_overlaps))
 
     #gp = layout([[image_thumbnail], [p1, pv1], [ph1], [p3, pv3], [ph3], [stat_box], [data_table]])
-    gp = layout([[image_thumbnail], [umap_plots[0].p, umap_plots[0].pv], [umap_plots[0].ph], [umap_plots[2].p, umap_plots[2].pv], [umap_plots[2].ph], [stat_box], [data_tables[0], mean_overlaps_box]])
+    gp = layout([[image_thumbnail], [umap_plots[0].p, umap_plots[0].pv, umap_plots[0].multibox_input], [umap_plots[0].ph], [umap_plots[0].text_search], [umap_plots[2].p, umap_plots[2].pv], [umap_plots[2].ph], [stat_box], [data_tables[0], mean_overlaps_box]])
     tt = TapTool()
     tt.callback = OpenURL(url="@image_url")
     umap_plots[0].p.tools.append(tt)
@@ -338,15 +340,16 @@ def main(clinical_path, embeddings_path, thumbnail_path, n_cluster, out_dir):
     print ("There are {} images in the dataset".format(len(keys_sorted)))
 
     #keys_chosen = [k for k in keys_sorted if k.split("-")[1] in ["96", "94", "58"]]
-    keys_chosen = keys_sorted[:20]
+    #keys_chosen = keys_sorted[:3]
+    keys_chosen = keys_sorted
     pickle_out = os.path.join(args.out_dir, f"tmp_pickle_{len(keys_chosen)}.pkl")
     if os.path.exists(pickle_out) and 1 == 0:
         d = pickle.load(open(pickle_out, 'rb'))
         mapper, data, knn, knc, cpd = d["mapper"], d["data"], d["knn"], d["knc"], d["cpd"]
     else:
         mapper, data, knn, knc, cpd = umap_slice(keys_chosen, features, cluster, clinical)
-        pickle_obj = {"mapper": mapper, "data": data, "knn": knn, "knc": knc, "cpd": cpd}
-        pickle.dump(pickle_obj, open(pickle_out, 'wb'), protocol=4)
+        #pickle_obj = {"mapper": mapper, "data": data, "knn": knn, "knc": knc, "cpd": cpd}
+        #pickle.dump(pickle_obj, open(pickle_out, 'wb'), protocol=4)
 
 
     umap_plots = []
