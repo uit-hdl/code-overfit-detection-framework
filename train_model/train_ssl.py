@@ -261,7 +261,10 @@ def wrap_data(train_data, val_data, batch_size, batch_slide_num, batch_inst_num,
         train_sampler = torch.utils.data.distributed.DistributedSampler(ds_train)
     else:
         train_sampler = None
-    dl_train = DataLoader(ds_train, batch_sampler=samplers.MySampler(train_data, batch_size, batch_slide_num, batch_inst_num) if is_conditional else None, num_workers=workers)
+    dl_train = DataLoader(ds_train,
+                          batch_sampler=samplers.MySampler(train_data, batch_size, batch_slide_num, batch_inst_num) if is_conditional else None,
+                          batch_size=None if is_conditional else batch_size,
+                          num_workers=workers)
     dl_val = DataLoader(ds_val, batch_size=batch_size, num_workers=workers, shuffle=True)
     #dl_test = DataLoader(ds_test, batch_size=batch_size, num_workers=workers, shuffle=True)
 

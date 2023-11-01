@@ -75,13 +75,16 @@ class MySampler(Sampler):
 
             # flatten the list so we can shuffle around chunks
             tile_chunks = [item for sublist in [tile_chunks[x] for x in tile_chunks_key] for item in sublist]
-            # shuffle more
+            # shuffle order of chunks
             random.shuffle(tile_chunks)
 
             chunks_per_batch = self.batch_size // batch_sampler_size
             ret = []
             for chunk in [tile_chunks[i:i + chunks_per_batch] for i in range(0, len(tile_chunks), chunks_per_batch)]:
-                ret.append([item for sublist in chunk for item in sublist])
+                queue = [item for sublist in chunk for item in sublist]
+                # shuffle order of images
+                random.shuffle(queue)
+                ret.append(queue)
             return iter(ret)
 
     def __len__(self):
