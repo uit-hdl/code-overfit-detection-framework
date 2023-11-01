@@ -21,7 +21,7 @@ do
   c="$(basename "${model}" | command grep -Eo "True|False")"
   echo "$m $n $c $o"
   out_dir="${analysis_dir}/out${m}${n}${o}${c}"
-  #set -xe
+  set -xe
   ipython feature_extraction/extract_embeddings.py -- --src_dir "${SRC_DIR}" --feature_extractor "${model}" --out_dir "${out_dir}"
   ipython feature_extraction/get_clusters.py -- --embeddings_path "${out_dir}/MoCo/tiles/embeddings/test_tiles_embedding.pkl" --out_dir "${out_dir}"
   ipython survival_models/cox.py --  --embeddings_dir "${out_dir}/MoCo/tiles/embeddings/" --out_dir "${out_dir}/survival"
