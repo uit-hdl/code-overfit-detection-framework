@@ -1,14 +1,15 @@
 from warnings import warn
 
 import bokeh.plotting as bpl
-from bokeh.models import MultiSelect, CustomJS
 import matplotlib.cm
 import matplotlib.colors
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from bokeh.layouts import column
 from bokeh.models import CustomJS, TextInput
+from bokeh.models import OpenURL, TapTool, ColumnDataSource
+from bokeh.models import MultiSelect
+from bokeh.plotting import output_file, save, figure
 
 
 def _to_hex(arr):
@@ -58,18 +59,7 @@ def interactive(
         An array of labels (assumed integer or categorical),
         one for each data sample.
         This will be used for coloring the points in
-        the plot according to their label. Note that
-        this option is mutually exclusive to the ``values``
-        option.
-
-    values: array, shape (n_samples,) (optional, default None)
-        An array of values (assumed float or continuous),
-        one for each sample.
-        This will be used for coloring the points in
-        the plot according to a colorscale associated
-        to the total range of values. Note that this
-        option is mutually exclusive to the ``labels``
-        option.
+        the plot according to their label.
 
     hover_data: DataFrame, shape (n_samples, n_tooltip_features)
     (optional, default None)
@@ -204,7 +194,7 @@ def interactive(
         for (var i = 0; i < data.x.length; i++) {
             string_match = false
             for (var j in search_columns_dict) {
-                if (cb_obj.value.includes(data[search_columns_dict[j]][i])) {
+                if (cb_obj.value.includes(String(data[search_columns_dict[j]][i]))) {
                     string_match = true
                 }
             }
@@ -217,7 +207,8 @@ def interactive(
         source.change.emit();
         """,
         )
-        multibox_input = MultiSelect(options=[(str(l), str(l)) for l in unique_labels])
+        # if you want to improve: https://docs.bokeh.org/en/2.4.0/docs/reference/models/widgets/inputs.html#bokeh.models.MultiSelect.js_link
+        multibox_input = MultiSelect(options=list(map(str, unique_labels)), size=50)
         multibox_input.js_on_change("value", callback)
 
     if interactive_text_search:
@@ -277,5 +268,18 @@ def interactive(
         text_input = None
         multibox_input = None
 
-    return plot, data, color_key, text_input, multibox_input
+    counts = [np.sum(labels == l) for l in unique_labels]
+    unique_labels = list(map(str, unique_labels))
+    source = ColumnDataSource(data=dict(item=unique_labels, counts=counts, color=color_key))
+    distribution_plot = figure(toolbar_location=None, title="Distribution plot", tools="hover", tooltips="$name: @$name", width=600, height=200, x_range=unique_labels)
+    distribution_plot.vbar(source=source, x='item', top='counts', width=0.9, color='color')
+    #distribution_plot.vbar(source=source, x=unique_labels, top='counts', width=0.9, color='color', legend_field='item')
+    distribution_plot.y_range.start = 0
+    #distribution_plot.legend.visible = False
+    if len(unique_labels) > 10:
+        distribution_plot.xaxis.major_label_orientation = 1.2
+    #new_color_key = {k: color_key[i] for i, k in enumerate(unique_labels)}
+
+
+    return plot, data, color_key, text_input, multibox_input, distribution_plot
 

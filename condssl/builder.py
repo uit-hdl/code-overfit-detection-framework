@@ -139,42 +139,42 @@ class MoCo(nn.Module):
             self._momentum_update_key_encoder()  # update the key encoder
 
             # shuffle for making use of BN
-            # im_k, idx_unshuffle = self._batch_shuffle_ddp(im_k)
+            im_k, idx_unshuffle = self._batch_shuffle_ddp(im_k)
 
             k = self.encoder_k(im_k)  # keys: NxC
             k = nn.functional.normalize(k, dim=1)
 
             # undo shuffle
-            # k = self._batch_unshuffle_ddp(k, idx_unshuffle)
+            k = self._batch_unshuffle_ddp(k, idx_unshuffle)
 
 
-        # TODO: why does the model need to know about conditionals?
-        if self.condition:
-            logits = torch.mm(q, k.T) / self.T
-            labels = torch.arange(logits.shape[0], dtype=torch.long).cuda()
-            return logits, labels
+        # TODO: why does the model need to know about conditionals? commenting out...
+        #if self.condition:
+            #logits = torch.mm(q, k.T) / self.T
+            #labels = torch.arange(logits.shape[0], dtype=torch.long).cuda()
+            #return logits, labels
 
-        else:
+        #else:
             # compute logits
             # Einstein sum is more intuitive
             # positive logits: Nx1
-            l_pos = torch.einsum('nc,nc->n', [q, k]).unsqueeze(-1)
+        l_pos = torch.einsum('nc,nc->n', [q, k]).unsqueeze(-1)
 
-            # negative logits: NxK
-            l_neg = torch.einsum('nc,ck->nk', [q, self.queue.clone().detach()])
+        # negative logits: NxK
+        l_neg = torch.einsum('nc,ck->nk', [q, self.queue.clone().detach()])
 
-            # logits: Nx(1+K)
-            logits = torch.cat([l_pos, l_neg], dim=1)
+        # logits: Nx(1+K)
+        logits = torch.cat([l_pos, l_neg], dim=1)
 
-            # apply temperature
-            logits /= self.T
+        # apply temperature
+        logits /= self.T
 
-            # labels: positive key indicators
-            labels = torch.zeros(logits.shape[0], dtype=torch.long).cuda()
+        # labels: positive key indicators
+        labels = torch.zeros(logits.shape[0], dtype=torch.long).cuda()
 
-            # dequeue and enqueue
-            self._dequeue_and_enqueue(k)
-            return logits, labels
+        # dequeue and enqueue
+        self._dequeue_and_enqueue(k)
+        return logits, labels
 
 # utils
 @torch.no_grad()

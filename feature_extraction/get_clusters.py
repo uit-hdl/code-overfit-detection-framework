@@ -2,29 +2,27 @@
 
 import argparse
 import operator
-from collections import defaultdict
-import sys
 import os
 import pickle
 import random
+from collections import defaultdict
 from itertools import accumulate
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import umap
-import itertools
 from bokeh.layouts import layout
-from bokeh.models import OpenURL, TapTool, ColumnDataSource, MultiSelect, CustomJS
+from bokeh.models import OpenURL, TapTool, ColumnDataSource
 from bokeh.models.widgets import Div, DataTable, TableColumn
-from bokeh.palettes import Category20_20, HighContrast3
-from bokeh.plotting import output_file, save, figure, show
+from bokeh.plotting import output_file, save, figure
 from scipy.spatial import distance
 from scipy.stats import spearmanr
 from sklearn.mixture import GaussianMixture
 from sklearn.neighbors import NearestNeighbors
 
 import umap_plot
+
 
 def ensure_dir_exists(path):
     dest_dir = os.path.dirname(path)
@@ -37,6 +35,8 @@ parser = argparse.ArgumentParser(description='Get cluster features')
 reducer = umap.UMAP(random_state=42)
 
 parser.add_argument('--embeddings_path', default='./out/MoCo/lung_scc/embeddings/test_lung_scc_embedding.pkl', type=str, help="location of embedding pkl from feature_extraction.py")
+parser.add_argument('--number_of_images', default=3, type=int, help="how many images to sample for the UMAP plot")
+parser.add_argument('--histogram_bins', default=10, type=int, help="how many histogram buckets to use in each (x,y) dimension (e.g. 10 means 100 buckets in total)")
 parser.add_argument('--clinical_path', default='./annotations/TCGA/clinical.tsv', type=str, help="location of file containing clinical data")
 parser.add_argument('--thumbnail_path', default='/Data/TCGA_LUSC/thumbnails', type=str, help="location of directory containing thumbnails")
 parser.add_argument('--n_cluster', default=50, type=int)
@@ -71,6 +71,18 @@ TOOLTIPS = """
         <div>
             <span style="font-size: 15px;">Race:</span>
             <span style="font-size: 15px;">@race</span>
+        </div>
+        <div>
+            <span style="font-size: 15px;">Path_m:</span>
+            <span style="font-size: 15px;">@path_stage_m</span>
+        </div>
+        <div>
+            <span style="font-size: 15px;">Path_t:</span>
+            <span style="font-size: 15px;">@path_stage_t</span>
+        </div>
+        <div>
+            <span style="font-size: 15px;">Resection site</span>
+            <span style="font-size: 15px;">@resection</span>
         </div>
         <div>
             <span style="font-size: 15px;">Location</span>
@@ -165,25 +177,36 @@ def umap_slice(names, features, cluster, clinical):
     names_labels = [item for sublist in names_labels for item in sublist]
     case_submitter_ids = ["-".join(name.split("-")[:3]) for name in names_labels]
     gender_labels = [clinical['gender'][case][0] for case in case_submitter_ids]
+    site_of_resection_labels = [clinical['site_of_resection_or_biopsy'][case][0] for case in case_submitter_ids]
+    path_stage_t = [clinical['ajcc_pathologic_t'][case][0] for case in case_submitter_ids]
+    path_stage_m = [clinical['ajcc_pathologic_m'][case][0] for case in case_submitter_ids]
     race_labels = [clinical['race'][case][0] for case in case_submitter_ids]
     # If you want to see what the codes refer to https://gdc.cancer.gov/resources-tcga-users/tcga-code-tables/tissue-source-site-codes
     institution_labels = [case.split("-")[1] for case in case_submitter_ids]
 
-    data = pd.DataFrame({'index': np.arange(len(features_flattened)),
-                               'cluster_id': cluster_labels,
-                               'gender': gender_labels,
-                               'race': race_labels,
-                               'institution': institution_labels,
-                               'slide': names_labels,
-                               'image_url': tile_names,
-                               })
+    data = pd.DataFrame({
+        'index': np.arange(len(features_flattened)),
+        'cluster_id': cluster_labels,
+        'gender': gender_labels,
+        'race': race_labels,
+        'institution': institution_labels,
+        'resection': site_of_resection_labels,
+        'path_stage_m': path_stage_m,
+        'path_stage_t': path_stage_t,
+        'slide': names_labels,
+        'image_url': tile_names,
+    })
     return mapper, data, knn_fractions, knc_fractions, cpd
 
-def plot_umap_scatter(mapper, data, data_key, title, no_bins=10):
+def plot_umap_scatter(mapper, data, data_key, title, no_bins):
     labels = data[data_key]
     unique_labels = np.unique(labels)
 
-    p, plot_data, color_key, text_search, multibox_input = umap_plot.interactive(mapper, labels=labels, hover_data=data, point_size=7, hover_tips=TOOLTIPS, title=title, interactive_text_search=True, interactive_text_search_columns=[data_key])
+    color_key_cmap = "tab20"
+    if len(unique_labels) > 20:
+        color_key_cmap = "Spectral"
+    p, plot_data, color_key, text_search, multibox_input, distribution_plot = \
+        umap_plot.interactive(mapper, width=1000, height=1000, color_key_cmap=color_key_cmap, labels=labels, hover_data=data, point_size=3, hover_tips=TOOLTIPS, title=title, interactive_text_search=True, interactive_text_search_columns=[data_key])
 
     plot_href, plot_vref = compute_scatter_histograms(mapper.embedding_, labels, plot_data, data_key, no_bins)
     embedding = mapper.embedding_
@@ -191,21 +214,22 @@ def plot_umap_scatter(mapper, data, data_key, title, no_bins=10):
     hhist, hedges = np.histogram(embedding[:, 0], bins=no_bins)
     LINE_ARGS = dict(color="#3A5785", line_color=None)
 
-    ph = figure(toolbar_location=None, width=p.width, height=200, min_border=10, min_border_left=50, y_axis_location="right", x_range=plot_href["hedges"])
+    ph = figure(toolbar_location=None, width=p.width, height=200, min_border=10, min_border_left=50, y_axis_location="right", x_range=plot_href["hedges"], y_axis_label="no. of points")
+    ph.yaxis.axis_label_text_align = "left"
     ph.xgrid.grid_line_color = None
     ph.yaxis.major_label_orientation = np.pi / 4
     ph.xaxis.visible = False
-    ph.background_fill_color = "#fafafa"
     ph.vbar_stack(list(map(str, unique_labels)), source=plot_href, x='hedges', color=color_key)
 
-    pv = figure(toolbar_location=None, width=200, height=p.height, min_border=10, y_axis_location="right", y_range=plot_vref["vedges"])
+    pv = figure(toolbar_location=None, width=200, height=p.height, min_border=10, y_axis_location="right", y_range=plot_vref["vedges"], x_axis_label="no. of points")
+    ph.xaxis.axis_label_text_align = "left"
     pv.ygrid.grid_line_color = None
     pv.yaxis.visible = False
     pv.background_fill_color = "#fafafa"
 
     pv.hbar_stack(list(map(str, unique_labels)), source=plot_vref, y='vedges', color=color_key)
 
-    return p, pv, ph, plot_data, text_search, multibox_input
+    return p, pv, ph, plot_data, text_search, multibox_input, distribution_plot
 
 def compute_scatter_histograms(embedding, labels, plot_data, data_key, no_bins):
     unique_labels = np.unique(labels)
@@ -229,7 +253,7 @@ class UmapPlot:
     def __init__(self, mapper, data, data_key, title, unique_labels, no_bins):
         self.overlaps = None
         self.mean_overlap = 0.0
-        p, pv, ph, plot_data, text_search, multibox_input = plot_umap_scatter(mapper, data, data_key, title, no_bins)
+        p, pv, ph, plot_data, text_search, multibox_input, distribution_plot = plot_umap_scatter(mapper, data, data_key, title, no_bins)
         self.p = p
         self.pv = pv
         self.ph = ph
@@ -239,6 +263,7 @@ class UmapPlot:
         self.unique_labels = unique_labels
         self.text_search = text_search
         self.multibox_input = multibox_input
+        self.distribution_plot = distribution_plot
 
         if len(self.unique_labels) > 5:
             p.legend.visible = False
@@ -257,11 +282,13 @@ class UmapPlot:
         self.overlaps = counts
         self.mean_overlap = mean_overlap
 
-def viz_data(mapper, data, names, knn, knc, cpd, thumbnail_path, out_dir, umap_plots):
-    out_html = os.path.join(out_dir, "web", "condssl_out.html")
-    ensure_dir_exists(out_html)
-    output_file(out_html, title="Conditional SSL UMAP")
+    def render_to_bokeh(self):
+        return [[self.p, self.ph, self.distribution_plot], [self.pv], [self.text_search, self.multibox_input]]
 
+
+def viz_data(mapper, data, names, knn, knc, cpd, thumbnail_path, out_html, umap_plots):
+    output_file(out_html, title="Conditional SSL UMAP")
+    print("Outputting to {}".format(out_html))
     stat_box = Div(text="""<p style="font-size: 500%">CPD: {:.4f} (p {:.1f})<br />KNC mean {:.4f}<br />KNN mean {:.4f}<br /></p>""".format(cpd[0], cpd[1], np.mean(knc), np.mean(knn)))
 
     image_links = """<style>
@@ -311,7 +338,8 @@ def viz_data(mapper, data, names, knn, knc, cpd, thumbnail_path, out_dir, umap_p
     mean_overlaps_box = Div(text="""<p style="font-size: 300%">{}</p>""".format(mean_overlaps))
 
     #gp = layout([[image_thumbnail], [p1, pv1], [ph1], [p3, pv3], [ph3], [stat_box], [data_table]])
-    gp = layout([[image_thumbnail], [umap_plots[0].p, umap_plots[0].pv, umap_plots[0].multibox_input], [umap_plots[0].ph], [umap_plots[0].text_search], [umap_plots[2].p, umap_plots[2].pv], [umap_plots[2].ph], [stat_box], [data_tables[0], mean_overlaps_box]])
+    components = [plot.render_to_bokeh() for plot in umap_plots]
+    gp = layout([[image_thumbnail]] + components +  [[stat_box], [data_tables] + [[mean_overlaps_box]]])
     tt = TapTool()
     tt.callback = OpenURL(url="@image_url")
     umap_plots[0].p.tools.append(tt)
@@ -319,7 +347,7 @@ def viz_data(mapper, data, names, knn, knc, cpd, thumbnail_path, out_dir, umap_p
 
     save(gp)
 
-def main(clinical_path, embeddings_path, thumbnail_path, n_cluster, out_dir):
+def main(clinical_path, embeddings_path, thumbnail_path, histogram_bins, n_cluster, number_of_images, out_dir):
     clinical = pd.read_csv(clinical_path, sep='\t')
     clinical = clinical.set_index('case_submitter_id')
 
@@ -337,11 +365,11 @@ def main(clinical_path, embeddings_path, thumbnail_path, n_cluster, out_dir):
         print("Loaded cluster from {}".format(cluster_dst))
 
     keys_sorted = list(sorted(features.keys()))
-    print ("There are {} images in the dataset".format(len(keys_sorted)))
 
-    #keys_chosen = [k for k in keys_sorted if k.split("-")[1] in ["96", "94", "58"]]
-    #keys_chosen = keys_sorted[:3]
-    keys_chosen = keys_sorted
+    number_of_images = min(number_of_images, len(keys_sorted))
+    keys_chosen = keys_sorted[:number_of_images]
+    print ("There are {} images in the dataset: using {} in analysis...".format(len(keys_sorted), number_of_images))
+    #keys_chosen = keys_sorted
     pickle_out = os.path.join(args.out_dir, f"tmp_pickle_{len(keys_chosen)}.pkl")
     if os.path.exists(pickle_out) and 1 == 0:
         d = pickle.load(open(pickle_out, 'rb'))
@@ -353,17 +381,29 @@ def main(clinical_path, embeddings_path, thumbnail_path, n_cluster, out_dir):
 
 
     umap_plots = []
-    no_bins = 10
-    for key,title in [('slide', "Slide"), ('gender', "Gender"), ('institution', "Institution"), ('race', "Race"), ('cluster_id', "GMM Cluster")]:
+    for key,title in [
+        ('slide', "Slide"),
+        ('institution', "Institution"),
+        ('race', "Race"),
+        ('gender', "Gender"),
+        ('cluster_id', "GMM Cluster"),
+        ('resection', "Site of resection"),
+        ('path_stage_t', "Pathological stage T"),
+        ('path_stage_m', "Pathological stage M")
+    ]:
         unique_labels = np.unique(data[key])
-        plot = UmapPlot(mapper, data, key, title, unique_labels, no_bins)
-        overlaps, mean_overlap = compute_histograms_overlap(plot.plot_data, key, unique_labels, no_bins)
+        plot = UmapPlot(mapper, data, key, title, unique_labels, histogram_bins)
+        overlaps, mean_overlap = compute_histograms_overlap(plot.plot_data, key, unique_labels, histogram_bins)
         plot.set_overlaps(overlaps, mean_overlap)
         umap_plots.append(plot)
-    viz_data(mapper, data, keys_chosen, knn, knc, cpd, thumbnail_path, out_dir, umap_plots)
+
+    out_html = os.path.join(out_dir, "web", "condssl_out_{}_{}.html".format(number_of_images, histogram_bins))
+    ensure_dir_exists(out_html)
+
+    viz_data(mapper, data, keys_chosen, knn, knc, cpd, thumbnail_path, out_html, umap_plots)
 
 if __name__ == "__main__":
     args = parser.parse_args()
-    main(args.clinical_path, args.embeddings_path, args.thumbnail_path, args.n_cluster, args.out_dir)
+    main(args.clinical_path, args.embeddings_path, args.thumbnail_path, args.histogram_bins, args.n_cluster, args.number_of_images, args.out_dir)
 
     #keys_randomized = random.sample(keys_sorted, len(keys_sorted))
