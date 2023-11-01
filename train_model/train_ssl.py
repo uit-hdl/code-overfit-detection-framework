@@ -1,5 +1,6 @@
 import argparse
 import glob
+import os.path
 import random
 import csv
 import tempfile
@@ -101,8 +102,10 @@ parser.add_argument('--aug-plus', action='store_true',
 parser.add_argument('--cos', action='store_true', default=True, help='use cosine lr schedule')
 parser.add_argument('--data-dir', default='./data/', type=str,
                     help='path to source directory')
-parser.add_argument('--out-dir', default='./models/', type=str,
+parser.add_argument('--out-dir', default='./out/models/', type=str,
                     help='path to output directory')
+parser.add_argument('--file-list-path', default='./out/files.csv', type=str,
+                    help='path to list of file splits')
 parser.add_argument('--batch_slide_num', default=4, type=int)
 parser.add_argument('--batch_inst_num', default=0, type=int)
 parser.add_argument('--condition', default=True, type=bool, action=argparse.BooleanOptionalAction,
@@ -205,7 +208,7 @@ def add_dir(directory):
             all_data.append({"q": filename, "k": filename, 'filename': filename})
     return all_data
 
-def find_data(data_dir, batch_size, batch_slide_num, batch_inst_num, workers, is_profiling, is_conditional, is_distributed):
+def wrap_data(train_data, val_data, batch_size, batch_slide_num, batch_inst_num, workers, is_profiling, is_conditional, is_distributed):
     print('Creating dataset')
     grayer = transforms.Grayscale(num_output_channels=3)
     cropper = transforms.RandomResizedCrop(299, scale=(0.2, 1.))
@@ -246,21 +249,6 @@ def find_data(data_dir, batch_size, batch_slide_num, batch_inst_num, workers, is
         ]
     )
 
-    number_of_slides = len(glob.glob(f"{data_dir}{os.sep}*"))
-    splits = [int(number_of_slides * 0.7), int(number_of_slides * 0.1), int(number_of_slides * 0.2)]
-
-    train_data, val_data, test_data = [], [], []
-    for i, directory in enumerate(glob.glob(f"{data_dir}{os.sep}*")):
-        if i < splits[0]:
-            train_data += add_dir(directory)
-        elif i < splits[0] + splits[1]:
-            val_data += add_dir(directory)
-        else:
-            test_data += add_dir(directory)
-
-    if not train_data:
-        raise RuntimeError(f"Found no data in {data_dir}")
-
     #ds_train = PersistentDataset(train_data, transformations, cache_dir="/var/cache/monai")
     #ds_train = CacheNTransDataset(train_data, transformations, cache_n_trans=7, cache_dir="/var/cache/monai")
     #ds_train = CacheDataset(train_data, transformations)
@@ -291,6 +279,62 @@ def find_data(data_dir, batch_size, batch_slide_num, batch_inst_num, workers, is
 
     print("Dataset Created ...")
     return dl_train, dl_val, None
+
+def build_file_list(data_dir, file_list_path):
+    if not os.path.exists(file_list_path):
+        print ("File list not found. Creating file list in {}".format(file_list_path))
+        number_of_slides = len(glob.glob(f"{data_dir}{os.sep}*"))
+        splits = [int(number_of_slides * 0.7), int(number_of_slides * 0.1), int(number_of_slides * 0.2)]
+        all_data = []
+        group_by_patient = {}
+        for i, directory in enumerate(glob.glob(f"{data_dir}{os.sep}*")):
+            all_data += add_dir(directory)
+        for d in all_data:
+            patient = d['filename'].split(os.sep)[-2]
+            if patient not in group_by_patient:
+                group_by_patient[patient] = []
+            group_by_patient[patient].append(d)
+
+        train_data, val_data, test_data = [], [], []
+        patients = list(group_by_patient.keys())
+        # impose (a more) random ordering
+        random.shuffle(patients)
+        for i, patient in enumerate(patients):
+            d = group_by_patient[patient]
+            if i < splits[0]:
+                train_data += d
+            elif i < splits[0] + splits[1]:
+                val_data += d
+            else:
+                test_data += d
+
+        if not train_data:
+            raise RuntimeError(f"Found no data in {data_dir}")
+
+        ensure_dir_exists(file_list_path)
+        with open(file_list_path, 'w') as csvfile:
+            csvwriter = csv.writer(csvfile)
+            csvwriter.writerow(["q", "k", "filename", "mode"])
+            for d in train_data:
+                csvwriter.writerow([d['q'], d['k'], d['filename'], "train"])
+            for d in val_data:
+                csvwriter.writerow([d['q'], d['k'], d['filename'], "val"])
+            for d in test_data:
+                csvwriter.writerow([d['q'], d['k'], d['filename'], "test"])
+
+    with open(file_list_path, 'r') as csvfile:
+        csvreader = csv.reader(csvfile)
+        next(csvreader)
+        train_data, val_data, test_data = [], [], []
+        for row in csvreader:
+            if row[3] == "train":
+                train_data.append({"q": row[0], "k": row[1], 'filename': row[2]})
+            elif row[3] == "val":
+                val_data.append({"q": row[0], "k": row[1], 'filename': row[2]})
+            else:
+                test_data.append({"q": row[0], "k": row[1], 'filename': row[2]})
+        print("Loaded file list from {}".format(file_list_path))
+    return train_data, val_data, test_data
 
 def main():
     args = parser.parse_args()
@@ -323,7 +367,9 @@ def main():
     is_distributed = args.world_size > 1 or args.multiprocessing_distributed
     if is_distributed:
         torch.distributed.init_process_group(args.dist_backend)
-    dl_train, dl_val, dl_test = find_data(args.data_dir, args.batch_size, args.batch_slide_num, args.batch_inst_num, args.workers, args.is_profiling, args.condition, is_distributed)
+
+    train_data, val_data, _ = build_file_list(args.data_dir, args.file_list_path)
+    dl_train, dl_val, dl_test = wrap_data(train_data, val_data, args.batch_size, args.batch_slide_num, args.batch_inst_num, args.workers, args.is_profiling, args.condition, is_distributed)
     print("Dataset Created ...")
 
     if args.seed is not None:

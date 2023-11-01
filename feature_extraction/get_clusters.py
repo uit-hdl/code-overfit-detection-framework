@@ -183,6 +183,7 @@ def umap_slice(names, features, cluster, clinical):
     race_labels = [clinical['race'][case][0] for case in case_submitter_ids]
     # If you want to see what the codes refer to https://gdc.cancer.gov/resources-tcga-users/tcga-code-tables/tissue-source-site-codes
     institution_labels = [case.split("-")[1] for case in case_submitter_ids]
+    patient_labels = [case.split("-")[2] for case in case_submitter_ids]
 
     data = pd.DataFrame({
         'index': np.arange(len(features_flattened)),
@@ -194,6 +195,7 @@ def umap_slice(names, features, cluster, clinical):
         'path_stage_m': path_stage_m,
         'path_stage_t': path_stage_t,
         'slide': names_labels,
+        'patient': patient_labels,
         'image_url': tile_names,
     })
     return mapper, data, knn_fractions, knc_fractions, cpd
@@ -206,7 +208,9 @@ def plot_umap_scatter(mapper, data, data_key, title, no_bins):
     if len(unique_labels) > 20:
         color_key_cmap = "Spectral"
     p, plot_data, color_key, text_search, multibox_input, distribution_plot = \
-        umap_plot.interactive(mapper, width=1000, height=1000, color_key_cmap=color_key_cmap, labels=labels, hover_data=data, point_size=3, hover_tips=TOOLTIPS, title=title, interactive_text_search=True, interactive_text_search_columns=[data_key])
+        umap_plot.interactive(mapper, width=1000, height=1000, color_key_cmap=color_key_cmap, labels=labels,
+                              hover_data=data, point_size=3, hover_tips=TOOLTIPS, title=title,
+                              interactive_text_search=True, interactive_text_search_columns=[data_key])
 
     plot_href, plot_vref = compute_scatter_histograms(mapper.embedding_, labels, plot_data, data_key, no_bins)
     embedding = mapper.embedding_
@@ -383,15 +387,17 @@ def main(clinical_path, embeddings_path, thumbnail_path, histogram_bins, n_clust
     umap_plots = []
     for key,title in [
         ('slide', "Slide"),
+        ('patient', 'Patient'),
         ('institution', "Institution"),
         ('race', "Race"),
         ('gender', "Gender"),
         ('cluster_id', "GMM Cluster"),
-        ('resection', "Site of resection"),
-        ('path_stage_t', "Pathological stage T"),
-        ('path_stage_m', "Pathological stage M")
+        ('resection', "Resection Site"),
+        ('path_stage_t', "Pathological Stage T"),
+        ('path_stage_m', "Pathological Stage M")
     ]:
         unique_labels = np.unique(data[key])
+        title += (" ({} unique colors)".format(len(unique_labels)))
         plot = UmapPlot(mapper, data, key, title, unique_labels, histogram_bins)
         overlaps, mean_overlap = compute_histograms_overlap(plot.plot_data, key, unique_labels, histogram_bins)
         plot.set_overlaps(overlaps, mean_overlap)

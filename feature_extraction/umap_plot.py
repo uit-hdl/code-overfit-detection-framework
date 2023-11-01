@@ -271,7 +271,7 @@ def interactive(
     counts = [np.sum(labels == l) for l in unique_labels]
     unique_labels = list(map(str, unique_labels))
     source = ColumnDataSource(data=dict(item=unique_labels, counts=counts, color=color_key))
-    distribution_plot = figure(toolbar_location=None, title="Distribution plot", tools="hover", tooltips="$name: @$name", width=600, height=200, x_range=unique_labels)
+    distribution_plot = figure(toolbar_location=None, title="Distribution plot (number of points overall)", tools="hover", tooltips="$name: @$name", width=600, height=200, x_range=unique_labels)
     distribution_plot.vbar(source=source, x='item', top='counts', width=0.9, color='color')
     #distribution_plot.vbar(source=source, x=unique_labels, top='counts', width=0.9, color='color', legend_field='item')
     distribution_plot.y_range.start = 0

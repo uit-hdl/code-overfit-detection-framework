@@ -29,18 +29,18 @@ class MySampler(Sampler):
         # Generate chunks of indices. If one slide has indices slide2tiles['slide'] = [1 .. 10] the result can be like
         # tile_chunks = [[1 .. 4], [ 1 .. 8 ]]
         # cut_off_indices = [ 9, 10 ]
-        tile_chunks = []
-        cut_off_indices = []
+        tile_chunks = defaultdict(list)
+        cut_off_indices = defaultdict(list)
         for confounder, tiles in confound2tiles.items():
             random.shuffle(tiles)
             indices = [tiles[i:i + batch_size] for i in range(0, len(tiles), batch_size)]
             # Prune if a chunk created above is less than `batch_slide_num`
             if len(indices[-1]) < batch_size:
-                cut_off_indices.append({confounder: indices[-1]})
+                cut_off_indices[confounder] += indices[-1]
                 indices = indices[:-1]
             if indices:
                 random.shuffle(indices)
-                tile_chunks.append({confounder: indices})
+                tile_chunks[confounder] += indices
         return tile_chunks, cut_off_indices
 
     def __iter__(self):
@@ -59,38 +59,34 @@ class MySampler(Sampler):
 
             #cut_off_indices = []
 
-            if self.batch_inst_num:
-                tile_chunks_inst, inst_cutoff = self._sample_batch_from_group(inst2tiles, self.batch_inst_num)
-            if self.batch_slide_num:
-                tile_chunks_slide, slide_cutoff = self._sample_batch_from_group(slide2tiles, self.batch_slide_num)
-
             if self.batch_inst_num and self.batch_slide_num:
-                raise NotImplementedError("Not implemented")
-                # tile_chunks = []
-                # if self.batch_inst_num > self.batch_slide_num:
-                #     d = tile_chunks_slide[0]
-                #     slide, chunks = list(d.keys())[0], list(d.values())[0]
-                #     institution_id = slide.split("-")[1]
-                #     tile_chunks = tile_chunks_slide[0] + tile_chunks_inst[0:(self.batch_inst_num - self.batch_slide_num)]
-                # pass
+                raise NotImplementedError("Not implemented, too complicated?")
 
-            elif self.batch_slide_num and not self.batch_inst_num:
-                tile_chunks = tile_chunks_slide
-            elif self.batch_inst_num and not self.batch_slide_num:
-                tile_chunks = tile_chunks_inst
+            if self.batch_inst_num:
+                tile_chunks, inst_cutoff = self._sample_batch_from_group(inst2tiles, self.batch_inst_num)
+                batch_sampler_size = self.batch_inst_num
+            else: # self.batch_slide_num:
+                tile_chunks, slide_cutoff = self._sample_batch_from_group(slide2tiles, self.batch_slide_num)
+                batch_sampler_size = self.batch_slide_num
 
-            random.shuffle(tile_chunks)
+            tile_chunks_key = list(tile_chunks.keys())
+            # shuffle the order of the confounders (not just with default dictionary randomness)
+            random.shuffle(tile_chunks_key)
 
             # flatten the list so we can shuffle around chunks
-            tile_chunks = [item for sublist in tile_chunks for item in sublist]
+            tile_chunks = [item for sublist in [tile_chunks[x] for x in tile_chunks_key] for item in sublist]
+            # shuffle more
             random.shuffle(tile_chunks)
 
-            chunks_per_batch = self.batch_size // self.batch_slide_num
+            chunks_per_batch = self.batch_size // batch_sampler_size
             ret = []
             for chunk in [tile_chunks[i:i + chunks_per_batch] for i in range(0, len(tile_chunks), chunks_per_batch)]:
                 ret.append([item for sublist in chunk for item in sublist])
             return iter(ret)
 
     def __len__(self):
-        return len(self.data_source) // (self.batch_size * self.batch_slide_num)
+        if self.batch_slide_num == 0:
+            return len(self.data_source) // (self.batch_size * self.batch_inst_num)
+        else:
+            return len(self.data_source) // (self.batch_size * self.batch_slide_num)
 
