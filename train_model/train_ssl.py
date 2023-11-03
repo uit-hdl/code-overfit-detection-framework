@@ -187,7 +187,7 @@ def train(train_loader, val_loader, model, criterion, optimizer, max_epochs, lr,
         accuracy1_values.append(acc1)
         print(f"epoch {epoch} average loss: {epoch_loss:.4f}")
 
-        if not epoch % 20:
+        if not epoch % 20 or epoch == max_epochs:
             model_savename = model_filename.replace("#NUM#", "{:04d}".format(epoch))
             ensure_dir_exists(model_savename)
             torch.save({
@@ -263,7 +263,8 @@ def wrap_data(train_data, val_data, batch_size, batch_slide_num, batch_inst_num,
         train_sampler = None
     dl_train = DataLoader(ds_train,
                           batch_sampler=samplers.MySampler(train_data, batch_size, batch_slide_num, batch_inst_num) if is_conditional else None,
-                          batch_size=None if is_conditional else batch_size,
+                          batch_size=1 if is_conditional else batch_size,
+                          drop_last=False if is_conditional else True,
                           num_workers=workers)
     dl_val = DataLoader(ds_val, batch_size=batch_size, num_workers=workers, shuffle=True)
     #dl_test = DataLoader(ds_test, batch_size=batch_size, num_workers=workers, shuffle=True)
@@ -321,7 +322,7 @@ def build_file_list(data_dir, file_list_path):
             for d in train_data:
                 csvwriter.writerow([d['q'], d['k'], d['filename'], "train"])
             for d in val_data:
-                csvwriter.writerow([d['q'], d['k'], d['filename'], "val"])
+                csvwriter.writerow([d['q'], d['k'], d['filename'], "validation"])
             for d in test_data:
                 csvwriter.writerow([d['q'], d['k'], d['filename'], "test"])
 
@@ -332,7 +333,7 @@ def build_file_list(data_dir, file_list_path):
         for row in csvreader:
             if row[3] == "train":
                 train_data.append({"q": row[0], "k": row[1], 'filename': row[2]})
-            elif row[3] == "val":
+            elif row[3] == "validation":
                 val_data.append({"q": row[0], "k": row[1], 'filename': row[2]})
             else:
                 test_data.append({"q": row[0], "k": row[1], 'filename': row[2]})
