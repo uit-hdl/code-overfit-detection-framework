@@ -30,18 +30,19 @@ class MySampler(Sampler):
         # tile_chunks = [[1 .. 4], [ 1 .. 8 ]]
         # cut_off_indices = [ 9, 10 ]
         tile_chunks = defaultdict(list)
-        cut_off_indices = defaultdict(list)
         for confounder, tiles in confound2tiles.items():
             random.shuffle(tiles)
             indices = [tiles[i:i + batch_size] for i in range(0, len(tiles), batch_size)]
             # Prune if a chunk created above is less than `batch_slide_num`
             if len(indices[-1]) < batch_size:
-                cut_off_indices[confounder] += indices[-1]
-                indices = indices[:-1]
+                items_to_fill = batch_size - len(indices[-1])
+                for i in range(items_to_fill):
+                    random_index = random.choice(tiles)
+                    indices[-1].append(random_index)
             if indices:
                 random.shuffle(indices)
                 tile_chunks[confounder] += indices
-        return tile_chunks, cut_off_indices
+        return tile_chunks
 
     def __iter__(self):
         with Range("MySampler") if self.is_profiling else no_profiling:
@@ -57,16 +58,14 @@ class MySampler(Sampler):
                 slide2tiles[slide_id].append(i)
                 inst2tiles[institution_id].append(i)
 
-            #cut_off_indices = []
-
             if self.batch_inst_num and self.batch_slide_num:
                 raise NotImplementedError("Not implemented, too complicated?")
 
             if self.batch_inst_num:
-                tile_chunks, inst_cutoff = self._sample_batch_from_group(inst2tiles, self.batch_inst_num)
+                tile_chunks = self._sample_batch_from_group(inst2tiles, self.batch_inst_num)
                 batch_sampler_size = self.batch_inst_num
             else: # self.batch_slide_num:
-                tile_chunks, slide_cutoff = self._sample_batch_from_group(slide2tiles, self.batch_slide_num)
+                tile_chunks = self._sample_batch_from_group(slide2tiles, self.batch_slide_num)
                 batch_sampler_size = self.batch_slide_num
 
             tile_chunks_key = list(tile_chunks.keys())
@@ -88,8 +87,5 @@ class MySampler(Sampler):
             return iter(ret)
 
     def __len__(self):
-        if self.batch_slide_num == 0:
-            return len(self.data_source) // (self.batch_size * self.batch_inst_num)
-        else:
-            return len(self.data_source) // (self.batch_size * self.batch_slide_num)
+        return len(list(self.__iter__()))
 

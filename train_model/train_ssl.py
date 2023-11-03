@@ -261,11 +261,12 @@ def wrap_data(train_data, val_data, batch_size, batch_slide_num, batch_inst_num,
         train_sampler = torch.utils.data.distributed.DistributedSampler(ds_train)
     else:
         train_sampler = None
-    dl_train = DataLoader(ds_train,
-                          batch_sampler=samplers.MySampler(train_data, batch_size, batch_slide_num, batch_inst_num) if is_conditional else None,
-                          batch_size=1 if is_conditional else batch_size,
-                          drop_last=False if is_conditional else True,
-                          num_workers=workers)
+    if is_conditional:
+        dl_train = DataLoader(ds_train,
+                            batch_sampler=samplers.MySampler(train_data, batch_size, batch_slide_num, batch_inst_num), num_workers=workers)
+    else:
+        dl_train = DataLoader(ds_train, batch_size=batch_size, drop_last=True, shuffle=True, num_workers=workers)
+
     dl_val = DataLoader(ds_val, batch_size=batch_size, num_workers=workers, shuffle=True)
     #dl_test = DataLoader(ds_test, batch_size=batch_size, num_workers=workers, shuffle=True)
 
@@ -281,6 +282,9 @@ def wrap_data(train_data, val_data, batch_size, batch_slide_num, batch_inst_num,
     #     )
     #del first_sample
 
+    print ("Number of images in DL: {}".format(len(ds_train)))
+    print ("Number of batches in DL: {}".format(len(dl_train)))
+
     print("Dataset Created ...")
     return dl_train, dl_val, None
 
@@ -288,7 +292,6 @@ def build_file_list(data_dir, file_list_path):
     if not os.path.exists(file_list_path):
         print ("File list not found. Creating file list in {}".format(file_list_path))
         number_of_slides = len(glob.glob(f"{data_dir}{os.sep}*"))
-        splits = [int(number_of_slides * 0.7), int(number_of_slides * 0.1), int(number_of_slides * 0.2)]
         all_data = []
         group_by_patient = {}
         for i, directory in enumerate(glob.glob(f"{data_dir}{os.sep}*")):
@@ -303,6 +306,8 @@ def build_file_list(data_dir, file_list_path):
         patients = list(group_by_patient.keys())
         # impose (a more) random ordering
         random.shuffle(patients)
+        splits = lambda x: [int(x * 0.7), int(x * 0.1), int(x * 0.2)]
+        splits = splits(len(patients))
         for i, patient in enumerate(patients):
             d = group_by_patient[patient]
             if i < splits[0]:
