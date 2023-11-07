@@ -315,7 +315,7 @@ def viz_data(mapper, data, names, knn, knc, cpd, thumbnail_path, out_html, umap_
         tp = f"file:///{tp}"
         image_links+=f"""<img src="{tp}" title="{n}"/>"""
     image_links += "</div>"
-    if len(names) > 5:
+    if len(names) > 8:
         image_links = ""
     image_thumbnail = Div(text=image_links)
 
@@ -369,6 +369,15 @@ def main(clinical_path, embeddings_path, thumbnail_path, histogram_bins, n_clust
     number_of_images = min(number_of_images, len(keys_sorted))
     #keys_chosen = keys_sorted[:number_of_images]
     keys_chosen = keys_random[:number_of_images]
+    keys_chosen = ["TCGA-22-4605-01A-01-BS1",
+                   "TCGA-22-5479-11A-01-TS1",
+                   "TCGA-33-4583-11A-01-BS1",
+                   "TCGA-56-5897-01A-01-TS1",
+                   "TCGA-56-8309-11A-01-TS1",
+                   "TCGA-66-2790-01A-01-BS1",
+                   "TCGA-85-7699-01A-01-TS1",
+                   "TCGA-98-8023-11A-01-TS1",
+                   ]
     print ("There are {} images in the dataset: using {} in analysis...".format(len(keys_sorted), number_of_images))
     #keys_chosen = keys_sorted
     pickle_out = os.path.join(args.out_dir, f"tmp_pickle_{len(keys_chosen)}.pkl")
