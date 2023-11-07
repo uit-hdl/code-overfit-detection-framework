@@ -1,6 +1,5 @@
 import math
 import os
-from pathlib import Path
 
 import torch
 
@@ -70,9 +69,3 @@ def adjust_learning_rate(optimizer, epoch, lr, cos, schedule, max_epochs):
             lr *= 0.1 if epoch >= milestone else 1.
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
-
-def ensure_dir_exists(path):
-    dest_dir = os.path.dirname(path)
-    if not os.path.exists(dest_dir):
-        Path(dest_dir).mkdir(parents=True, exist_ok=True)
-        print(f"mkdir: '{dest_dir}'")

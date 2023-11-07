@@ -23,12 +23,7 @@ from sklearn.neighbors import NearestNeighbors
 
 import umap_plot
 
-
-def ensure_dir_exists(path):
-    dest_dir = os.path.dirname(path)
-    if not os.path.exists(dest_dir):
-        Path(dest_dir).mkdir(parents=True, exist_ok=True)
-
+from global_util import ensure_dir_exists
 
 
 parser = argparse.ArgumentParser(description='Get cluster features')
@@ -163,7 +158,7 @@ def umap_slice(names, features, cluster, clinical):
     file_root = os.path.abspath("/").replace(os.sep, "/")
     tile_names = ["file:///" + file_root + x for x in np.concatenate(tile_names, axis=0)]
     features_flattened = np.concatenate(values, axis=0)
-    umap_projection = reducer.fit_transform(features_flattened)
+    #umap_projection = reducer.fit_transform(features_flattened)
     mapper = reducer.fit(features_flattened)
 
     # #1
@@ -369,9 +364,11 @@ def main(clinical_path, embeddings_path, thumbnail_path, histogram_bins, n_clust
         print("Loaded cluster from {}".format(cluster_dst))
 
     keys_sorted = list(sorted(features.keys()))
+    keys_random = random.sample(keys_sorted, len(keys_sorted))
 
     number_of_images = min(number_of_images, len(keys_sorted))
-    keys_chosen = keys_sorted[:number_of_images]
+    #keys_chosen = keys_sorted[:number_of_images]
+    keys_chosen = keys_random[:number_of_images]
     print ("There are {} images in the dataset: using {} in analysis...".format(len(keys_sorted), number_of_images))
     #keys_chosen = keys_sorted
     pickle_out = os.path.join(args.out_dir, f"tmp_pickle_{len(keys_chosen)}.pkl")

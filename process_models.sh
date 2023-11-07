@@ -13,7 +13,8 @@ SHA="$(git rev-parse HEAD)"
 analysis_dir="analysis_out_$SHA/"
 mkdir "${analysis_dir}"
 
-for model in out/MoCo/tiles/model/*.tar
+#for model in out/MoCo/tiles/model/*.tar
+for model in out/MoCo/tiles/model/checkpoint_MoCo_tiles_0200_False_m128_n0_o0.pth.tar
 do
   m="$(basename "${model}" | command grep -Eo 'm[0-9]+')"
   n="$(basename "${model}" | command grep -Eo "n[0-9]+")"

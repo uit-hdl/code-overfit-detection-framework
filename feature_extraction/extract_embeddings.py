@@ -6,6 +6,7 @@ import numpy as np
 from monai.data import DataLoader, Dataset
 
 sys.path.append('./')
+from global_util import build_file_list, ensure_dir_exists
 
 import condssl.builder
 import argparse
@@ -26,6 +27,7 @@ parser.add_argument('--tcga_annotation_file', default='./out/annotation/recurren
 parser.add_argument('--cptac_annotation_file', default='./out/annotation/recurrence_annotation_cptac.pkl', type=str, help='path to CPTAC annotations')
 parser.add_argument('--src_dir', default='/Data/TCGA_LUSC/preprocessed/by_class/lung_scc', type=str, help='path to preprocessed slide images')
 parser.add_argument('--out_dir', default='./out', type=str, help='path to save extracted embeddings')
+parser.add_argument('--file-list-path', default='./out/files.csv', type=str, help='path to list of file splits')
 
 args = parser.parse_args()
 
@@ -34,11 +36,6 @@ if torch.cuda.is_available():
 else:
     raise RuntimeError("cuda not found, use different comp :-(")
 print(device)
-
-def ensure_dir_exists(path):
-    dest_dir = os.path.dirname(path)
-    if not os.path.exists(dest_dir):
-        Path(dest_dir).mkdir(parents=True, exist_ok=True)
 
 def get_embeddings_bagging(feature_extractor, dl, annotations):
     embedding_dict = defaultdict(list)
@@ -108,14 +105,14 @@ def add_dir(directory):
             all_data.append({"image": filename, "tile_id": filename, "slide_id": slide_id})
     return all_data
 
+_train_data, _val_data, _test_data = build_file_list(args.src_dir, args.file_list_path)
 train_data, val_data, test_data = [], [], []
-for i, directory in enumerate(glob.glob(f"{args.src_dir}{os.sep}*")):
-    if i < splits[0]:
-        train_data += add_dir(directory)
-    elif i < splits[0] + splits[1]:
-        val_data += add_dir(directory)
-    else:
-        test_data += add_dir(directory)
+for (li,dst) in [(_train_data,train_data), (_val_data,val_data), (_test_data,test_data)]:
+    for entry in li:
+        filename = entry['filename']
+        slide_id = os.path.basename(filename.split(os.sep)[-2])
+        tile_id = os.path.basename(filename.split(os.sep)[-1])
+        dst.append({"image": filename, "tile_id": filename, "slide_id": slide_id})
 
 transformations = mt.Compose(
     [
@@ -126,9 +123,6 @@ transformations = mt.Compose(
         # mt.ToDeviceD(keys="image", device=device),
     ])
 
-# train_data, test_data = train_test_split(all_data, test_size=0.1, random_state=42)
-# # note that we split the train data again, not the entire dataset
-# train_data, validation_data = train_test_split(train_data, test_size=0.1, random_state=42)
 model_name = condssl.builder.MoCo.__name__
 data_dir_name = list(filter(None, args.src_dir.split(os.sep)))[-1]
 
@@ -139,6 +133,8 @@ for name, data in list(zip(['train', 'val', 'test'], [train_data, val_data, test
     embedding_dest_path = os.path.join(args.out_dir, model_name,  data_dir_name, "embeddings", f"{name}_{data_dir_name}_embedding.pkl")
     ensure_dir_exists(embedding_dest_path)
     pickle.dump(embedding_dict, open(embedding_dest_path, 'wb'), protocol=4)
+    print(f"Wrote embeddings to {embedding_dest_path}")
 
     outcomes_dest_path = os.path.join(args.out_dir, model_name, data_dir_name, "embeddings", f"{name}_{data_dir_name}_outcomes.pkl")
     pickle.dump((outcomes_dict), open(outcomes_dest_path, 'wb'), protocol=4)
+    print(f"Wrote outcomes to {outcomes_dest_path}")

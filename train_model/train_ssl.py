@@ -23,6 +23,7 @@ import samplers
 sys.path.append("../")
 import condssl.builder
 import condssl.loader
+from global_util import build_file_list, ensure_dir_exists
 
 from network.inception_v4 import InceptionV4
 from train_util import *
@@ -33,6 +34,7 @@ import contextlib
 no_profiling = contextlib.nullcontext()
 
 from itertools import zip_longest
+
 
 
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
@@ -104,8 +106,7 @@ parser.add_argument('--data-dir', default='./data/', type=str,
                     help='path to source directory')
 parser.add_argument('--out-dir', default='./out/models/', type=str,
                     help='path to output directory')
-parser.add_argument('--file-list-path', default='./out/files.csv', type=str,
-                    help='path to list of file splits')
+parser.add_argument('--file-list-path', default='./out/files.csv', type=str, help='path to list of file splits')
 parser.add_argument('--batch_slide_num', default=4, type=int)
 parser.add_argument('--batch_inst_num', default=0, type=int)
 parser.add_argument('--condition', default=True, type=bool, action=argparse.BooleanOptionalAction,
@@ -201,13 +202,6 @@ def train(train_loader, val_loader, model, criterion, optimizer, max_epochs, lr,
     save_data_to_csv(accuracy1_values, os.path.join(out_path, "data", os.path.basename(model_savename).replace("checkpoint_", "accuracy_").replace(".pth.tar", ".csv")), "accuracy")
     save_data_to_csv(epoch_loss_values, os.path.join(out_path, "data", os.path.basename(model_savename).replace("checkpoint_", "loss_").replace(".pth.tar", ".csv")), "loss")
 
-def add_dir(directory):
-    all_data = []
-    for filename in glob.glob(f"{directory}{os.sep}**{os.sep}*", recursive=True):
-        if os.path.isfile(filename):
-            all_data.append({"q": filename, "k": filename, 'filename': filename})
-    return all_data
-
 def wrap_data(train_data, val_data, batch_size, batch_slide_num, batch_inst_num, workers, is_profiling, is_conditional, is_distributed):
     print('Creating dataset')
     grayer = transforms.Grayscale(num_output_channels=3)
@@ -287,63 +281,6 @@ def wrap_data(train_data, val_data, batch_size, batch_slide_num, batch_inst_num,
 
     print("Dataset Created ...")
     return dl_train, dl_val, None
-
-def build_file_list(data_dir, file_list_path):
-    if not os.path.exists(file_list_path):
-        print ("File list not found. Creating file list in {}".format(file_list_path))
-        number_of_slides = len(glob.glob(f"{data_dir}{os.sep}*"))
-        all_data = []
-        group_by_patient = {}
-        for i, directory in enumerate(glob.glob(f"{data_dir}{os.sep}*")):
-            all_data += add_dir(directory)
-        for d in all_data:
-            patient = d['filename'].split(os.sep)[-2]
-            if patient not in group_by_patient:
-                group_by_patient[patient] = []
-            group_by_patient[patient].append(d)
-
-        train_data, val_data, test_data = [], [], []
-        patients = list(group_by_patient.keys())
-        # impose (a more) random ordering
-        random.shuffle(patients)
-        splits = lambda x: [int(x * 0.7), int(x * 0.1), int(x * 0.2)]
-        splits = splits(len(patients))
-        for i, patient in enumerate(patients):
-            d = group_by_patient[patient]
-            if i < splits[0]:
-                train_data += d
-            elif i < splits[0] + splits[1]:
-                val_data += d
-            else:
-                test_data += d
-
-        if not train_data:
-            raise RuntimeError(f"Found no data in {data_dir}")
-
-        ensure_dir_exists(file_list_path)
-        with open(file_list_path, 'w') as csvfile:
-            csvwriter = csv.writer(csvfile)
-            csvwriter.writerow(["q", "k", "filename", "mode"])
-            for d in train_data:
-                csvwriter.writerow([d['q'], d['k'], d['filename'], "train"])
-            for d in val_data:
-                csvwriter.writerow([d['q'], d['k'], d['filename'], "validation"])
-            for d in test_data:
-                csvwriter.writerow([d['q'], d['k'], d['filename'], "test"])
-
-    with open(file_list_path, 'r') as csvfile:
-        csvreader = csv.reader(csvfile)
-        next(csvreader)
-        train_data, val_data, test_data = [], [], []
-        for row in csvreader:
-            if row[3] == "train":
-                train_data.append({"q": row[0], "k": row[1], 'filename': row[2]})
-            elif row[3] == "validation":
-                val_data.append({"q": row[0], "k": row[1], 'filename': row[2]})
-            else:
-                test_data.append({"q": row[0], "k": row[1], 'filename': row[2]})
-        print("Loaded file list from {}".format(file_list_path))
-    return train_data, val_data, test_data
 
 def main():
     args = parser.parse_args()
