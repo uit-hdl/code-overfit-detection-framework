@@ -20,6 +20,7 @@ from scipy.spatial import distance
 from scipy.stats import spearmanr
 from sklearn.mixture import GaussianMixture
 from sklearn.neighbors import NearestNeighbors
+import scipy.stats
 
 import umap_plot
 
@@ -138,13 +139,26 @@ def compute_histograms_overlap(plot_data, data_key, unique_labels, no_bins):
     overlaps = defaultdict(lambda: defaultdict(list))
     all_counts = np.sum([x[1] for x in counts])
     for (label_left,count_left) in counts:
-        cc = np.array([count_left, all_counts - count_left])
-        overlaps[label_left]["all"] = np.mean(np.divide(cc.min(axis=0), cc.max(axis=0), where=cc.min(axis=0)!=0))
+        #cc = np.array([count_left, all_counts - count_left])
+        #overlaps[label_left]["all"] = np.mean(np.divide(cc.min(axis=0), cc.max(axis=0), where=cc.min(axis=0)!=0))
         for label_right,count_right in counts:
             if label_left == label_right:
                 continue
-            cc = np.array([count_left, count_right])
-            overlaps[label_left][label_right] = np.mean(np.divide(cc.min(axis=0), cc.max(axis=0), where=cc.min(axis=0)!=0))
+            #cc = np.array([count_left, count_right])
+            #division = np.divide(cc.min(axis=0), cc.max(axis=0))
+            # problem with line below: doesn't respect where there are cells in one line, but not the other
+            #overlaps[label_left][label_right] = np.mean(np.divide(cc.min(axis=0), cc.max(axis=0), where=cc.min(axis=0)!=0))
+            # problem with below: doesn't take into account that there is a different number of tiles altogether
+            #overlaps[label_left][label_right] = np.mean(np.nan_to_num(division[division != 0]))
+            #pearson, pearson_p = scipy.stats.pearsonr(count_left, count_right)
+            #spearman = scipy.stats.spearmanr(count_left, count_right)
+            #kendalltau = scipy.stats.kendalltau(count_left, count_right)
+            overlaps[label_left][label_right] = scipy.stats.kendalltau(count_left, count_right).correlation
+
+        #overlaps[label_left]["all"] = scipy.stats.kendalltau(count_left, all_counts - count_left).correlation
+        overlaps[label_left]["all"] = np.mean(list(overlaps[label_left].values()))
+
+
     mean_overlap = np.mean([x["all"] for x in overlaps.values()])
     return overlaps, mean_overlap
 
@@ -158,13 +172,13 @@ def umap_slice(names, features, cluster, clinical):
     file_root = os.path.abspath("/").replace(os.sep, "/")
     tile_names = ["file:///" + file_root + x for x in np.concatenate(tile_names, axis=0)]
     features_flattened = np.concatenate(values, axis=0)
-    #umap_projection = reducer.fit_transform(features_flattened)
-    mapper = reducer.fit(features_flattened)
+    umap_projection = reducer.fit_transform(features_flattened)
+    #mapper = reducer.fit(features_flattened)
 
     # #1
-    knn_fractions = compute_knn(features_flattened, mapper.embedding_, k=10)
-    knc_fractions = compute_knc(features_flattened, mapper.embedding_, cluster_labels, k=10)
-    cpd = compute_cpd(features_flattened, mapper.embedding_, sample_size=1000)
+    knn_fractions = None #compute_knn(features_flattened, umap_projection, k=10)
+    knc_fractions = None # compute_knc(features_flattened, umap_projection, cluster_labels, k=10)
+    cpd = None # compute_cpd(features_flattened, umap_projection, sample_size=1000)
 
     #umap_projection = reducer.fit_transform(features_flattened)
     slices = list(accumulate([0] + [len(y) for y in values], operator.add))
@@ -193,9 +207,9 @@ def umap_slice(names, features, cluster, clinical):
         'patient': patient_labels,
         'image_url': tile_names,
     })
-    return mapper, data, knn_fractions, knc_fractions, cpd
+    return umap_projection, data, knn_fractions, knc_fractions, cpd
 
-def plot_umap_scatter(mapper, data, data_key, title, no_bins):
+def plot_umap_scatter(umap_projection, data, data_key, title, no_bins):
     labels = data[data_key]
     unique_labels = np.unique(labels)
 
@@ -203,14 +217,13 @@ def plot_umap_scatter(mapper, data, data_key, title, no_bins):
     if len(unique_labels) > 20:
         color_key_cmap = "Spectral"
     p, plot_data, color_key, text_search, multibox_input, distribution_plot = \
-        umap_plot.interactive(mapper, width=1000, height=1000, color_key_cmap=color_key_cmap, labels=labels,
+        umap_plot.interactive(umap_projection, width=1000, height=1000, color_key_cmap=color_key_cmap, labels=labels,
                               hover_data=data, point_size=3, hover_tips=TOOLTIPS, title=title,
                               interactive_text_search=True, interactive_text_search_columns=[data_key])
 
-    plot_href, plot_vref = compute_scatter_histograms(mapper.embedding_, labels, plot_data, data_key, no_bins)
-    embedding = mapper.embedding_
+    plot_href, plot_vref = compute_scatter_histograms(umap_projection, labels, plot_data, data_key, no_bins)
     """https://github.com/bokeh/bokeh/blob/d37c647d170cc4b03a13db1a944372724b00c171/examples/server/app/selection_histogram.py#L4"""
-    hhist, hedges = np.histogram(embedding[:, 0], bins=no_bins)
+    hhist, hedges = np.histogram(umap_projection[:, 0], bins=no_bins)
     LINE_ARGS = dict(color="#3A5785", line_color=None)
 
     ph = figure(toolbar_location=None, width=p.width, height=200, min_border=10, min_border_left=50, y_axis_location="right", x_range=plot_href["hedges"], y_axis_label="no. of points")
@@ -288,7 +301,8 @@ class UmapPlot:
 def viz_data(mapper, data, names, knn, knc, cpd, thumbnail_path, out_html, umap_plots):
     output_file(out_html, title="Conditional SSL UMAP")
     print("Outputting to {}".format(out_html))
-    stat_box = Div(text="""<p style="font-size: 500%">CPD: {:.4f} (p {:.1f})<br />KNC mean {:.4f}<br />KNN mean {:.4f}<br /></p>""".format(cpd[0], cpd[1], np.mean(knc), np.mean(knn)))
+    stat_box = Div(text="""<p style="font-size: 500%">CPD: {:.4f} (p {:.1f})<br />KNC mean {:.4f}<br />KNN mean {:.4f}<br /></p>"""
+                   .format(cpd[0] if cpd else 0, cpd[1] if cpd else 0, np.mean(knc) if knc else 0, np.mean(knn) if knn else 0))
 
     image_links = """<style>
     .top-left {
@@ -324,7 +338,7 @@ def viz_data(mapper, data, names, knn, knc, cpd, thumbnail_path, out_html, umap_
         data = dict(keys=list(map(str, plot.unique_labels)) + ["all"])
         columns = []
         for i,overlap in enumerate(plot.overlaps):
-            data[f"counts_{i+1}"] = list(map(lambda f: f"{f:.2%}" if f > 0.0 else "-", overlap))
+            data[f"counts_{i+1}"] = list(map(lambda f: f"{f:.2%}" if f != 0.0 else "-", overlap))
             columns.append(TableColumn(field=f"counts_{i+1}", title=str(plot.unique_labels[i])))
         source = ColumnDataSource(data)
         columns = [ TableColumn(field="keys", title=plot.title)] + columns
@@ -369,15 +383,8 @@ def main(clinical_path, embeddings_path, thumbnail_path, histogram_bins, n_clust
     number_of_images = min(number_of_images, len(keys_sorted))
     #keys_chosen = keys_sorted[:number_of_images]
     keys_chosen = keys_random[:number_of_images]
-    keys_chosen = ["TCGA-22-4605-01A-01-BS1",
-                   "TCGA-22-5479-11A-01-TS1",
-                   "TCGA-33-4583-11A-01-BS1",
-                   "TCGA-56-5897-01A-01-TS1",
-                   "TCGA-56-8309-11A-01-TS1",
-                   "TCGA-66-2790-01A-01-BS1",
-                   "TCGA-85-7699-01A-01-TS1",
-                   "TCGA-98-8023-11A-01-TS1",
-                   ]
+    keys_chosen = ["TCGA-18-3410-11A-01-TS1", "TCGA-60-2711-11A-01-BS1", "TCGA-63-7022-01A-01-BS1", "TCGA-66-2777-01A-01-BS1", "TCGA-66-2781-11A-01-TS1", "TCGA-77-8146-01A-01-TS1", "TCGA-98-A53H-01A-01-TS1"]
+    #keys_chosen = ["TCGA-22-4605-01A-01-BS1", "TCGA-22-5479-11A-01-TS1", "TCGA-33-4583-11A-01-BS1", "TCGA-56-5897-01A-01-TS1", "TCGA-56-8309-11A-01-TS1", "TCGA-66-2790-01A-01-BS1", "TCGA-85-7699-01A-01-TS1", "TCGA-98-8023-11A-01-TS1", ]
     print ("There are {} images in the dataset: using {} in analysis...".format(len(keys_sorted), number_of_images))
     #keys_chosen = keys_sorted
     pickle_out = os.path.join(args.out_dir, f"tmp_pickle_{len(keys_chosen)}.pkl")

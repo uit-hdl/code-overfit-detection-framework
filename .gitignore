@@ -1,3 +1,4 @@
+analysis_out*/
 *.sqlite
 *.nsys-rep
 train_model/train_venv

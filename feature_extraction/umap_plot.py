@@ -15,17 +15,9 @@ from bokeh.plotting import output_file, save, figure
 def _to_hex(arr):
     return [matplotlib.colors.to_hex(c) for c in arr]
 
-def _get_embedding(umap_object):
-    if hasattr(umap_object, "embedding_"):
-        return umap_object.embedding_
-    elif hasattr(umap_object, "embedding"):
-        return umap_object.embedding
-    else:
-        raise ValueError("Could not find embedding attribute of umap_object")
-
 
 def interactive(
-        umap_object,
+        umap_projection,
         labels,
         hover_data=None,
         color_key_cmap="Spectral",
@@ -107,7 +99,7 @@ def interactive(
         if not 0.0 <= alpha <= 1.0:
             raise ValueError("Alpha must be between 0 and 1 inclusive")
 
-    points = _get_embedding(umap_object)
+    points = umap_projection
 
     if points.shape[1] != 2:
         raise ValueError("Plotting is currently only implemented for 2D embeddings")
@@ -115,7 +107,7 @@ def interactive(
     if point_size is None:
         point_size = 100.0 / np.sqrt(points.shape[0])
 
-    data = pd.DataFrame(_get_embedding(umap_object), columns=("x", "y"))
+    data = pd.DataFrame(umap_projection, columns=("x", "y"))
 
     data["label"] = labels
 
