@@ -166,8 +166,7 @@ def umap_slice(names, features, cluster, clinical):
     values = [[x[0] for x in features[name]] for name in names]
     if not all(values):
         raise RuntimeError("One of the keys did not lead anywhere!")
-    cluster_labels = [cluster.predict(y) for y in values]
-    cluster_labels = [item for sublist in cluster_labels for item in sublist]
+    cluster_labels = [item for sublist in [cluster.predict(y) for y in values] for item in sublist] if cluster else [0] * sum([len(x) for x in values])
     tile_names = [[x[1] for x in features[name]] for name in names]
     file_root = os.path.abspath("/").replace(os.sep, "/")
     tile_names = ["file:///" + file_root + x for x in np.concatenate(tile_names, axis=0)]
@@ -329,7 +328,7 @@ def viz_data(mapper, data, names, knn, knc, cpd, thumbnail_path, out_html, umap_
         tp = f"file:///{tp}"
         image_links+=f"""<img src="{tp}" title="{n}"/>"""
     image_links += "</div>"
-    if len(names) > 8:
+    if len(names) > 9:
         image_links = ""
     image_thumbnail = Div(text=image_links)
 
@@ -372,9 +371,10 @@ def main(clinical_path, embeddings_path, thumbnail_path, histogram_bins, n_clust
         print("Loaded cluster from {}".format(cluster_dst))
     else:
         print("Making gmm cluster...")
-        cluster = GaussianMixture(n_components=n_cluster, random_state=42).fit([item[0] for sublist in features.values() for item in sublist])
+        #cluster = GaussianMixture(n_components=n_cluster, random_state=42).fit([item[0] for sublist in features.values() for item in sublist])
+        cluster = None
         ensure_dir_exists(cluster_dst)
-        pickle.dump(cluster, open(cluster_dst, 'wb'))
+        #pickle.dump(cluster, open(cluster_dst, 'wb'))
         print("Loaded cluster from {}".format(cluster_dst))
 
     keys_sorted = list(sorted(features.keys()))
@@ -382,9 +382,11 @@ def main(clinical_path, embeddings_path, thumbnail_path, histogram_bins, n_clust
 
     number_of_images = min(number_of_images, len(keys_sorted))
     #keys_chosen = keys_sorted[:number_of_images]
-    keys_chosen = keys_random[:number_of_images]
-    keys_chosen = ["TCGA-18-3410-11A-01-TS1", "TCGA-60-2711-11A-01-BS1", "TCGA-63-7022-01A-01-BS1", "TCGA-66-2777-01A-01-BS1", "TCGA-66-2781-11A-01-TS1", "TCGA-77-8146-01A-01-TS1", "TCGA-98-A53H-01A-01-TS1"]
-    #keys_chosen = ["TCGA-22-4605-01A-01-BS1", "TCGA-22-5479-11A-01-TS1", "TCGA-33-4583-11A-01-BS1", "TCGA-56-5897-01A-01-TS1", "TCGA-56-8309-11A-01-TS1", "TCGA-66-2790-01A-01-BS1", "TCGA-85-7699-01A-01-TS1", "TCGA-98-8023-11A-01-TS1", ]
+    #keys_chosen = keys_random[:number_of_images]
+    #keys_chosen = ["TCGA-60-2698-01A-01-TS1", "TCGA-22-4596-01A-01-TS1", "TCGA-21-1077-01A-01-TS1", "TCGA-39-5019-11A-01-TS1", "TCGA-85-7950-01A-01-TS1", "TCGA-34-2608-11A-01-BS1", "TCGA-58-8387-11A-01-TS1", "TCGA-85-8353-01A-01-BS1", "TCGA-85-8664-01A-01-TS1", "TCGA-33-4532-01A-01-TS1", "TCGA-60-2698-01A-01-TS1", "TCGA-51-4080-01A-01-BS1", "TCGA-85-8664-01A-01-TS1", "TCGA-85-8666-01A-01-BS1", "TCGA-60-2716-01A-01-BS1", "TCGA-39-5034-01A-01-BS1", "TCGA-66-2783-01A-01-BS1", "TCGA-39-5011-01A-01-BS1", "TCGA-85-8355-01A-01-TS1", "TCGA-L3-A4E7-01A-01-TSA"]
+    #keys_chosen = ["TCGA-39-5035-01A-01-BS1", "TCGA-85-8664-01A-01-TS1", "TCGA-39-5024-01A-01-BS1", "TCGA-66-2756-11A-01-BS1", "TCGA-33-4532-01A-01-TS1", "TCGA-85-7950-01A-01-TS1", "TCGA-60-2725-01A-01-BS1", "TCGA-56-6545-01A-01-BS1", "TCGA-22-4596-01A-01-TS1", "TCGA-XC-AA0X-01A-03-TS3", "TCGA-39-5035-01A-01-BS1", "TCGA-60-2698-01A-01-TS1", "TCGA-63-A5MG-01A-01-TSA", "TCGA-63-7022-01A-01-BS1", "TCGA-18-3406-11A-01-TS1", "TCGA-90-7767-11A-01-TS1", "TCGA-39-5011-01A-01-BS1", "TCGA-33-4533-01A-01-TS1", "TCGA-66-2783-01A-01-TS1", "TCGA-77-6845-01A-01-BS1"]
+    keys_chosen = ["TCGA-77-A5GH-01A-01-TS1", "TCGA-60-2725-01A-01-BS1", "TCGA-60-2714-11A-01-BS1", "TCGA-NC-A5HP-01A-01-TS1", "TCGA-77-8139-01A-01-TS1", "TCGA-98-A53D-01A-03-TS3", "TCGA-39-5039-01A-01-BS1"] + keys_sorted[:2]
+
     print ("There are {} images in the dataset: using {} in analysis...".format(len(keys_sorted), number_of_images))
     #keys_chosen = keys_sorted
     pickle_out = os.path.join(args.out_dir, f"tmp_pickle_{len(keys_chosen)}.pkl")
@@ -404,7 +406,7 @@ def main(clinical_path, embeddings_path, thumbnail_path, histogram_bins, n_clust
         ('institution', "Institution"),
         ('race', "Race"),
         ('gender', "Gender"),
-        ('cluster_id', "GMM Cluster"),
+        #('cluster_id', "GMM Cluster"),
         ('resection', "Resection Site"),
         ('path_stage_t', "Pathological Stage T"),
         ('path_stage_m', "Pathological Stage M")
