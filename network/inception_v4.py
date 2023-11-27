@@ -9,7 +9,7 @@ from torch.utils.checkpoint import checkpoint_sequential
 
 class BasicConv2d(nn.Module):
 
-    def __init__(self, in_planes, out_planes, kernel_size, stride, do_checkpoint=False, padding=0):
+    def __init__(self, in_planes, out_planes, kernel_size, stride, padding=0):
         super(BasicConv2d, self).__init__()
         self.conv = nn.Conv2d(in_planes, out_planes,
                               kernel_size=kernel_size, stride=stride,
@@ -20,17 +20,11 @@ class BasicConv2d(nn.Module):
                                  affine=True)
         self.relu = nn.ReLU(inplace=True)
 
-        self.do_checkpoint = do_checkpoint
-
     def forward(self, x):
-        if self.do_checkpoint:
-            x = checkpoint_sequential(nn.Sequential(self.conv, self.bn, self.relu), 2, x)
-            return x
-        else:
-            x = self.conv(x)
-            x = self.bn(x)
-            x = self.relu(x)
-            return x
+        x = self.conv(x)
+        x = self.bn(x)
+        x = self.relu(x)
+        return x
 
 if __name__ == "__main__":
     import random

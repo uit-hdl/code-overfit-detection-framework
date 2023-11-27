@@ -23,6 +23,7 @@ import samplers
 sys.path.append("../")
 import condssl.builder
 import condssl.loader
+import numpy as np
 from global_util import build_file_list, ensure_dir_exists
 
 from network.inception_v4 import InceptionV4
@@ -121,6 +122,13 @@ def save_data_to_csv(data, filename, label):
             csvwriter.writerow([e,l])
 
 
+def reset_seeds():
+    torch.manual_seed(0)
+    random.seed(0)
+    np.random.seed(0)
+    torch.use_deterministic_algorithms(True)
+    torch.backends.cudnn.benchmark = False
+
 
 def train(train_loader, val_loader, model, criterion, optimizer, max_epochs, lr, cos, schedule, out_path, model_filename, is_profiling, is_distributed):
     epoch_loss_values = []
@@ -148,7 +156,7 @@ def train(train_loader, val_loader, model, criterion, optimizer, max_epochs, lr,
         # using step instead of iterate through train_loader directly to track data loading time
         # steps are 1-indexed for printing and calculation purposes
         #for i, d in enumerate(train_loader):
-        for step in range(1, len(train_loader) + 1):
+        for step in range(1, 3):
             if is_distributed:
                 train_loader.batch_sampler.set_epoch(epoch)
             with Range("Step"):
@@ -157,9 +165,10 @@ def train(train_loader, val_loader, model, criterion, optimizer, max_epochs, lr,
                 # Download https://developer.nvidia.com/gameworksdownload#?dn=nsight-systems-2023-3 to visualize
                 with Range("Dataload") if is_profiling else no_profiling:
                     batch_data = next(train_loader_iterator)
-                    images_q, images_k = batch_data['q'].cuda(), batch_data['k'].cuda()
+                    images_q, images_k = batch_data['q'], batch_data['k']
                 with Range("forward") if is_profiling else no_profiling:
                     output, target = model(im_q=images_q, im_k=images_k)
+                    target = target.cpu()
                     loss = criterion(output, target)
 
                 with Range("accuracy") if is_profiling else no_profiling:
@@ -196,6 +205,8 @@ def train(train_loader, val_loader, model, criterion, optimizer, max_epochs, lr,
                 'state_dict': model.state_dict(),
                 'optimizer' : optimizer.state_dict(),
             }, model_savename)
+
+        return output
 
     accuracy1_values = list(map(lambda d: d.cpu().item(), accuracy1_values))
     save_data_to_csv(accuracy1_values, os.path.join(out_path, "data", os.path.basename(model_savename).replace("checkpoint_", "accuracy_").replace(".pth.tar", ".csv")), "accuracy")
@@ -258,9 +269,9 @@ def wrap_data(train_data, val_data, batch_size, batch_slide_num, batch_inst_num,
         dl_train = DataLoader(ds_train,
                             batch_sampler=samplers.MySampler(train_data, batch_size, batch_slide_num, batch_inst_num), num_workers=workers)
     else:
-        dl_train = DataLoader(ds_train, batch_size=batch_size, drop_last=True, shuffle=True, num_workers=workers)
+        dl_train = DataLoader(ds_train, batch_size=batch_size, drop_last=True, shuffle=False, num_workers=workers)
 
-    dl_val = DataLoader(ds_val, batch_size=batch_size, num_workers=workers, shuffle=True)
+    dl_val = DataLoader(ds_val, batch_size=batch_size, num_workers=workers, shuffle=False)
     #dl_test = DataLoader(ds_test, batch_size=batch_size, num_workers=workers, shuffle=True)
 
     # first_sample = monai.utils.first(dl_train)
@@ -283,6 +294,7 @@ def wrap_data(train_data, val_data, batch_size, batch_slide_num, batch_inst_num,
 
 def main():
     args = parser.parse_args()
+    reset_seeds()
 
     if args.batch_slide_num > args.batch_size or args.batch_inst_num > args.batch_size:
         print("Looks like you mistook m or n for n: batch_slide_num and batch_inst_num has to be less than batch_size")
@@ -313,10 +325,6 @@ def main():
     if is_distributed:
         torch.distributed.init_process_group(args.dist_backend)
 
-    train_data, val_data, _ = build_file_list(args.data_dir, args.file_list_path)
-    dl_train, dl_val, dl_test = wrap_data(train_data, val_data, args.batch_size, args.batch_slide_num, args.batch_inst_num, args.workers, args.is_profiling, args.condition, is_distributed)
-    print("Dataset Created ...")
-
     if args.seed is not None:
         random.seed(args.seed)
         torch.manual_seed(args.seed)
@@ -329,30 +337,43 @@ def main():
 
     print("=> creating model '{}'".format('x64'))
     print("condition: {}".format(args.condition))
-    model = condssl.builder.MoCo(
-        InceptionV4, args.moco_dim, args.moco_k, args.moco_m, args.moco_t, args.mlp, condition=args.condition, do_checkpoint=not is_distributed)
-    model = model.cuda()
-    if is_distributed:
-        model = torch.nn.parallel.DistributedDataParallel(model)
-    optimizer = torch.optim.SGD(model.parameters(), args.lr,
-                                momentum=args.momentum,
-                                weight_decay=args.weight_decay)
-    print('Model builder done, placed on cuda()')
-    print("Batch size: {}".format(args.batch_size))
+    def do_stuff(do_checkpoint):
+        reset_seeds()
+        train_data, val_data, _ = build_file_list(args.data_dir, args.file_list_path)
+        dl_train, dl_val, dl_test = wrap_data(train_data, val_data, args.batch_size, args.batch_slide_num,
+                                              args.batch_inst_num, args.workers, args.is_profiling, args.condition,
+                                              is_distributed)
+        print("Dataset Created ...")
 
-    if args.resume:
-        print ("Loading checkpoint. Make sure start_epoch is set correctly")
-        checkpoint = torch.load(args.resume)
-        model.load_state_dict(checkpoint['state_dict'])
-        optimizer.load_state_dict(checkpoint['optimizer'])
+        model = condssl.builder.MoCo(InceptionV4, args.moco_dim, args.moco_k, args.moco_m, args.moco_t, args.mlp, condition=args.condition, do_checkpoint=do_checkpoint)
+        if is_distributed:
+            model = torch.nn.parallel.DistributedDataParallel(model)
+        optimizer = torch.optim.SGD(model.parameters(), args.lr,
+                                    momentum=args.momentum,
+                                    weight_decay=args.weight_decay)
+        print('Model builder done')
+        print("Batch size: {}".format(args.batch_size))
 
-    model_name = condssl.builder.MoCo.__name__
-    data_dir_name = list(filter(None, args.data_dir.split(os.sep)))[-1]
-    out_path = os.path.join(args.out_dir, model_name, data_dir_name)
-    model_filename = os.path.join(out_path, 'model', 'checkpoint_{}_{}_#NUM#_{}_m{}_n{}_o{}.pth.tar'.format(model_name, data_dir_name, args.condition, args.batch_size, args.batch_slide_num, args.batch_inst_num))
+        if args.resume:
+            print ("Loading checkpoint. Make sure start_epoch is set correctly")
+            checkpoint = torch.load(args.resume)
+            model.load_state_dict(checkpoint['state_dict'])
+            optimizer.load_state_dict(checkpoint['optimizer'])
 
-    criterion = nn.CrossEntropyLoss().cuda()
-    train(dl_train, dl_val, model, criterion, optimizer, args.epochs, args.lr, args.cos, args.schedule, out_path, model_filename, args.is_profiling, is_distributed)
+        model_name = condssl.builder.MoCo.__name__
+        data_dir_name = list(filter(None, args.data_dir.split(os.sep)))[-1]
+        out_path = os.path.join(args.out_dir, model_name, data_dir_name)
+        model_filename = os.path.join(out_path, 'model', 'checkpoint_{}_{}_#NUM#_{}_m{}_n{}_o{}.pth.tar'.format(model_name, data_dir_name, args.condition, args.batch_size, args.batch_slide_num, args.batch_inst_num))
+
+        criterion = nn.CrossEntropyLoss().cpu()
+        output = train(dl_train, dl_val, model, criterion, optimizer, args.epochs, args.lr, args.cos, args.schedule, out_path, model_filename, args.is_profiling, is_distributed)
+        return output
+    pass_one = do_stuff(False).detach().numpy()
+    pass_two = do_stuff(False).detach().numpy()
+    pass_three = do_stuff(True).detach().numpy()
+    assert np.allclose(pass_one, pass_two, atol=1e-6), "new_y != new_y_verified"
+    assert np.allclose(pass_three, pass_two, atol=1e-6), "new_y != new_y_verified"
+    pass
 
 if __name__ == '__main__':
     #torch.multiprocessing.set_start_method('spawn')
