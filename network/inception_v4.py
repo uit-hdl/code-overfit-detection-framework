@@ -24,7 +24,7 @@ class BasicConv2d(nn.Module):
 
     def forward(self, x):
         if self.do_checkpoint:
-            x = checkpoint_sequential(nn.Sequential(self.conv, self.bn, self.relu), 1, x)
+            x = checkpoint_sequential(nn.Sequential(self.conv, self.bn, self.relu), 2, x)
             return x
         else:
             x = self.conv(x)
@@ -75,15 +75,15 @@ if __name__ == "__main__":
 
     reset_seeds()
 
-    x2_v = torch.tensor(data, dtype=torch.float32, requires_grad=False)
-    model2_v = BasicConv2d(in_planes, out_planes, kernel_size=kernel_size, do_checkpoint=True, stride=2)
-    y_checkpointed_no_grad = model2_v(x2_v)
+    x2_v_nograd = torch.tensor(data, dtype=torch.float32, requires_grad=False)
+    model2_v_for_nograd = BasicConv2d(in_planes, out_planes, kernel_size=kernel_size, do_checkpoint=True, stride=2)
+    y_checkpointed_no_grad = model2_v_for_nograd(x2_v_nograd)
     #y = torch.tensor(2, dtype=torch.float32, requires_grad=True)
     pass
     #y = torch.tensor(2, dtype=torch.float32, requires_grad=True)
     pass
 
-    target = np.array([[[[0.5000e+00, 0.5000e+00], [0.5000e+00, 0.5000e+00]], [[0.5000e+00, 0.5000e+00], [0.5000e+00, 0.5000e+00]],
+    tensor_data = np.array([[[[0.5000e+00, 0.5000e+00], [0.5000e+00, 0.5000e+00]], [[0.5000e+00, 0.5000e+00], [0.5000e+00, 0.5000e+00]],
          [[2.1166e-07, 2.1166e-07],
           [2.1166e-07, 2.1166e-07]],
          [[0.5000e+00, 0.5000e+00],
@@ -94,7 +94,7 @@ if __name__ == "__main__":
 
     reset_seeds()
 
-    target = torch.tensor(target, dtype=torch.float32, requires_grad=True)
+    target = torch.tensor(tensor_data, dtype=torch.float32, requires_grad=True)
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.SGD(model.parameters(), 0.001, momentum=0.1, weight_decay=1e-2)
     loss = criterion(y, target)
@@ -103,7 +103,7 @@ if __name__ == "__main__":
     optimizer.step()
 
 
-    target = torch.tensor(target, dtype=torch.float32, requires_grad=True)
+    target = torch.tensor(tensor_data, dtype=torch.float32, requires_grad=True)
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.SGD(model_v.parameters(), 0.001, momentum=0.1, weight_decay=1e-2)
     loss = criterion(y_v, target)
@@ -118,7 +118,7 @@ if __name__ == "__main__":
 
     #reset_seeds()
 
-    target = torch.tensor(target, dtype=torch.float32, requires_grad=False)
+    target = torch.tensor(tensor_data, dtype=torch.float32, requires_grad=False)
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.SGD(model2.parameters(), 0.001, momentum=0.1, weight_decay=1e-2)
     loss = criterion(y_checkpointed, target)
@@ -126,16 +126,30 @@ if __name__ == "__main__":
     loss.backward()
     optimizer.step()
 
+    target = torch.tensor(tensor_data, dtype=torch.float32, requires_grad=False)
+    criterion = nn.CrossEntropyLoss()
+    optimizer = torch.optim.SGD(model2_v_for_nograd.parameters(), 0.001, momentum=0.1, weight_decay=1e-2)
+    loss = criterion(y_checkpointed_no_grad, target)
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()
+
     new_y_checkpointed = model2(x2).detach().numpy()
+    new_y_checkpointed_nograd = model2_v_for_nograd(x2_v_nograd).detach().numpy()
+
     # flatten arrays
     new_y = new_y.flatten()
     new_y_verified = new_y_verified.flatten()
     new_y_checkpointed = new_y_checkpointed.flatten()
+    new_y_checkpointed_no_grad = new_y_checkpointed_nograd.flatten()
 
     # check if new_y == new_y_verified
     assert np.allclose(new_y, new_y_verified, atol=1e-6), "new_y != new_y_verified"
     # check if new_y == new_y_checkpointed
     assert np.allclose(new_y, new_y_checkpointed, atol=1e-6), "new_y != new_y_checkpointed"
+
+    assert np.allclose(new_y_checkpointed, new_y_checkpointed_no_grad, atol=1e-6), "new_y_checkpointed != new_y_checkpointed_no_grad"
+
 
 
 class Mixed_3a(nn.Module):
