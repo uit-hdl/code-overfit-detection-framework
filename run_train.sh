@@ -21,13 +21,12 @@ do
   n="$(basename "${model}" | command grep -Eo "n[0-9]+" | cut -c2-)"
   o="$(basename "${model}" | command grep -Eo "o[0-9]+" | cut -c2-)"
   c="$(basename "${model}" | command grep -Eo "True|False")"
-  out_dir="${model_dir}/out${m}${n}${o}${c}"
-  mkdir "${out_dir}"
-  echo "m:$m n:$n o:$o c:$c" | tee "$out_dir/train_params.txt"
+  echo "m:$m n:$n o:$o c:$c"
   set -xe
-  python ./train_model/train_ssl.py \
+  ipython ./train_model/train_ssl.py -- \
 	--data-dir "${SRC_DIR}" \
 	--batch_slide_num "${n}" \
+	--batch_inst_num "${o}" \
 	--out-dir "${out_dir}" 
         --batch-size "${m}" \
         --condition "${c}" \
