@@ -9,7 +9,7 @@ from torch.utils.checkpoint import checkpoint_sequential
 
 class BasicConv2d(nn.Module):
 
-    def __init__(self, in_planes, out_planes, kernel_size, stride, padding=0):
+    def __init__(self, in_planes, out_planes, kernel_size, stride, do_checkpoint=False, padding=0):
         super(BasicConv2d, self).__init__()
         self.conv = nn.Conv2d(in_planes, out_planes,
                               kernel_size=kernel_size, stride=stride,
@@ -20,11 +20,122 @@ class BasicConv2d(nn.Module):
                                  affine=True)
         self.relu = nn.ReLU(inplace=True)
 
+        self.do_checkpoint = do_checkpoint
+
     def forward(self, x):
-        x = self.conv(x)
-        x = self.bn(x)
-        x = self.relu(x)
-        return x
+        if self.do_checkpoint:
+            x = checkpoint_sequential(nn.Sequential(self.conv, self.bn, self.relu), 1, x)
+            return x
+        else:
+            x = self.conv(x)
+            x = self.bn(x)
+            x = self.relu(x)
+            return x
+
+if __name__ == "__main__":
+    import random
+    import numpy as np
+    def reset_seeds():
+        torch.manual_seed(0)
+        random.seed(0)
+        np.random.seed(0)
+        torch.use_deterministic_algorithms(True)
+        torch.backends.cudnn.benchmark = False
+    reset_seeds()
+
+    # generate a numpy 3d array with numbers 1 to 9 with shape 1, 3, 1, 1
+    #data = np.arange(1, 10).reshape(1, 3, 1, 1)
+    data = np.array([[[[1,1,1], [1,1,1], [1,1,1]], [[1,1,1], [1,1,1], [1,1,1]],[[1,1,1], [1,1,1], [1,1,1]]]])
+    in_planes = 3
+    out_planes = 5
+    kernel_size = 1
+
+
+    x = torch.tensor(data, dtype=torch.float32, requires_grad=True)
+    model = BasicConv2d(in_planes, out_planes, kernel_size=kernel_size, stride=2)
+    y = model(x)
+
+    reset_seeds()
+
+    x_v = torch.tensor(data, dtype=torch.float32, requires_grad=True)
+    model_v = BasicConv2d(in_planes, out_planes, kernel_size=kernel_size, stride=2)
+    y_v = model_v(x_v)
+
+    reset_seeds()
+
+    x_grad_false = torch.tensor(data, dtype=torch.float32, requires_grad=False)
+    model.do_checkpoint = True
+    y_grad_false_orig_model = model(x_grad_false)
+
+    reset_seeds()
+
+    x2 = torch.tensor(data, dtype=torch.float32, requires_grad=True)
+    model2 = BasicConv2d(in_planes, out_planes, kernel_size=kernel_size, do_checkpoint=True, stride=2)
+    y_checkpointed = model2(x2)
+
+    reset_seeds()
+
+    x2_v = torch.tensor(data, dtype=torch.float32, requires_grad=False)
+    model2_v = BasicConv2d(in_planes, out_planes, kernel_size=kernel_size, do_checkpoint=True, stride=2)
+    y_checkpointed_no_grad = model2_v(x2_v)
+    #y = torch.tensor(2, dtype=torch.float32, requires_grad=True)
+    pass
+    #y = torch.tensor(2, dtype=torch.float32, requires_grad=True)
+    pass
+
+    target = np.array([[[[0.5000e+00, 0.5000e+00], [0.5000e+00, 0.5000e+00]], [[0.5000e+00, 0.5000e+00], [0.5000e+00, 0.5000e+00]],
+         [[2.1166e-07, 2.1166e-07],
+          [2.1166e-07, 2.1166e-07]],
+         [[0.5000e+00, 0.5000e+00],
+          [0.5000e+00, 0.5000e+00]],
+         [[1.0905e-06, 1.0905e-06],
+          [1.0905e-06, 1.0905e-06]]]])
+
+
+    reset_seeds()
+
+    target = torch.tensor(target, dtype=torch.float32, requires_grad=True)
+    criterion = nn.CrossEntropyLoss()
+    optimizer = torch.optim.SGD(model.parameters(), 0.001, momentum=0.1, weight_decay=1e-2)
+    loss = criterion(y, target)
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()
+
+
+    target = torch.tensor(target, dtype=torch.float32, requires_grad=True)
+    criterion = nn.CrossEntropyLoss()
+    optimizer = torch.optim.SGD(model_v.parameters(), 0.001, momentum=0.1, weight_decay=1e-2)
+    loss = criterion(y_v, target)
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()
+
+    new_y = model(x).detach().numpy()
+    new_y_verified = model_v(x_v).detach().numpy()
+
+    pass
+
+    #reset_seeds()
+
+    target = torch.tensor(target, dtype=torch.float32, requires_grad=False)
+    criterion = nn.CrossEntropyLoss()
+    optimizer = torch.optim.SGD(model2.parameters(), 0.001, momentum=0.1, weight_decay=1e-2)
+    loss = criterion(y_checkpointed, target)
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()
+
+    new_y_checkpointed = model2(x2).detach().numpy()
+    # flatten arrays
+    new_y = new_y.flatten()
+    new_y_verified = new_y_verified.flatten()
+    new_y_checkpointed = new_y_checkpointed.flatten()
+
+    # check if new_y == new_y_verified
+    assert np.allclose(new_y, new_y_verified, atol=1e-6), "new_y != new_y_verified"
+    # check if new_y == new_y_checkpointed
+    assert np.allclose(new_y, new_y_checkpointed, atol=1e-6), "new_y != new_y_checkpointed"
 
 
 class Mixed_3a(nn.Module):
