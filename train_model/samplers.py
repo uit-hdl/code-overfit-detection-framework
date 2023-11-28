@@ -33,12 +33,13 @@ class MySampler(Sampler):
         for confounder, tiles in confound2tiles.items():
             random.shuffle(tiles)
             indices = [tiles[i:i + batch_size] for i in range(0, len(tiles), batch_size)]
-            # Prune if a chunk created above is less than `batch_slide_num`
+            # If we have a chunk which is not "whole", i.e. < batch_size
             if len(indices[-1]) < batch_size:
-                items_to_fill = batch_size - len(indices[-1])
-                for i in range(items_to_fill):
-                    random_index = random.choice(tiles)
-                    indices[-1].append(random_index)
+                indices = indices[:-1]
+                #items_to_fill = batch_size - len(indices[-1])
+                #for i in range(items_to_fill):
+                    #random_index = random.choice(tiles)
+                    #indices[-1].append(random_index)
             if indices:
                 random.shuffle(indices)
                 tile_chunks[confounder] += indices
