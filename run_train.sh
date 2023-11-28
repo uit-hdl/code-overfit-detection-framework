@@ -27,10 +27,11 @@ do
 	--data-dir "${SRC_DIR}" \
 	--batch_slide_num "${n}" \
 	--batch_inst_num "${o}" \
-	--out-dir "${model_out}" 
-        --batch-size "${m}" \
-        --condition "${c}" \
-      	--workers 6
+	--out-dir "${model_out}"  \
+  --batch-size "${m}" \
+  --condition "${c}" \
+  --workers 6 \
+      | tee "${model_out}"/train_ssl_"${m}"_"${n}"_"${o}"_"${c}".log
   set +xe
 done
 
