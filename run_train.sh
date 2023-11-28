@@ -22,17 +22,21 @@ do
   o="$(basename "${model}" | command grep -Eo "o[0-9]+" | cut -c2-)"
   c="$(basename "${model}" | command grep -Eo "True|False")"
   echo "m:$m n:$n o:$o c:$c"
+  if [[ "$c" == True ]]
+  then
+	  cond="--condition"
+  else
+	  cond="--no-condition"
+  fi
   set -xe
   ipython ./train_model/train_ssl.py -- \
 	--data-dir "${SRC_DIR}" \
 	--batch_slide_num "${n}" \
 	--batch_inst_num "${o}" \
-	--out-dir "${model_out}"  \
-  --batch-size "${m}" \
-  --condition "${c}" \
-  --workers 6 \
-      | tee "${model_out}"/train_ssl_"${m}"_"${n}"_"${o}"_"${c}".log
+	--out-dir "${model_out}" \
+	--batch-size "${m}" \
+	"${cond}" \
+	--workers 6 \
+	    | tee "${model_out}/train_ssl_${m}_${n}_${o}_${c}.log"
   set +xe
 done
-
-set -xe
