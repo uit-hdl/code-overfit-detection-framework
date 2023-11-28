@@ -276,6 +276,8 @@ def wrap_data(train_data, val_data, batch_size, batch_slide_num, batch_inst_num,
 
     print ("Number of images in DL: {}".format(len(ds_train)))
     print ("Number of batches in DL: {}".format(len(dl_train)))
+    dropped_off_tiles = len(dl_train.dataset) - (len(dl_train) * dl_train.batch_sampler.batch_size)
+    print(f"dropped_off_tiles: {dropped_off_tiles}")
 
     print("Dataset Created ...")
     return dl_train, dl_val, None
