@@ -139,8 +139,8 @@ def train(train_loader, val_loader, model, criterion, optimizer, max_epochs, lr,
         print(f"epoch {epoch}/{max_epochs}")
         model.train()
         epoch_loss = 0
-        acc5 = 0
-        acc1 = 0
+        acc5_total = 0
+        acc1_total = 0
         train_loader_iterator = iter(train_loader)
         adjust_learning_rate(optimizer, epoch, lr, cos, schedule, max_epochs)
 
@@ -164,7 +164,6 @@ def train(train_loader, val_loader, model, criterion, optimizer, max_epochs, lr,
 
                 with Range("accuracy") if is_profiling else no_profiling:
                     acc1, acc5 = accuracy(output, target, topk=(1, 5))
-                    acc1, acc5 = acc1[0], acc5[0]
 
                 # compute gradient and do SGD step
                 optimizer.zero_grad()
@@ -174,17 +173,17 @@ def train(train_loader, val_loader, model, criterion, optimizer, max_epochs, lr,
                     optimizer.step()
 
                 epoch_loss += loss.item()
-                acc5 += acc5
-                acc1 += acc1
+                acc5_total += acc5
+                acc1_total += acc1
                 print(
                         f"{step}/{len(train_loader)}, train_loss: {loss.item():.4f} acc1: {acc1:.2f} acc5: {acc5:.2f} step time: {(time.time() - step_start):.4f}"
                 )
         epoch_loss /= step
         epoch_loss_values.append(epoch_loss)
-        acc5 /= step
-        accuracy5_values.append(acc5)
-        acc1 /= step
-        accuracy1_values.append(acc1)
+        acc5_total /= step
+        accuracy5_values.append(acc5_total)
+        acc1_total /= step
+        accuracy1_values.append(acc1_total)
         print(f"epoch {epoch} average loss: {epoch_loss:.4f}")
 
         if not epoch % 20 or epoch == max_epochs:
