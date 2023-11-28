@@ -85,6 +85,9 @@ class MySampler(Sampler):
                 # shuffle order of images
                 random.shuffle(queue)
                 ret.append(queue)
+            # prune away the last drop-off layer
+            if len(ret[-1]) != self.batch_size:
+                ret = ret[:-1]
             return iter(ret)
 
     def __len__(self):
