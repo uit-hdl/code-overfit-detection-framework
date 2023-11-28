@@ -1,25 +1,21 @@
 import argparse
-import glob
+import csv
 import os.path
 import random
-import csv
-import tempfile
 import sys
+import tempfile
 import time
 import warnings
-from collections import defaultdict
-
-import monai.utils
-from sklearn.model_selection import train_test_split
 
 import monai.transforms as mt
 import torch.backends.cudnn as cudnn
 import torch.nn as nn
 import torchvision.transforms as transforms
-from monai.data import DataLoader, Dataset, set_track_meta, CacheDataset, PersistentDataset, SmartCacheDataset, ImageDataset, CacheNTransDataset
-from torch.utils.data import Sampler, DistributedSampler
+from monai.data import DataLoader, Dataset, set_track_meta
+from torch.utils.data import Sampler
 
 import samplers
+
 sys.path.append("../")
 import condssl.builder
 import condssl.loader
@@ -27,15 +23,9 @@ from global_util import build_file_list, ensure_dir_exists
 
 from network.inception_v4 import InceptionV4
 from train_util import *
-import nvtx
-import monai.utils
 from monai.utils import Range
 import contextlib
 no_profiling = contextlib.nullcontext()
-
-from itertools import zip_longest
-
-
 
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
 # parser.add_argument('data', metavar='DIR',
@@ -237,13 +227,8 @@ def wrap_data(train_data, val_data, batch_size, batch_slide_num, batch_inst_num,
         ]
     )
 
-    #ds_train = PersistentDataset(train_data, transformations, cache_dir="/var/cache/monai")
-    #ds_train = CacheNTransDataset(train_data, transformations, cache_n_trans=7, cache_dir="/var/cache/monai")
-    #ds_train = CacheDataset(train_data, transformations)
     ds_train = Dataset(train_data, transformations)
-    #ds_val = Dataset(val_data, transformations)
     ds_val = Dataset(val_data, val_transformations)
-    #ds_test = Dataset(test_data, val_transformations)
 
     if is_distributed:
         train_sampler = torch.utils.data.distributed.DistributedSampler(ds_train)
@@ -256,19 +241,6 @@ def wrap_data(train_data, val_data, batch_size, batch_slide_num, batch_inst_num,
         dl_train = DataLoader(ds_train, batch_size=batch_size, drop_last=True, shuffle=True, num_workers=workers)
 
     dl_val = DataLoader(ds_val, batch_size=batch_size, num_workers=workers, shuffle=True)
-    #dl_test = DataLoader(ds_test, batch_size=batch_size, num_workers=workers, shuffle=True)
-
-    # first_sample = monai.utils.first(dl_train)
-    # if first_sample is None:
-    #     raise ValueError("First sample is None!")
-    # for d in ["q", "k"]:
-    #     print(
-    #         f"[{d}] \n"
-    #         f"  {d} shape: {first_sample[d].shape}\n"
-    #         f"  {d} type:  {type(first_sample[d])}\n"
-    #         f"  {d} dtype: {first_sample[d].dtype}"
-    #     )
-    #del first_sample
 
     print ("Number of images in DL: {}".format(len(ds_train)))
     print ("Number of batches in DL: {}".format(len(dl_train)))
@@ -276,7 +248,7 @@ def wrap_data(train_data, val_data, batch_size, batch_slide_num, batch_inst_num,
     print(f"dropped_off_tiles: {dropped_off_tiles}")
 
     print("Dataset Created ...")
-    return dl_train, dl_val, None
+    return dl_train, dl_val
 
 def main():
     args = parser.parse_args()
@@ -311,7 +283,7 @@ def main():
         torch.distributed.init_process_group(args.dist_backend)
 
     train_data, val_data, _ = build_file_list(args.data_dir, args.file_list_path)
-    dl_train, dl_val, dl_test = wrap_data(train_data, val_data, args.batch_size, args.batch_slide_num, args.batch_inst_num, args.workers, args.is_profiling, args.condition, is_distributed)
+    dl_train, dl_val = wrap_data(train_data, val_data, args.batch_size, args.batch_slide_num, args.batch_inst_num, args.workers, args.is_profiling, args.condition, is_distributed)
     print("Dataset Created ...")
 
     if args.seed is not None:
@@ -352,5 +324,4 @@ def main():
     train(dl_train, dl_val, model, criterion, optimizer, args.epochs, args.lr, args.cos, args.schedule, out_path, model_filename, args.is_profiling, is_distributed)
 
 if __name__ == '__main__':
-    #torch.multiprocessing.set_start_method('spawn')
     main()
