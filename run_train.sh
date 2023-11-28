@@ -27,7 +27,7 @@ do
 	--data-dir "${SRC_DIR}" \
 	--batch_slide_num "${n}" \
 	--batch_inst_num "${o}" \
-	--out-dir "${out_dir}" 
+	--out-dir "${model_out}" 
         --batch-size "${m}" \
         --condition "${c}" \
       	--workers 6
