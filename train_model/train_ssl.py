@@ -221,8 +221,6 @@ def wrap_data(train_data, val_data, batch_size, batch_slide_num, batch_inst_num,
             range_func("Flip1", mt.RandFlipd(["q", "k"], prob=0.5, spatial_axis=1)),
             range_func("ToTensor", mt.ToTensord(["q", "k"], track_meta=False)),
             range_func("EnsureType", mt.EnsureTyped(["q", "k"], track_meta=False)),
-            # TODO: test this
-            #range_func("ToDeviced", mt.ToDeviced(["q", "k"], device="cuda:0")),
         ]
     )
 
@@ -236,8 +234,6 @@ def wrap_data(train_data, val_data, batch_size, batch_slide_num, batch_inst_num,
             mt.RandFlipd(["q", "k"], prob=0.5, spatial_axis=0),
             mt.RandFlipd(["q", "k"], prob=0.5, spatial_axis=1),
             mt.ToTensord(["q", "k"], track_meta=False),
-            # TODO: test this
-            #range_func("ToDeviced", mt.ToDeviced(["q", "k"], device="cuda:0")),
         ]
     )
 
