@@ -451,10 +451,10 @@ class InceptionV4(nn.Module):
         return x
 
     def forward(self, input):
-        if self.do_checkpoint:
-            x = checkpoint_sequential(self.features, 4, input)
-        else:
-            x = self.features(input)
+        #if self.do_checkpoint:
+            #x = checkpoint_sequential(self.features, 4, input)
+        #else:
+        x = self.features(input)
         x = self.logits(x)
         return x
 

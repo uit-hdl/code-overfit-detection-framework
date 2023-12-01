@@ -186,7 +186,6 @@ def train(train_loader, val_loader, model, criterion, optimizer, max_epochs, lr,
                 'optimizer' : optimizer.state_dict(),
             }, model_savename)
 
-    accuracy1_values = list(map(lambda d: d.cpu().item(), accuracy1_values))
     save_data_to_csv(accuracy1_values, os.path.join(out_path, "data", os.path.basename(model_savename).replace("checkpoint_", "accuracy_").replace(".pth.tar", ".csv")), "accuracy")
     save_data_to_csv(epoch_loss_values, os.path.join(out_path, "data", os.path.basename(model_savename).replace("checkpoint_", "loss_").replace(".pth.tar", ".csv")), "loss")
 
@@ -299,7 +298,7 @@ def main():
     print("=> creating model '{}'".format('x64'))
     print("condition: {}".format(args.condition))
     model = condssl.builder.MoCo(
-        InceptionV4, args.moco_dim, args.moco_k, args.moco_m, args.moco_t, args.mlp, condition=args.condition, do_checkpoint=not is_distributed)
+        base_encoder=InceptionV4, dim=args.moco_dim, K=args.moco_k, m=args.moco_m, T=args.moco_t, mlp=args.mlp, condition=args.condition, do_checkpoint=not is_distributed)
     model = model.cuda()
     if is_distributed:
         model = torch.nn.parallel.DistributedDataParallel(model)

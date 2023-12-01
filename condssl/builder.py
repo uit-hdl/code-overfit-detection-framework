@@ -131,7 +131,7 @@ class MoCo(nn.Module):
         """
 
         # compute query features
-        q = self.encoder_q(im_q)  # queries: NxC
+        q = self.encoder_q(im_q)  # queries: NxC, where N is the number of images and C is the number of dimensions from the encoder (args.moco-dim)
         q = nn.functional.normalize(q, dim=1)
 
         # compute key features
@@ -148,11 +148,10 @@ class MoCo(nn.Module):
             #k = self._batch_unshuffle_ddp(k, idx_unshuffle)
 
 
-        # TODO: why does the model need to know about conditionals? commenting out...
-        #if self.condition:
-            #logits = torch.mm(q, k.T) / self.T
-            #labels = torch.arange(logits.shape[0], dtype=torch.long).cuda()
-            #return logits, labels
+        if self.condition:
+            logits = torch.mm(q, k.T) / self.T
+            labels = torch.arange(logits.shape[0], dtype=torch.long).cuda()
+            return logits, labels
 
         #else:
             # compute logits
@@ -161,7 +160,8 @@ class MoCo(nn.Module):
         l_pos = torch.einsum('nc,nc->n', [q, k]).unsqueeze(-1)
 
         # negative logits: NxK
-        l_neg = torch.einsum('nc,ck->nk', [q, self.queue.clone().detach()])
+        k_neg = self.queue.clone().detach()
+        l_neg = torch.einsum('nc,ck->nk', [q, k_neg])
 
         # logits: Nx(1+K)
         logits = torch.cat([l_pos, l_neg], dim=1)
