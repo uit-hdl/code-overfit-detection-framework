@@ -924,7 +924,7 @@ l = [(y[0], institution_lookup[y[1]]) for y in l]
 counts, institutions = zip(*l)
 sorted_inst = sorted(institutions, key=lambda x: counts[institutions.index(x)])
 
-p_slide = figure(x_range=sorted_inst, height=750, title="Institution Tile Counts", toolbar_location=None, tools="")
+p_slide = figure(x_range=sorted_inst, height=750, title="Institution Tile Counts")
 p_slide.vbar(x=sorted_inst, top=counts, width=0.9)
 p_slide.xgrid.grid_line_color = None
 p_slide.y_range.start = 0
