@@ -451,35 +451,9 @@ class InceptionV4(nn.Module):
         return x
 
     def forward(self, input):
-        #if self.do_checkpoint:
-            #x = checkpoint_sequential(self.features, 4, input)
-        #else:
-        x = self.features(input)
+        if self.do_checkpoint:
+            x = checkpoint_sequential(self.features, 4, input)
+        else:
+            x = self.features(input)
         x = self.logits(x)
         return x
-
-
-def inceptionv4(num_classes=1000, pretrained='imagenet'):
-    if pretrained:
-        settings = pretrained_settings['inceptionv4'][pretrained]
-        assert num_classes == settings['num_classes'], \
-            "num_classes should be {}, but is {}".format(settings['num_classes'], num_classes)
-
-        # both 'imagenet'&'imagenet+background' are loaded from same parameters
-        model = InceptionV4(num_classes=1001)
-        model.load_state_dict(model_zoo.load_url(settings['url']))
-
-        if pretrained == 'imagenet':
-            new_last_linear = nn.Linear(1536, 1000)
-            new_last_linear.weight.data = model.last_linear.weight.data[1:]
-            new_last_linear.bias.data = model.last_linear.bias.data[1:]
-            model.last_linear = new_last_linear
-
-        model.input_space = settings['input_space']
-        model.input_size = settings['input_size']
-        model.input_range = settings['input_range']
-        model.mean = settings['mean']
-        model.std = settings['std']
-    else:
-        model = InceptionV4(num_classes=num_classes)
-    return model
