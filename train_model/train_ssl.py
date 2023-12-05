@@ -317,7 +317,7 @@ def main():
     model_name = condssl.builder.MoCo.__name__
     data_dir_name = list(filter(None, args.data_dir.split(os.sep)))[-1]
     out_path = os.path.join(args.out_dir, model_name, data_dir_name)
-    model_filename = os.path.join(out_path, 'model', 'checkpoint_{}_{}_#NUM#_{}_m{}_n{}_o{}.pth.tar'.format(model_name, data_dir_name, args.condition, args.batch_size, args.batch_slide_num, args.batch_inst_num))
+    model_filename = os.path.join(out_path, 'model', 'checkpoint_{}_{}_#NUM#_{}_m{}_n{}_o{}_K{}.pth.tar'.format(model_name, data_dir_name, args.condition, args.batch_size, args.batch_slide_num, args.batch_inst_num, args.moco_k))
 
     criterion = nn.CrossEntropyLoss().cuda()
     train(dl_train, dl_val, model, criterion, optimizer, args.epochs, args.lr, args.cos, args.schedule, out_path, model_filename, args.is_profiling, is_distributed)
