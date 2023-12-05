@@ -179,6 +179,7 @@ def train(train_loader, val_loader, model, criterion, optimizer, max_epochs, lr,
         if not epoch % 20 or epoch == max_epochs:
             model_savename = model_filename.replace("#NUM#", "{:04d}".format(epoch))
             ensure_dir_exists(model_savename)
+            print("Saved model to %s" % model_savename)
             torch.save({
                 'epoch': epoch,
                 'arch': 'x64',

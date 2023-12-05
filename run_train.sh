@@ -35,8 +35,7 @@ do
 	--out-dir "${model_out}" \
 	--batch-size "${m}" \
 	--moco-k "${k}" \
-	--epochs 1 \
-  	--moco-k "${m}" \
+	--epochs 200 \
 	"${cond}" \
 	--workers 6 \
 	    | tee "${model_out}/train_ssl_${m}_${n}_${o}_${c}_${k}.log"
