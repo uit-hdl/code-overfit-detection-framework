@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
-from bokeh.plotting import save, figure, show
+from bokeh.models import FuncTickFormatter, CustomJSTickFormatter
+from bokeh.plotting import save, figure, show, output_file
 from bokeh.layouts import layout
 
 data = """156 66
@@ -38,6 +39,12 @@ data = """156 66
 1 J1
 1 79
 1 6A"""
+
+49355+32685+25694
+
+107734
+40.868863
+
 
 slide_data = """49355 85
 32686 39
@@ -907,13 +914,52 @@ institution_lookup = {
 "ZX": "University of Alabama",
 }
 
+# for inst in $(egrep -o "TCGA-.{2}" /tmp/a | sed 's/TCGA-//' | sort | uniq); do echo -n "$inst "; egrep "TCGA-$inst" /tmp/a | cut -d' ' -f1 | command paste -sd+ | bc;  done | sort -k2 -n -r
+file_data = """85 51117491520
+39 15966219057
+66 14788446666
+60 11825285922
+22 10731198007
+43 9453050623
+34 9181833187
+33 8506729006
+77 7691365176
+21 6565305568
+56 6394610684
+63 5604613560
+58 5251705762
+98 5142978817
+37 4188176915
+18 3578723746
+NC 3238230608
+90 2875555982
+92 2077446131
+O2 1777062090
+94 1720031480
+52 1566273126
+70 1403472106
+46 1330393864
+96 1042197489
+NK 902421977
+51 884452955
+68 821520000
+L3 662144590
+LA 476958754
+XC 315494607
+6A 254700479
+MF 223828307
+J1 148674187
+79 31503355"""
+
 l = [x.strip().split() for x in data.split("\n")]
 l = [(y[0], institution_lookup[y[1]]) for y in l]
 counts, institutions = zip(*l)
-sorted_inst = sorted(institutions, key=lambda x: counts[institutions.index(x)])
+#sorted_inst = sorted(institutions, key=lambda x: counts[institutions.index(x)])
 
-p = figure(x_range=sorted_inst, height=750, title="Institution Slide Counts", toolbar_location=None, tools="")
-p.vbar(x=sorted_inst, top=counts, width=0.9)
+output_file("plot_dists.html", title="Instituion Dist Plots")
+
+p = figure(x_range=institutions, height=750, title="Institution Slide Counts")
+p.vbar(x=institutions, top=counts, width=0.9)
 p.xgrid.grid_line_color = None
 p.y_range.start = 0
 p.xaxis.major_label_orientation = np.pi / 2.0
@@ -922,14 +968,26 @@ p.xaxis.major_label_orientation = np.pi / 2.0
 l = [x.strip().split() for x in slide_data.split("\n")]
 l = [(y[0], institution_lookup[y[1]]) for y in l]
 counts, institutions = zip(*l)
-sorted_inst = sorted(institutions, key=lambda x: counts[institutions.index(x)])
 
-p_slide = figure(x_range=sorted_inst, height=750, title="Institution Tile Counts")
-p_slide.vbar(x=sorted_inst, top=counts, width=0.9)
+p_slide = figure(x_range=institutions, height=750, title="Institution Tile Counts")
+p_slide.vbar(x=institutions, top=counts, width=0.9)
 p_slide.xgrid.grid_line_color = None
 p_slide.y_range.start = 0
 p_slide.xaxis.major_label_orientation = np.pi / 2.0
 #show(p)
 
-gp = layout([p], [p_slide])
-show(gp)
+
+l = [x.strip().split() for x in file_data.split("\n")]
+l = [(institution_lookup[y[0]], y[1]) for y in l]
+institutions, counts = zip(*l)
+p_disk = figure(x_range=institutions, height=750, title="Institution Disk Usage")
+p_disk.vbar(x=institutions, top=counts, width=0.9)
+p_disk.xgrid.grid_line_color = None
+p_disk.y_range.start = 0
+p_disk.xaxis.major_label_orientation = np.pi / 2.0
+p_disk.yaxis.formatter = CustomJSTickFormatter(code='''return (tick/1000000000) + ' ' + 'GB';''')
+#show(p)
+
+
+gp = layout([p], [p_slide, p_disk])
+save(gp)
