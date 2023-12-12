@@ -156,7 +156,10 @@ def compute_histograms_overlap(plot_data, data_key, unique_labels, no_bins):
             overlaps[label_left][label_right] = scipy.stats.kendalltau(count_left, count_right).correlation
 
         #overlaps[label_left]["all"] = scipy.stats.kendalltau(count_left, all_counts - count_left).correlation
-        overlaps[label_left]["all"] = np.mean(list(overlaps[label_left].values()))
+        if len(overlaps[label_left].keys()) == 0:
+            overlaps[label_left]["all"] = 0.0
+        else:
+            overlaps[label_left]["all"] = np.mean(list(overlaps[label_left].values()))
 
 
     mean_overlap = np.mean([x["all"] for x in overlaps.values()])
@@ -420,6 +423,8 @@ def main(clinical_path, embeddings_path, thumbnail_path, histogram_bins, n_clust
         umap_plots.append(plot)
 
     out_html = os.path.join(out_dir, "web", "condssl_out_{}_{}.html".format(number_of_images, histogram_bins))
+    #inst_umap_overlap = list(filter(lambda x: x.data_key == "institution", umap_plots))[0].mean_overlap
+    #out_html = out_html.replace(".html", "_{}.html".format(inst_umap_overlap))
     ensure_dir_exists(out_html)
 
     viz_data(mapper, data, keys_chosen, knn, knc, cpd, thumbnail_path, out_html, umap_plots)
