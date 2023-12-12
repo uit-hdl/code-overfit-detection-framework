@@ -1,11 +1,10 @@
-import os
-import monai.transforms as mt
 import argparse
+import os
 import pickle
 from collections import defaultdict
 from pathlib import Path
+
 from sklearn.mixture import GaussianMixture
-from pathlib import Path
 
 parser = argparse.ArgumentParser(description='Compute overlaps')
 

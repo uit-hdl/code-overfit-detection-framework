@@ -285,6 +285,7 @@ class UmapPlot:
         ordering["all"] = len(self.unique_labels)
 
         counts = []
+        # convert the overlaps into a 2d-matrix
         for key,d in overlaps.items():
             dst_array = [0] * (len(self.unique_labels) + 1)
             for key2,v in d.items():
@@ -337,7 +338,7 @@ def viz_data(mapper, data, names, knn, knc, cpd, thumbnail_path, out_html, umap_
         data = dict(keys=list(map(str, plot.unique_labels)) + ["all"])
         columns = []
         for i,overlap in enumerate(plot.overlaps):
-            data[f"counts_{i+1}"] = list(map(lambda f: f"{f:.2%}" if f != 0.0 else "-", overlap))
+            data[f"counts_{i+1}"] = list(map(lambda f: f"{f:.2}" if f != 0.0 else "-", overlap))
             columns.append(TableColumn(field=f"counts_{i+1}", title=str(plot.unique_labels[i])))
         source = ColumnDataSource(data)
         columns = [ TableColumn(field="keys", title=plot.title)] + columns
@@ -381,11 +382,11 @@ def main(clinical_path, embeddings_path, thumbnail_path, histogram_bins, n_clust
     keys_random = random.sample(keys_sorted, len(keys_sorted))
 
     number_of_images = min(number_of_images, len(keys_sorted))
-    #keys_chosen = keys_sorted[:number_of_images]
+    keys_chosen = keys_sorted[:number_of_images]
     #keys_chosen = keys_random[:number_of_images]
     #keys_chosen = ["TCGA-60-2698-01A-01-TS1", "TCGA-22-4596-01A-01-TS1", "TCGA-21-1077-01A-01-TS1", "TCGA-39-5019-11A-01-TS1", "TCGA-85-7950-01A-01-TS1", "TCGA-34-2608-11A-01-BS1", "TCGA-58-8387-11A-01-TS1", "TCGA-85-8353-01A-01-BS1", "TCGA-85-8664-01A-01-TS1", "TCGA-33-4532-01A-01-TS1", "TCGA-60-2698-01A-01-TS1", "TCGA-51-4080-01A-01-BS1", "TCGA-85-8664-01A-01-TS1", "TCGA-85-8666-01A-01-BS1", "TCGA-60-2716-01A-01-BS1", "TCGA-39-5034-01A-01-BS1", "TCGA-66-2783-01A-01-BS1", "TCGA-39-5011-01A-01-BS1", "TCGA-85-8355-01A-01-TS1", "TCGA-L3-A4E7-01A-01-TSA"]
     #keys_chosen = ["TCGA-39-5035-01A-01-BS1", "TCGA-85-8664-01A-01-TS1", "TCGA-39-5024-01A-01-BS1", "TCGA-66-2756-11A-01-BS1", "TCGA-33-4532-01A-01-TS1", "TCGA-85-7950-01A-01-TS1", "TCGA-60-2725-01A-01-BS1", "TCGA-56-6545-01A-01-BS1", "TCGA-22-4596-01A-01-TS1", "TCGA-XC-AA0X-01A-03-TS3", "TCGA-39-5035-01A-01-BS1", "TCGA-60-2698-01A-01-TS1", "TCGA-63-A5MG-01A-01-TSA", "TCGA-63-7022-01A-01-BS1", "TCGA-18-3406-11A-01-TS1", "TCGA-90-7767-11A-01-TS1", "TCGA-39-5011-01A-01-BS1", "TCGA-33-4533-01A-01-TS1", "TCGA-66-2783-01A-01-TS1", "TCGA-77-6845-01A-01-BS1"]
-    keys_chosen = ["TCGA-77-A5GH-01A-01-TS1", "TCGA-60-2725-01A-01-BS1", "TCGA-60-2714-11A-01-BS1", "TCGA-NC-A5HP-01A-01-TS1", "TCGA-77-8139-01A-01-TS1", "TCGA-98-A53D-01A-03-TS3", "TCGA-39-5039-01A-01-BS1"] + keys_sorted[:2]
+    #keys_chosen = ["TCGA-77-A5GH-01A-01-TS1", "TCGA-60-2725-01A-01-BS1", "TCGA-60-2714-11A-01-BS1", "TCGA-NC-A5HP-01A-01-TS1", "TCGA-77-8139-01A-01-TS1", "TCGA-98-A53D-01A-03-TS3", "TCGA-39-5039-01A-01-BS1"] + keys_sorted[:2]
 
     print ("There are {} images in the dataset: using {} in analysis...".format(len(keys_sorted), number_of_images))
     #keys_chosen = keys_sorted

@@ -187,7 +187,8 @@ def train(train_loader, val_loader, model, criterion, optimizer, max_epochs, lr,
                 'optimizer' : optimizer.state_dict(),
             }, model_savename)
 
-    save_data_to_csv(accuracy1_values, os.path.join(out_path, "data", os.path.basename(model_savename).replace("checkpoint_", "accuracy_").replace(".pth.tar", ".csv")), "accuracy")
+    save_data_to_csv(accuracy1_values, os.path.join(out_path, "data", os.path.basename(model_savename).replace("checkpoint_", "accuracy1_").replace(".pth.tar", ".csv")), "accuracy")
+    save_data_to_csv(accuracy5_values, os.path.join(out_path, "data", os.path.basename(model_savename).replace("checkpoint_", "accuracy5_").replace(".pth.tar", ".csv")), "accuracy")
     save_data_to_csv(epoch_loss_values, os.path.join(out_path, "data", os.path.basename(model_savename).replace("checkpoint_", "loss_").replace(".pth.tar", ".csv")), "loss")
 
 def wrap_data(train_data, val_data, batch_size, batch_slide_num, batch_inst_num, workers, is_profiling, is_conditional, is_distributed):
