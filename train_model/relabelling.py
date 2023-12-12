@@ -170,5 +170,15 @@ def main():
     )
     retrain_model(model, dl, annotations)
 
+    train_data, annotations = load_data("train_data_path")
+    model = load("my_model")
+    predictions = model.inference("test_data_path")
+
+    analysis = monai.test_overfitting(model, train_data, annotations["confounder"], predictions)
+    print(analysis)
+
 if __name__ == "__main__":
     main()
+
+def load_data(a):
+    pass
