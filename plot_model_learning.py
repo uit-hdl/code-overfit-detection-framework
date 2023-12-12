@@ -30,4 +30,4 @@ for (metric, title), df in dfs:
     plots.append([p])
 
 gp = layout(plots)
-show(gp)
+#show(gp)
