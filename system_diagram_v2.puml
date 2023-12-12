@@ -1,0 +1,47 @@
+```plantuml
+left to right direction
+skinparam linetype polyline
+
+node "Model developer" as developer {
+    node "Training data" as train
+    node "Annotations" as anno {
+        node Labels as labels
+        node "Sensitive variables" as sens
+    }
+}
+
+node <img:MONAI-logo-color.png> as monai {
+    node "Imageloader" as imageloader
+    node "PyTorch <img:pytorch.png{scale=.2}>" as pytorch
+    node "Distributed trainer\n\t<img:distributed.png{scale=.10}>"
+}
+
+node "Model SSL training" as trainer {
+    hexagon "Conditional Sampler" as sampler
+}
+
+collections "Models" as models
+
+node "Overfit exploration plugin" as overfit {
+    collections "Metrics" as metrics
+}
+
+map "Analysis output" as analysis {
+    Metric #1 => α, β, γ
+    Metric #2 => α, β, γ
+    Metric #3 => α, β, γ
+
+}
+
+monai -left[hidden]-> developer
+monai -left[hidden]-> trainer
+monai -down[hidden]-> overfit
+monai -down[hidden]-> analysis
+train --> trainer
+sens --> sampler
+monai .d. trainer
+trainer --> models
+models --> overfit
+monai .. overfit
+overfit --> analysis
+```
