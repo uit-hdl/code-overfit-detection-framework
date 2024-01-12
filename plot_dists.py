@@ -948,35 +948,41 @@ J1 148674187
 79 31503355"""
 
 l = [x.strip().split() for x in data.split("\n")]
-l = [(y[0], institution_lookup[y[1]]) for y in l]
+#l = [(y[0], institution_lookup[y[1]]) for y in l]
+l = [(y[0], y[1]) for y in l]
 counts, institutions = zip(*l)
 #sorted_inst = sorted(institutions, key=lambda x: counts[institutions.index(x)])
 
 output_file("plot_dists.html", title="Instituion Dist Plots")
 
-p = figure(x_range=institutions, height=750, title="Institution Slide Counts")
+plot_height = 300
+plot_width = 650
+
+p = figure(x_range=institutions, height=plot_height, width=plot_width, title="Institution Slide Counts")
 p.vbar(x=institutions, top=counts, width=0.9)
 p.xgrid.grid_line_color = None
 p.y_range.start = 0
-p.xaxis.major_label_orientation = np.pi / 2.0
+#p.xaxis.major_label_orientation = 0
 #show(p)
 
 l = [x.strip().split() for x in slide_data.split("\n")]
-l = [(y[0], institution_lookup[y[1]]) for y in l]
+#l = [(y[0], institution_lookup[y[1]]) for y in l]
+l = [(y[0], y[1]) for y in l]
 counts, institutions = zip(*l)
 
-p_slide = figure(x_range=institutions, height=750, title="Institution Tile Counts")
+p_slide = figure(x_range=institutions, height=plot_height, width=plot_width, title="Institution Tile Counts")
 p_slide.vbar(x=institutions, top=counts, width=0.9)
 p_slide.xgrid.grid_line_color = None
 p_slide.y_range.start = 0
-p_slide.xaxis.major_label_orientation = np.pi / 2.0
+#p_slide.xaxis.major_label_orientation = np.pi / 2.0
+#p_slide.xaxis.major_label_orientation = 1.2
 #show(p)
 
 
 l = [x.strip().split() for x in file_data.split("\n")]
 l = [(institution_lookup[y[0]], y[1]) for y in l]
 institutions, counts = zip(*l)
-p_disk = figure(x_range=institutions, height=750, title="Institution Disk Usage")
+p_disk = figure(x_range=institutions, height=plot_height, width=plot_width, title="Institution Disk Usage")
 p_disk.vbar(x=institutions, top=counts, width=0.9)
 p_disk.xgrid.grid_line_color = None
 p_disk.y_range.start = 0
@@ -985,5 +991,5 @@ p_disk.yaxis.formatter = CustomJSTickFormatter(code='''return (tick/1000000000) 
 #show(p)
 
 
-gp = layout([p], [p_slide, p_disk])
+gp = layout([p], [p_slide], [p_disk])
 save(gp)
