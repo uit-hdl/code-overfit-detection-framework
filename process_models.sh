@@ -22,7 +22,8 @@ mkdir "${analysis_dir}"
 
 ipython plot_model_learning.py -- "${model_out_dir}"/MoCo/tiles/data/
 #for model in "${model_out_dir}"/MoCo/tiles/model/*0200*.tar
-for model in "${model_out_dir}"/MoCo/tiles/model/*0180*False*.tar
+#for model in "${model_out_dir}"/MoCo/tiles/model/*0180*False*.tar
+for model in "${model_out_dir}"/MoCo/tiles/model/*0180*False*.tar "${model_out_dir}"/MoCo/tiles/model/*0180*False*.tar
 do
   m="$(basename "${model}" | command grep -Eo 'm[0-9]+')"
   n="$(basename "${model}" | command grep -Eo "n[0-9]+")"
@@ -32,8 +33,8 @@ do
   echo "$m $n $c $K $o"
   out_dir="${analysis_dir}/out${m}${n}${K}${o}${c}"
   set -xe
-  ipython feature_extraction/extract_embeddings.py -- --src_dir "${SRC_DIR}" --feature_extractor "${model}" --out_dir "${out_dir}"
-  ipython feature_extraction/get_clusters.py -- --embeddings_path "${out_dir}/MoCo/tiles/embeddings/test_tiles_embedding.pkl" --out_dir "${out_dir}" --number_of_images 20 --histogram_bins 20
+  #ipython feature_extraction/extract_embeddings.py -- --src_dir "${SRC_DIR}" --feature_extractor "${model}" --out_dir "${out_dir}"
+  #ipython feature_extraction/get_clusters.py -- --embeddings_path "${out_dir}/MoCo/tiles/embeddings/test_tiles_embedding.pkl" --out_dir "${out_dir}" --number_of_images 20 --histogram_bins 20
   ipython feature_extraction/get_clusters.py -- --embeddings_path "${out_dir}/MoCo/tiles/embeddings/test_tiles_embedding.pkl" --out_dir "${out_dir}" --number_of_images 2999 --histogram_bins 2999
   #ipython survival_models/cox.py --  --embeddings_dir "${out_dir}/MoCo/tiles/embeddings/" --out_dir "${out_dir}/survival"
   set +xe

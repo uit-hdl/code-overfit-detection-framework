@@ -161,7 +161,6 @@ def compute_histograms_overlap(plot_data, data_key, unique_labels, no_bins):
         else:
             overlaps[label_left]["all"] = np.mean(list(overlaps[label_left].values()))
 
-
     mean_overlap = np.mean([x["all"] for x in overlaps.values()])
     return overlaps, mean_overlap
 
@@ -382,52 +381,53 @@ def main(clinical_path, embeddings_path, thumbnail_path, histogram_bins, n_clust
         print("Loaded cluster from {}".format(cluster_dst))
 
     keys_sorted = list(sorted(features.keys()))
-    keys_random = random.sample(keys_sorted, len(keys_sorted))
+    for i in range(1):
+        keys_random = random.sample(keys_sorted, len(keys_sorted))
 
-    number_of_images = min(number_of_images, len(keys_sorted))
-    keys_chosen = keys_sorted[:number_of_images]
-    #keys_chosen = keys_random[:number_of_images]
-    #keys_chosen = ["TCGA-60-2698-01A-01-TS1", "TCGA-22-4596-01A-01-TS1", "TCGA-21-1077-01A-01-TS1", "TCGA-39-5019-11A-01-TS1", "TCGA-85-7950-01A-01-TS1", "TCGA-34-2608-11A-01-BS1", "TCGA-58-8387-11A-01-TS1", "TCGA-85-8353-01A-01-BS1", "TCGA-85-8664-01A-01-TS1", "TCGA-33-4532-01A-01-TS1", "TCGA-60-2698-01A-01-TS1", "TCGA-51-4080-01A-01-BS1", "TCGA-85-8664-01A-01-TS1", "TCGA-85-8666-01A-01-BS1", "TCGA-60-2716-01A-01-BS1", "TCGA-39-5034-01A-01-BS1", "TCGA-66-2783-01A-01-BS1", "TCGA-39-5011-01A-01-BS1", "TCGA-85-8355-01A-01-TS1", "TCGA-L3-A4E7-01A-01-TSA"]
-    #keys_chosen = ["TCGA-39-5035-01A-01-BS1", "TCGA-85-8664-01A-01-TS1", "TCGA-39-5024-01A-01-BS1", "TCGA-66-2756-11A-01-BS1", "TCGA-33-4532-01A-01-TS1", "TCGA-85-7950-01A-01-TS1", "TCGA-60-2725-01A-01-BS1", "TCGA-56-6545-01A-01-BS1", "TCGA-22-4596-01A-01-TS1", "TCGA-XC-AA0X-01A-03-TS3", "TCGA-39-5035-01A-01-BS1", "TCGA-60-2698-01A-01-TS1", "TCGA-63-A5MG-01A-01-TSA", "TCGA-63-7022-01A-01-BS1", "TCGA-18-3406-11A-01-TS1", "TCGA-90-7767-11A-01-TS1", "TCGA-39-5011-01A-01-BS1", "TCGA-33-4533-01A-01-TS1", "TCGA-66-2783-01A-01-TS1", "TCGA-77-6845-01A-01-BS1"]
-    #keys_chosen = ["TCGA-77-A5GH-01A-01-TS1", "TCGA-60-2725-01A-01-BS1", "TCGA-60-2714-11A-01-BS1", "TCGA-NC-A5HP-01A-01-TS1", "TCGA-77-8139-01A-01-TS1", "TCGA-98-A53D-01A-03-TS3", "TCGA-39-5039-01A-01-BS1"] + keys_sorted[:2]
+        number_of_images = min(number_of_images, len(keys_sorted))
+        keys_chosen = keys_sorted[:number_of_images]
+        #keys_chosen = keys_random[:number_of_images]
+        #keys_chosen = ["TCGA-60-2698-01A-01-TS1", "TCGA-22-4596-01A-01-TS1", "TCGA-21-1077-01A-01-TS1", "TCGA-39-5019-11A-01-TS1", "TCGA-85-7950-01A-01-TS1", "TCGA-34-2608-11A-01-BS1", "TCGA-58-8387-11A-01-TS1", "TCGA-85-8353-01A-01-BS1", "TCGA-85-8664-01A-01-TS1", "TCGA-33-4532-01A-01-TS1", "TCGA-60-2698-01A-01-TS1", "TCGA-51-4080-01A-01-BS1", "TCGA-85-8664-01A-01-TS1", "TCGA-85-8666-01A-01-BS1", "TCGA-60-2716-01A-01-BS1", "TCGA-39-5034-01A-01-BS1", "TCGA-66-2783-01A-01-BS1", "TCGA-39-5011-01A-01-BS1", "TCGA-85-8355-01A-01-TS1", "TCGA-L3-A4E7-01A-01-TSA"]
+        #keys_chosen = ["TCGA-39-5035-01A-01-BS1", "TCGA-85-8664-01A-01-TS1", "TCGA-39-5024-01A-01-BS1", "TCGA-66-2756-11A-01-BS1", "TCGA-33-4532-01A-01-TS1", "TCGA-85-7950-01A-01-TS1", "TCGA-60-2725-01A-01-BS1", "TCGA-56-6545-01A-01-BS1", "TCGA-22-4596-01A-01-TS1", "TCGA-XC-AA0X-01A-03-TS3", "TCGA-39-5035-01A-01-BS1", "TCGA-60-2698-01A-01-TS1", "TCGA-63-A5MG-01A-01-TSA", "TCGA-63-7022-01A-01-BS1", "TCGA-18-3406-11A-01-TS1", "TCGA-90-7767-11A-01-TS1", "TCGA-39-5011-01A-01-BS1", "TCGA-33-4533-01A-01-TS1", "TCGA-66-2783-01A-01-TS1", "TCGA-77-6845-01A-01-BS1"]
+        #keys_chosen = ["TCGA-77-A5GH-01A-01-TS1", "TCGA-60-2725-01A-01-BS1", "TCGA-60-2714-11A-01-BS1", "TCGA-NC-A5HP-01A-01-TS1", "TCGA-77-8139-01A-01-TS1", "TCGA-98-A53D-01A-03-TS3", "TCGA-39-5039-01A-01-BS1"] + keys_sorted[:2]
 
-    print ("There are {} images in the dataset: using {} in analysis...".format(len(keys_sorted), number_of_images))
-    #keys_chosen = keys_sorted
-    pickle_out = os.path.join(args.out_dir, f"tmp_pickle_{len(keys_chosen)}.pkl")
-    if os.path.exists(pickle_out) and 1 == 0:
-        d = pickle.load(open(pickle_out, 'rb'))
-        mapper, data, knn, knc, cpd = d["mapper"], d["data"], d["knn"], d["knc"], d["cpd"]
-    else:
-        mapper, data, knn, knc, cpd = umap_slice(keys_chosen, features, cluster, clinical)
-        #pickle_obj = {"mapper": mapper, "data": data, "knn": knn, "knc": knc, "cpd": cpd}
-        #pickle.dump(pickle_obj, open(pickle_out, 'wb'), protocol=4)
+        print ("There are {} images in the dataset: using {} in analysis...".format(len(keys_sorted), number_of_images))
+        #keys_chosen = keys_sorted
+        pickle_out = os.path.join(args.out_dir, f"tmp_pickle_{len(keys_chosen)}.pkl")
+        if os.path.exists(pickle_out) and 1 == 0:
+            d = pickle.load(open(pickle_out, 'rb'))
+            mapper, data, knn, knc, cpd = d["mapper"], d["data"], d["knn"], d["knc"], d["cpd"]
+        else:
+            mapper, data, knn, knc, cpd = umap_slice(keys_chosen, features, cluster, clinical)
+            #pickle_obj = {"mapper": mapper, "data": data, "knn": knn, "knc": knc, "cpd": cpd}
+            #pickle.dump(pickle_obj, open(pickle_out, 'wb'), protocol=4)
 
 
-    umap_plots = []
-    for key,title in [
-        ('slide', "Slide"),
-        ('patient', 'Patient'),
-        ('institution', "Institution"),
-        ('race', "Race"),
-        ('gender', "Gender"),
-        #('cluster_id', "GMM Cluster"),
-        ('resection', "Resection Site"),
-        ('path_stage_t', "Pathological Stage T"),
-        ('path_stage_m', "Pathological Stage M")
-    ]:
-        unique_labels = np.unique(data[key])
-        title += (" ({} unique colors)".format(len(unique_labels)))
-        plot = UmapPlot(mapper, data, key, title, unique_labels, histogram_bins)
-        overlaps, mean_overlap = compute_histograms_overlap(plot.plot_data, key, unique_labels, histogram_bins)
-        plot.set_overlaps(overlaps, mean_overlap)
-        umap_plots.append(plot)
+        umap_plots = []
+        for key,title in [
+            ('slide', "Slide"),
+            ('patient', 'Patient'),
+            ('institution', "Institution"),
+            ('race', "Race"),
+            ('gender', "Gender"),
+            #('cluster_id', "GMM Cluster"),
+            ('resection', "Resection Site"),
+            ('path_stage_t', "Pathological Stage T"),
+            ('path_stage_m', "Pathological Stage M")
+        ]:
+            unique_labels = np.unique(data[key])
+            title += (" ({} unique colors)".format(len(unique_labels)))
+            plot = UmapPlot(mapper, data, key, title, unique_labels, histogram_bins)
+            overlaps, mean_overlap = compute_histograms_overlap(plot.plot_data, key, unique_labels, histogram_bins)
+            plot.set_overlaps(overlaps, mean_overlap)
+            umap_plots.append(plot)
 
-    out_html = os.path.join(out_dir, "web", "condssl_out_{}_{}.html".format(number_of_images, histogram_bins))
-    #inst_umap_overlap = list(filter(lambda x: x.data_key == "institution", umap_plots))[0].mean_overlap
-    #out_html = out_html.replace(".html", "_{}.html".format(inst_umap_overlap))
-    ensure_dir_exists(out_html)
+        out_html = os.path.join(out_dir, "web", "condssl_out_{}_{}.html".format(number_of_images, histogram_bins))
+        inst_umap_overlap = str(100*list(filter(lambda x: x.data_key == "institution", umap_plots))[0].mean_overlap)[:2]
+        out_html = out_html.replace(".html", "_{}.html".format(inst_umap_overlap))
+        ensure_dir_exists(out_html)
 
-    viz_data(mapper, data, keys_chosen, knn, knc, cpd, thumbnail_path, out_html, umap_plots)
+        viz_data(mapper, data, keys_chosen, knn, knc, cpd, thumbnail_path, out_html, umap_plots)
 
 if __name__ == "__main__":
     args = parser.parse_args()
