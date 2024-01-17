@@ -3,7 +3,9 @@
 # orig paper: adds two new layers for classification and re-trains
 # https://github.com/TahDeh/TCGA_Acquisition_site_project/blob/main/tss-feature-extraction.ipynb
 # guide
-# https://snappishproductions.com/blog/2020/05/25/image-self-supervised-training-with-pytorch-lightning.html.html
+#https://snappishproductions.com/blog/2020/05/25/image-self-supervised-training-with-pytorch-lightning.html.html
+# other guide:
+#https://github.com/Project-MONAI/tutorials/blob/main/modules/layer_wise_learning_rate.ipynb
 
 import glob
 import tempfile

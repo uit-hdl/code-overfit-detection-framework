@@ -50,3 +50,8 @@ Price estimations
 # price per day
 1883
 ```
+
+## From talk
+clusters are subjectively assigned, which is a weakness
+
+was it the cluster labels that was the explainable part, not the UMAPs?
