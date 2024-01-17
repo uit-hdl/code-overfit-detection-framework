@@ -2,7 +2,7 @@ import csv
 import os
 import glob
 import random
-
+from io import TextIOWrapper
 from pathlib import Path
 
 def ensure_dir_exists(path):
@@ -51,8 +51,10 @@ def build_file_list(data_dir, file_list_path):
             raise RuntimeError(f"Found no data in {data_dir}")
 
         ensure_dir_exists(file_list_path)
-        with open(file_list_path, 'w') as csvfile:
-            csvwriter = csv.writer(csvfile)
+        #with open(file_list_path, 'w', newline='') as csvfile:
+        with open(file_list_path, 'wb') as csvfile, TextIOWrapper(csvfile, encoding='utf-8', newline='') as wrapper:
+            #csvwriter = csv.writer(csvfile)
+            csvwriter = csv.writer(wrapper)
             csvwriter.writerow(["q", "k", "filename", "mode"])
             for d in train_data:
                 csvwriter.writerow([d['q'], d['k'], d['filename'], "train"])
@@ -61,7 +63,7 @@ def build_file_list(data_dir, file_list_path):
             for d in test_data:
                 csvwriter.writerow([d['q'], d['k'], d['filename'], "test"])
 
-    with open(file_list_path, 'r') as csvfile:
+    with open(file_list_path, 'r', newline='') as csvfile:
         csvreader = csv.reader(csvfile)
         next(csvreader)
         train_data, val_data, test_data = [], [], []
