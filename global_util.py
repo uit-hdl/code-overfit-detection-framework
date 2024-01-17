@@ -67,11 +67,11 @@ def build_file_list(data_dir, file_list_path):
         train_data, val_data, test_data = [], [], []
         for row in csvreader:
             if row[3] == "train":
-                train_data.append({"q": row[0], "k": row[1], 'filename': row[2]})
+                train_data.append({"q": row[0], "k": row[1], "image": row[0], 'filename': row[2]})
             elif row[3] == "validation":
-                val_data.append({"q": row[0], "k": row[1], 'filename': row[2]})
+                val_data.append({"q": row[0], "k": row[1], "image": row[0], 'filename': row[2]})
             else:
-                test_data.append({"q": row[0], "k": row[1], 'filename': row[2]})
+                test_data.append({"q": row[0], "k": row[1], "image": row[0], 'filename': row[2]})
         print("Loaded file list from {}".format(file_list_path))
     return train_data, val_data, test_data
 
