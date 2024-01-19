@@ -955,24 +955,21 @@ def main():
         img, classes = batchdata["image"], batchdata["label"]
         return convert_tensor(img, device, non_blocking), convert_tensor(classes, device, non_blocking)
 
-    batch_size = 2
-    dl_val = DataLoader(dataset=Dataset([val_data[0], val_data[-1]], transformations), batch_size=batch_size, num_workers=0, shuffle=True)
-    #dl_val = DataLoader(dataset=Dataset(val_data, transformations), batch_size=batch_size, num_workers=4, shuffle=True)
+    dl_val = DataLoader(dataset=Dataset(val_data, transformations), num_workers=4, shuffle=True)
     val_postprocessing = Compose([Activationsd(keys="pred", sigmoid=True), AsDiscreted(keys="pred", threshold=0.5)])
     evaluator = SupervisedEvaluator(
         device=device,
         val_data_loader=dl_val,
         network=model,
-        #key_val_metric={"val_acc": Accuracy(output_transform=from_engine(["pred", "label"]))},
-        additional_metrics={"val_acc": Accuracy(output_transform=from_engine(["predaaa", "label"]))},
         postprocessing=val_postprocessing,
     )
 
     # TODO: am I supposed to keep using the training data now, or just from test data?
-    dl = DataLoader(dataset=Dataset(train_data[:2], transformations), batch_size=batch_size, num_workers=4, shuffle=True)
+    batch_size = 64
+    dl = DataLoader(dataset=Dataset(train_data, transformations), batch_size=batch_size, num_workers=4, shuffle=True)
     trainer = SupervisedTrainer(
         device=device,
-        max_epochs=2,
+        max_epochs=5,
         train_data_loader=dl,
         network=model,
         optimizer=opt,
@@ -997,15 +994,9 @@ def main():
         batch_loss = engine.state.output
         loss = np.average([o["loss"] for o in engine.state.output])
         batch_len = len(engine.state.batch[0])
-        lr = opt.param_groups[0]['lr']
-        e = engine.state.epoch
-        n = engine.state.max_epochs
-        i = engine.state.iteration
 
         iterLosses.append(loss)
         batchSizes.append(batch_len)
-
-        print(f"Epoch {e}/{n} : {i}/{how_many_batches}, lr: {lr}, loss: {loss}")
 
     @trainer.on(Events.EPOCH_COMPLETED)
     def run_validation(engine):
@@ -1055,7 +1046,7 @@ def main():
     plt.plot(x, y)
     plt.grid()
     #plt.show()
-    plt.savefig(os.path.join(args.out_dir, 'relabelling_stats.png')
+    plt.savefig(os.path.join(args.out_dir, 'relabelling_stats.png'))
 
     #analysis = monai.test_overfitting(model, train_data, annotations["confounder"], predictions)
     #print(analysis)
