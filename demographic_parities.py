@@ -9,16 +9,10 @@
 #https://github.com/Project-MONAI/tutorials/blob/main/modules/layer_wise_learning_rate.ipynb
 
 import logging
-import glob
-import tempfile
 import os
 import sys
 
-import numpy as np
-from ignite.utils import convert_tensor
-from matplotlib import pyplot as plt
 from monai.data import DataLoader, Dataset
-from monai.networks import eval_mode
 
 from global_util import build_file_list, ensure_dir_exists
 
@@ -28,29 +22,11 @@ import condssl.builder
 import argparse
 import pickle
 import torch
-import torch.nn as nn
-from collections import defaultdict
 import pandas as pd
 from tqdm import tqdm
 from network.inception_v4 import InceptionV4
-from pathlib import Path
 import monai.transforms as mt
-from monai.handlers import StatsHandler, from_engine, CheckpointSaver, ROCAUC, ValidationHandler
-from monai.engines import SupervisedTrainer, SupervisedEvaluator
-from sklearn.mixture import GaussianMixture
 from monai.inferers import SimpleInferer
-from monai.optimizers import generate_param_groups
-from ignite.engine import Engine, Events
-from ignite.metrics import Accuracy
-from monai.apps import MedNISTDataset
-from monai.apps import get_logger
-from monai.transforms import (
-    EnsureChannelFirstd,
-    Compose,
-    LoadImaged,
-    ScaleIntensityd,
-    EnsureTyped, AsDiscrete, EnsureType, Activations, Activationsd, AsDiscreted,
-)
 from fairlearn.metrics import demographic_parity_difference, equalized_odds_difference
 
 parser = argparse.ArgumentParser(description='Demographic parities')
@@ -170,8 +146,8 @@ def main():
 
     data = {"Demographic Parity": [demographic_parity],
             "Equalized Odds": [equalized_odds],
-            "Equalized Opportunity Positive": [equalized_opportunity],
-            "Equalized Opportunity Negative": [equalized_opportunity_negative],
+            f"Equalized Opportunity {tissue_types[1]}": [equalized_opportunity],
+            f"Equalized Opportunity {tissue_types[0]}": [equalized_opportunity_negative],
             }
     df = pd.DataFrame(data)
     out_path = os.path.join(args.out_dir, "fairness.csv")
