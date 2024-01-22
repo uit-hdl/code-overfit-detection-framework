@@ -62,7 +62,7 @@ for d in ds:
     # if not recurrence_free_days:
     #     print("no recurrence information for patient %s" % patient_id)
     if recurrence and not recurrence_free_days:
-        print("something fucky with patient %s: reccurence %s, free_days %s" % (patient_id, recurrence, recurrence_free_days))
+        print("data seems malformed with patient %s: reccurence %s, free_days %s" % (patient_id, recurrence, recurrence_free_days))
 
     followup_days = int(clinicalRow['days_to_last_follow_up']) if (clinicalRow['days_to_last_follow_up'] and clinicalRow['days_to_last_follow_up'].isnumeric()) else None
     annotation[patient_id] = {

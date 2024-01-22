@@ -14,7 +14,7 @@ To get normal vs LUSC slides:
 cut -d$'\t' -f2,8 gdc_sample_sheet.2023-08-14.tsv | sed 's/\([0-9A-Z]\)\.[^ \t]\+/\1/ ; s/Solid Tissue // ; s/Primary // ; 1d' > sample_sheet_filtered.tsv 
 grep Normal sample_sheet_filtered.tsv | cut -d$'\t' -f1 > normal_filtered.txt 
 grep Tumor sample_sheet_filtered.tsv | cut -d$'\t' -f1 > tumor_filtered.txt 
-# to get the files into separate directories
+# if you want files into separate directories
 for file in /Data/TCGA_LUSC/preprocessed/TCGA/tiles/*; do command grep $(basename $file) tumor_filtered.txt && cp -r ${file} /Data/TCGA_LUSC/preprocessed/by
 _class/lung_scc/ || cp -r ${file} /Data/TCGA_LUSC/preprocessed/by_class/lung_n; done
 ```

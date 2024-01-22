@@ -4,6 +4,7 @@ import glob
 import random
 from io import TextIOWrapper
 from pathlib import Path
+import logging
 
 def ensure_dir_exists(path):
     dest_dir = os.path.dirname(path)
@@ -74,6 +75,6 @@ def build_file_list(data_dir, file_list_path):
                 val_data.append({"q": row[0], "k": row[1], "image": row[0], 'filename': row[2]})
             else:
                 test_data.append({"q": row[0], "k": row[1], "image": row[0], 'filename': row[2]})
-        print("Loaded file list from {}".format(file_list_path))
+        logging.info("Loaded file list from {}".format(file_list_path))
     return train_data, val_data, test_data
 
