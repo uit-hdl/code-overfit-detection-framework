@@ -35,11 +35,11 @@ ds = Dataset(data, transform=None)
 for slide_id in ds:
     patient_relevant_id = "-".join(os.path.basename(slide_id['filename']).split("-")[0:7]).split(".")[0]
     #tile_path = os.path.join(args.out_dir, 'TCGA', 'tiles', os.path.basename(slide_id['patient']))
-    tile_path = os.path.join(args.out_dir, 'TCGA', 'tiles', patient_relevant_id)
+    tile_path = os.path.join(args.out_dir, 'tiles', patient_relevant_id)
 
-    if not os.path.exists(tile_path):
-        Path(tile_path).mkdir(parents=True, exist_ok=True)
-        wsi_to_tiles(slide_id['filename'], tile_path, args.refer_img, args.s)
+    #if not os.path.exists(tile_path):
+        #Path(tile_path).mkdir(parents=True, exist_ok=True)
+        #wsi_to_tiles(slide_id['filename'], tile_path, args.refer_img, args.s)
 
 followUpTable = pd.read_csv(args.follow_up_path, sep='\t')
 followUpTable = followUpTable.loc[followUpTable['new_tumor_event_dx_indicator'].isin({'YES', 'NO'})]

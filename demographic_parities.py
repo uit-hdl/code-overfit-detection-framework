@@ -64,13 +64,6 @@ def main():
     slide_annotations = slide_annotations.set_index("my_slide_id")
     tissue_types = slide_annotations["Sample Type"].unique().tolist()
 
-    annotations = {}
-    tcga_annotation = pickle.load(open(args.tcga_annotation_file, 'rb')) if os.path.exists(args.tcga_annotation_file) else {}
-    cptac_annotation = pickle.load(open(args.cptac_annotation_file, 'rb')) if os.path.exists(args.cptac_annotation_file) else {}
-    # TODO: CPTAC
-    # annotations = {**tcga_annotation, **cptac_annotation}
-    annotations = {**tcga_annotation}
-
     logging.info("Processing annotations")
     # TODO: this is slow. Can speed up the lookups?
     train_data, val_data, test_data = build_file_list(args.src_dir, args.file_list_path)

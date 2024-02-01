@@ -14,6 +14,7 @@ import warnings
 
 import monai.transforms as mt
 import numpy as np
+import pandas as pd
 import torch.backends.cudnn as cudnn
 import torch.nn as nn
 import torchvision.transforms as transforms
@@ -61,7 +62,9 @@ parser.add_argument('--data-dir', default='./data/', type=str,
 parser.add_argument('--out-dir', default='./out/models/', type=str,
                     help='path to output directory')
 parser.add_argument('--file-list-path', default='./out/files.csv', type=str, help='path to list of file splits')
-parser.add_argument('--tcga_annotation_file', default='./out/annotation/recurrence_annotation_tcga.pkl', type=str, help='path to TCGA annotations')
+parser.add_argument('--slide_annotation_file', default='annotations/slide_label/gdc_sample_sheet.2023-08-14.tsv', type=str, help='"Sample sheet" from TCGA, see README.md for instructions on how to get sheet')
+parser.add_argument('-j', '--workers', default=6, type=int, metavar='N',
+                    help='number of data loading workers (default: 6)')
 
 def save_data_to_csv(data, filename, label):
     ensure_dir_exists(filename)
@@ -133,8 +136,9 @@ def train(dl_train, dl_val, model, optimizer, max_epochs, out_path, device):
 
     return epoch_loss_values, metric_values
 
-def wrap_data(train_data, val_data, test_data, tcga_annotation_file, labels, batch_size, workers, is_profiling):
-    print('Creating dataset')
+
+def wrap_data(train_data, val_data, test_data, slide_annotations, labels, batch_size, workers, is_profiling):
+    logging.info('Creating dataset')
     grayer = transforms.Grayscale(num_output_channels=3)
     cropper = transforms.RandomResizedCrop(299, scale=(0.2, 1.))
     jitterer = transforms.ColorJitter(brightness=4, contrast=0.4, saturation=0.4, hue=0.01)
@@ -170,14 +174,13 @@ def wrap_data(train_data, val_data, test_data, tcga_annotation_file, labels, bat
         ]
     )
 
+    assign_labels(train_data, labels, slide_annotations)
+    assign_labels(val_data, labels, slide_annotations)
+    assign_labels(test_data, labels, slide_annotations)
+
     ds_train = Dataset(train_data, transformations)
     ds_val = Dataset(val_data, val_transformations)
     ds_test = Dataset(test_data, val_transformations)
-
-    tcga_annotation = pickle.load(open(tcga_annotation_file, 'rb')) if os.path.exists(tcga_annotation_file) else {}
-    assign_labels(ds_train, labels, tcga_annotation)
-    assign_labels(ds_val, labels, tcga_annotation)
-    assign_labels(ds_test, labels, tcga_annotation)
 
     dl_train = DataLoader(ds_train, batch_size=batch_size, drop_last=True, shuffle=True, num_workers=workers)
     dl_val = DataLoader(ds_val, batch_size=batch_size, num_workers=workers, shuffle=True)
@@ -190,12 +193,11 @@ def wrap_data(train_data, val_data, test_data, tcga_annotation_file, labels, bat
 
 def assign_labels(ds, labels, annotations):
     logging.info("Processing annotations")
-    # TODO: this is slow. Can speed up the lookups?
-    for i in range(len(ds)):
-        filename = ds[i]['filename']
+    labels = {l: i for i, l in enumerate(labels)}
+    for entry in ds:
+        filename = entry['filename']
         slide_id = os.path.basename(os.path.dirname(filename))
-        ann = annotations.loc[slide_id]
-        ds[i]['label'] = labels.index(ann["Sample Type"])
+        entry['label'] = labels[annotations.loc[slide_id, "Sample Type"]]
     logging.info("Annotations complete")
 
 def main():
@@ -203,6 +205,9 @@ def main():
 
     if not torch.cuda.is_available():
         print('No GPU device available')
+        sys.exit(1)
+    if not os.path.exists(args.slide_annotation_file):
+        logging.error("TCGA annotation file not found: {}".format(args.tcga_annotation_file))
         sys.exit(1)
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -213,10 +218,13 @@ def main():
 
     logging.info('Create dataset')
 
+    slide_annotations = pd.read_csv(args.slide_annotation_file, sep='\t', header=0)
+    slide_annotations["my_slide_id"] = slide_annotations["File Name"].map(lambda s: s.split(".")[0])
+    slide_annotations = slide_annotations.set_index("my_slide_id")
+    labels = slide_annotations["Sample Type"].unique().tolist()
+
     train_data, val_data, test_data = build_file_list(args.data_dir, args.file_list_path)
-    labels = ["Normal", "Tumor"]
-    dl_train, dl_val, dl_test = wrap_data(train_data, val_data, test_data, args.tcga_annotation_file, labels, args.batch_size, args.workers)
-    logging.info("Dataset Created ...")
+    dl_train, dl_val, dl_test = wrap_data(train_data, val_data, test_data, slide_annotations, labels, args.batch_size, args.workers, args.is_profiling)
 
     if args.seed is not None:
         random.seed(args.seed)
@@ -229,7 +237,7 @@ def main():
                       'from checkpoints.')
 
     logging.info("=> creating model '{}'".format('x64'))
-    model = densenet121(spatial_dims=2, in_channels=1, out_channels=6).to("cuda:0")
+    model = densenet121(spatial_dims=2, in_channels=3, out_channels=2, pretrained=True).to(device)
     model = model.cuda()
     optimizer = torch.optim.Adam(model.parameters(), args.lr)
     logging.info('Model builder done, placed on cuda()')
