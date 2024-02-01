@@ -225,8 +225,8 @@ def main():
     labels = slide_annotations["Sample Type"].unique().tolist()
 
     train_data, val_data, test_data = build_file_list(args.data_dir, args.file_list_path)
-    train_data = train_data[:args.batch_size]
-    test_data = test_data[:args.batch_size]
+    #train_data = train_data[:args.batch_size]
+    #test_data = test_data[:args.batch_size]
     dl_train, dl_val, dl_test = wrap_data(train_data, val_data, test_data, slide_annotations, labels, args.batch_size, args.workers, args.is_profiling)
 
     if args.seed is not None:
@@ -297,7 +297,7 @@ def main():
     plt.plot(roc[0], roc[1])
 
     labels = slide_annotations["Sample Type"].unique().tolist()
-    cm = confusion_matrix(gts, predictions, normalize="true", labels=list(range(len(labels))))
+    cm = confusion_matrix(gts, predictions, labels=list(range(len(labels))))
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=labels)
     disp.plot(ax=plt.subplots(1, 1, facecolor="white")[1])
 
