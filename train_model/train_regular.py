@@ -45,7 +45,7 @@ no_profiling = contextlib.nullcontext()
 
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
 
-parser.add_argument('--epochs', default=3, type=int, metavar='N',
+parser.add_argument('--epochs', default=100, type=int, metavar='N',
                     help='number of total epochs to run')
 parser.add_argument('-b', '--batch-size', default=64, type=int,
                     metavar='N', help='batch size (default: 128), this is the total batch size of all GPUs on the current node when using Data Parallel or Distributed Data Parallel')
