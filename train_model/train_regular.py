@@ -23,7 +23,7 @@ from tqdm import tqdm
 import torch.backends.cudnn as cudnn
 import torch.nn as nn
 import torchvision.transforms as transforms
-from ignite.metrics import Accuracy
+from ignite.metrics import Accuracy, Loss
 from matplotlib import pyplot as plt
 from monai.data import DataLoader, Dataset, set_track_meta, create_test_image_2d
 from monai.engines import SupervisedTrainer, SupervisedEvaluator
@@ -118,6 +118,7 @@ def train(dl_train, dl_val, model, optimizer, max_epochs, out_path, device):
         loss_function=torch.nn.CrossEntropyLoss(),
         inferer=SimpleInferer(),
         key_train_metric={"train_acc": Accuracy(output_transform=from_engine([CommonKeys.PRED, CommonKeys.LABEL]))},
+        additional_metrics={"train_loss": Loss(output_transform=from_engine([CommonKeys.PRED, CommonKeys.LABEL], first=False), loss_fn=nn.NLLLoss())},
         train_handlers=[StatsHandler(tag_name="train_loss", output_transform=from_engine([CommonKeys.LOSS], first=True)),
                         TensorBoardStatsHandler(log_dir=os.path.join(out_path, "runs"), output_transform=lambda x: x),
                         ValidationHandler(1, evaluator),
