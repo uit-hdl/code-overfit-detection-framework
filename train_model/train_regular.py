@@ -97,7 +97,6 @@ def train(dl_train, dl_val, model, optimizer, max_epochs, out_path, device):
         device=device,
         val_data_loader=dl_val,
         network=model,
-        # No stats for iteration
         val_handlers=[
             StatsHandler(tag_name="train_log", output_transform=lambda x: None),
             TensorBoardStatsHandler(log_dir=os.path.join(out_path, "runs"), output_transform=lambda x: x),
@@ -120,6 +119,7 @@ def train(dl_train, dl_val, model, optimizer, max_epochs, out_path, device):
         inferer=SimpleInferer(),
         key_train_metric={"train_acc": Accuracy(output_transform=from_engine([CommonKeys.PRED, CommonKeys.LABEL]))},
         train_handlers=[StatsHandler(tag_name="train_loss", output_transform=from_engine([CommonKeys.LOSS], first=True)),
+                        TensorBoardStatsHandler(log_dir=os.path.join(out_path, "runs"), output_transform=lambda x: x),
                         ValidationHandler(1, evaluator),
                         CheckpointSaver(save_dir=out_path, save_dict={'network': model}, save_interval=1)
                         ],
@@ -328,9 +328,8 @@ def main():
         ax.plot(y)
         ax.xaxis.set_major_locator(mticker.MaxNLocator(integer=True))
         fig.gca().xaxis.set_major_locator(mticker.MaxNLocator(integer=True))
-        fig.show()
-        sys.exit(0)
-        #plt.savefig(os.path.join(args.out_dir, 'train_stats.png'))
+        #fig.show()
+        plt.savefig(os.path.join(args.out_dir, 'train_stats.png'))
 
     predictions = []
     gts = []
