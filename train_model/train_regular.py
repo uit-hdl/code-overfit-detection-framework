@@ -16,6 +16,7 @@ import warnings
 
 import monai.transforms as mt
 import torch
+from monai.handlers.tensorboard_handlers import SummaryWriter
 from monai.metrics import ConfusionMatrixMetric
 import numpy as np
 import pandas as pd
@@ -88,7 +89,7 @@ def from_engine_custom(keys, device):
     return _wrapper
 
 
-def train(dl_train, dl_val, model, optimizer, max_epochs, out_path, device):
+def train(dl_train, dl_val, model, optimizer, max_epochs, out_path, writer, device):
     val_postprocessing = Compose([EnsureTyped(keys=CommonKeys.PRED),
                                   AsDiscreted(keys=CommonKeys.PRED, argmax=True),
                                   ])
@@ -99,7 +100,7 @@ def train(dl_train, dl_val, model, optimizer, max_epochs, out_path, device):
         network=model,
         val_handlers=[
             StatsHandler(tag_name="train_log", output_transform=lambda x: None),
-            TensorBoardStatsHandler(log_dir=os.path.join(out_path, "runs"), output_transform=lambda x: x),
+            TensorBoardStatsHandler(writer, output_transform=lambda x: x),
             CheckpointSaver(save_dir=os.path.join(out_path, "runs"), save_dict={"net": model}, save_key_metric=True),
             ],
         additional_metrics={"val_acc": Accuracy(output_transform=from_engine([CommonKeys.PRED, CommonKeys.LABEL]))},
@@ -120,7 +121,7 @@ def train(dl_train, dl_val, model, optimizer, max_epochs, out_path, device):
         key_train_metric={"train_acc": Accuracy(output_transform=from_engine([CommonKeys.PRED, CommonKeys.LABEL]))},
         additional_metrics={"train_loss": Loss(output_transform=from_engine([CommonKeys.PRED, CommonKeys.LABEL], first=False), loss_fn=nn.NLLLoss())},
         train_handlers=[StatsHandler(tag_name="train_loss", output_transform=from_engine([CommonKeys.LOSS], first=True)),
-                        TensorBoardStatsHandler(log_dir=os.path.join(out_path, "runs"), output_transform=lambda x: x),
+                        TensorBoardStatsHandler(writer, output_transform=lambda x: x),
                         ValidationHandler(1, evaluator),
                         CheckpointSaver(save_dir=out_path, save_dict={'network': model}, save_interval=1)
                         ],
@@ -281,7 +282,6 @@ def main():
     data_dir_name = list(filter(None, args.data_dir.split(os.sep)))[-1]
     out_path = os.path.join(args.out_dir, model_name, data_dir_name, 'model')
 
-    model = None
     model_path = os.path.join(out_path, f"network_epoch={args.epochs}.pt")
     model = densenet121(spatial_dims=2, in_channels=3, out_channels=2, pretrained=True).to(device)
     if os.path.exists(model_path) and False:
@@ -292,45 +292,14 @@ def main():
         logging.info("=> creating model '{}'".format('x64'))
         optimizer = torch.optim.Adam(model.parameters(), args.lr)
         logging.info('Model builder done, placed on cuda()')
-        epoch_loss_values, metric_values, mean_dice_values, mean_val_acc = train(dl_train, dl_val, model, optimizer, args.epochs, out_path, device)
-
-        how_many_batches = len(train_data) // args.batch_size
-        fig = plt.figure(1, (24, 6))
-        fig.subplots_adjust(hspace=0.4, wspace=0.4)
-        ax = fig.add_subplot(2, 2, 1)
-        ax.set_title("Iteration Average Loss")
-        y = epoch_loss_values
-        # set label of x-axis
-        ax.axes.set_xlabel("Iteration")
-        ax.xaxis.set_major_locator(mticker.MaxNLocator(integer=True))
-        ax.plot(range(len(y)), y)
-        ax.xaxis.set_major_locator(mticker.MaxNLocator(integer=True))
-        ax = fig.add_subplot(2, 2, 2)
-        ax.set_title("Val Mean Dice")
-        y = metric_values
-        ax.axes.set_xlabel("Iteration")
-        ax.plot(y)
-        ax = fig.add_subplot(2, 2, 3)
-        # plot the mean dice values
-        ax.set_title("Val Mean Dice")
-        ax.xaxis.set_major_locator(mticker.MultipleLocator(1))
-        x = len(mean_dice_values)
-        y = mean_dice_values
-        ax.axes.set_xlabel("Epoch")
-        ax.axes.set_ylim(0, 1)
-        ax.plot(y)
-        ax = fig.add_subplot(2, 2, 4)
-        # plot the mean validation accuracy
-        ax.set_title("Val Accuracy")
-        x = len(mean_val_acc)
-        y = mean_val_acc
-        ax.axes.set_ylim(0, 1)
-        ax.axes.set_xlabel("Epoch")
-        ax.plot(y)
-        ax.xaxis.set_major_locator(mticker.MaxNLocator(integer=True))
-        fig.gca().xaxis.set_major_locator(mticker.MaxNLocator(integer=True))
-        #fig.show()
-        plt.savefig(os.path.join(args.out_dir, 'train_stats.png'))
+        log_dir = os.path.join(out_path, "runs")
+        writer = SummaryWriter(log_dir=log_dir)
+        epoch_loss_values, metric_values, mean_dice_values, mean_val_acc = train(dl_train, dl_val, model, optimizer, args.epochs, out_path, writer, device)
+        writer.add_scalar("size of dataset", len(train_data), 0)
+        writer.add_scalar("batch size", args.batch_size, 0)
+        writer.add_text("model name", model_name)
+        writer.add_text("data dir", data_dir_name)
+        writer.flush()
 
     predictions = []
     gts = []
