@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+!/usr/bin/env python
 # coding: utf-8
 
 import logging
@@ -52,8 +52,6 @@ parser.add_argument('-b', '--batch-size', default=64, type=int,
                     metavar='N', help='batch size (default: 128), this is the total batch size of all GPUs on the current node when using Data Parallel or Distributed Data Parallel')
 parser.add_argument('--lr', '--learning-rate', default=0.03, type=float,
                     metavar='LR', help='initial learning rate', dest='lr')
-parser.add_argument('--schedule', default=[120, 160], nargs='*', type=int,
-                    help='learning rate schedule (when to drop lr by 10x)')
 parser.add_argument('-p', '--print-freq', default=10, type=int,
                     metavar='N', help='print frequency (default: 10)')
 parser.add_argument('--profile', default=False, type=bool, action=argparse.BooleanOptionalAction,
@@ -91,7 +89,7 @@ def from_engine_custom(keys, device):
 
 def train(dl_train, dl_val, model, optimizer, max_epochs, out_path, writer, device):
     val_postprocessing = Compose([EnsureTyped(keys=CommonKeys.PRED),
-                                  AsDiscreted(keys=CommonKeys.PRED, argmax=True),
+                                  # AsDiscreted(keys=CommonKeys.PRED, argmax=True),
                                   ])
 
     evaluator = SupervisedEvaluator(
@@ -176,10 +174,10 @@ def wrap_data(train_data, val_data, test_data, slide_annotations, labels, batch_
     cropper = transforms.RandomResizedCrop(299, scale=(0.2, 1.), antialias=True)
     jitterer = transforms.ColorJitter(brightness=4, contrast=0.4, saturation=0.4, hue=0.01)
 
-
+    # For profiling purposes, if profiling
     def range_func(x, y):
-        #return y
         return Range(x, methods="__call__")(y) if is_profiling else y
+
     transformations = mt.Compose(
         [
             range_func("LoadImage", mt.LoadImaged([CommonKeys.IMAGE], image_only=True)),
@@ -198,11 +196,6 @@ def wrap_data(train_data, val_data, test_data, slide_annotations, labels, batch_
         [
             mt.LoadImaged([CommonKeys.IMAGE]),
             mt.EnsureChannelFirstd([CommonKeys.IMAGE]),
-            # mt.Lambdad([CommonKeys.IMAGE], cropper),
-            # mt.RandLambdad([CommonKeys.IMAGE], jitterer, prob=0.8),
-            # mt.RandLambdad([CommonKeys.IMAGE], grayer, prob=0.2),
-            # mt.RandFlipd([CommonKeys.IMAGE], prob=0.5, spatial_axis=0),
-            # mt.RandFlipd([CommonKeys.IMAGE], prob=0.5, spatial_axis=1),
             mt.ToTensord([CommonKeys.IMAGE], track_meta=False),
             mt.EnsureTyped([CommonKeys.IMAGE, CommonKeys.LABEL], track_meta=False),
         ]
@@ -220,9 +213,9 @@ def wrap_data(train_data, val_data, test_data, slide_annotations, labels, batch_
     dl_val = DataLoader(ds_val, batch_size=batch_size, num_workers=workers, shuffle=True)
     dl_test = DataLoader(ds_test, batch_size=batch_size, num_workers=workers, shuffle=True)
 
-    logging.info("Number of images in dataset: {}".format(len(ds_train)))
-    logging.info("Number of batches in DL: {}".format(len(dl_train)))
     logging.info("Dataset Created ...")
+    logging.info("Number of images in train dataset: {}".format(len(ds_train)))
+    logging.info("Number of batches in train DL: {}".format(len(dl_train)))
     return dl_train, dl_val, dl_test
 
 def assign_labels(ds, labels, annotations):
@@ -248,10 +241,6 @@ def main():
         sys.exit(1)
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
-    directory = os.environ.get("MONAI_DATA_DIRECTORY")
-    root_dir = tempfile.mkdtemp() if directory is None else directory
-    logging.info(f"root dir for MONAI is: {root_dir}")
 
     logging.info('Create dataset')
 

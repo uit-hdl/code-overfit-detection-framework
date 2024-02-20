@@ -980,9 +980,10 @@ p_slide.y_range.start = 0
 
 
 l = [x.strip().split() for x in file_data.split("\n")]
-l = [(institution_lookup[y[0]], y[1]) for y in l]
+#l = [(institution_lookup[y[0]], y[1]) for y in l]
+l = [(y[0], y[1]) for y in l]
 institutions, counts = zip(*l)
-p_disk = figure(x_range=institutions, height=plot_height, width=plot_width, title="Institution Disk Usage")
+p_disk = figure(x_range=institutions, height=plot_height, width=plot_width, title="Institution Data Amount")
 p_disk.vbar(x=institutions, top=counts, width=0.9)
 p_disk.xgrid.grid_line_color = None
 p_disk.y_range.start = 0
