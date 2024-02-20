@@ -38,8 +38,12 @@ from monai.inferers import SimpleInferer
 from monai.optimizers import generate_param_groups
 from ignite.engine import Events
 from ignite.metrics import Accuracy
-from monai.transforms import Compose, Activationsd, AsDiscreted
+from monai.transforms import Compose, Activationsd, AsDiscreted, EnsureTyped
+from monai.handlers import StatsHandler, from_engine, ValidationHandler, CheckpointSaver, MeanDice, \
+    TensorBoardImageHandler, TensorBoardStatsHandler
+from monai.handlers.tensorboard_handlers import SummaryWriter
 from sklearn.metrics import roc_curve, confusion_matrix, ConfusionMatrixDisplay
+from ignite.metrics import Accuracy, Loss
 
 parser = argparse.ArgumentParser(description='Extract embeddings ')
 
@@ -56,12 +60,24 @@ parser.add_argument('-b', '--batch-size', default=64, type=int,
                     metavar='N', help=f'batch size, this is the total batch size of all GPUs on the current node when using Data Parallel or Distributed Data Parallel')
 parser.add_argument('--profile', default=False, type=bool, action=argparse.BooleanOptionalAction,
                     metavar='P', help='whether to profile training or not', dest='is_profiling')
+parser.add_argument('--debug-mode', default=False, type=bool, action=argparse.BooleanOptionalAction,
+                    metavar='D', help='turn debugging on or off. Will limit amount of data used. Development only', dest='debug_mode')
 parser.add_argument('-j', '--workers', default=0, type=int, metavar='N',
                     help='number of data loading workers')
 parser.add_argument('--lr', '--learning-rate', default=0.03, type=float,
                     metavar='LR', help='initial learning rate', dest='lr')
 parser.add_argument('-p', '--print-freq', default=10, type=int,
                     metavar='N', help='print frequency (default: 10)')
+
+def from_engine_custom(keys, device):
+    """
+        Encapsulate data in dimensions to satisfy MONAI API
+    """
+    def _wrapper(data):
+        ret = [[i[k] for i in data] for k in keys]
+        return list(map(lambda l: l.unsqueeze(0), ret[0])), list(map(lambda l: torch.tensor(l).unsqueeze(0).to(device), ret[1]))
+
+    return _wrapper
 
 def load_model(net, model_path, device):
     # original
@@ -94,45 +110,63 @@ def assign_labels(ds, labels, annotations, label_key):
         del entry['filename']
     logging.info("Annotations complete")
 
-def train(dl_train, dl_val, model, optimizer, max_epochs, out_path, device):
-    val_postprocessing = Compose([Activationsd(keys="pred", sigmoid=True), AsDiscreted(keys="pred", threshold=0.5)])
+def train(dl_train, dl_val, model, optimizer, max_epochs, out_path, writer, device):
+    val_postprocessing = Compose([EnsureTyped(keys=CommonKeys.PRED),
+                                  # AsDiscreted(keys=CommonKeys.PRED, argmax=True),
+                                  ])
 
     evaluator = SupervisedEvaluator(
         device=device,
         val_data_loader=dl_val,
         network=model,
+        val_handlers=[
+            StatsHandler(tag_name="train_log", output_transform=lambda x: None),
+            TensorBoardStatsHandler(writer, output_transform=lambda x: x),
+            CheckpointSaver(save_dir=os.path.join(out_path, "runs"), save_dict={"net": model}, save_key_metric=True),
+            ],
+        additional_metrics={"val_acc": Accuracy(output_transform=from_engine([CommonKeys.PRED, CommonKeys.LABEL]))},
+        key_val_metric={
+            "val_mean_dice": MeanDice(output_transform=from_engine_custom(keys=[CommonKeys.PRED, CommonKeys.LABEL], device=device))
+        },
         postprocessing=val_postprocessing,
     )
+
 
     params = generate_param_groups(network=model, layer_matches=[lambda x: x.last_linear], match_types=["select"], lr_values=[1e-3])
 
     # TODO: am I supposed to keep using the training data now, or just from test data?
-    batch_size = 64
     trainer = SupervisedTrainer(
         device=device,
-        max_epochs=5,
+        max_epochs=max_epochs,
         train_data_loader=dl_train,
         network=model,
-        optimizer=torch.optim.Adam(params, 1e-5),
+        optimizer=optimizer,
         loss_function=torch.nn.CrossEntropyLoss(),
         inferer=SimpleInferer(),
-        key_train_metric={"train_acc": Accuracy(output_transform=from_engine(["pred", "label"]))},
-        train_handlers=[StatsHandler(tag_name="train_loss", output_transform=from_engine(["loss"], first=True)),
-                        ValidationHandler(1, evaluator, epoch_level=True),
+        key_train_metric={"train_acc": Accuracy(output_transform=from_engine([CommonKeys.PRED, CommonKeys.LABEL]))},
+        additional_metrics={"train_loss": Loss(output_transform=from_engine([CommonKeys.PRED, CommonKeys.LABEL], first=False), loss_fn=nn.NLLLoss())},
+        train_handlers=[StatsHandler(tag_name="train_loss", output_transform=from_engine([CommonKeys.LOSS], first=True)),
+                        TensorBoardStatsHandler(writer, output_transform=lambda x: x),
+                        ValidationHandler(1, evaluator),
                         CheckpointSaver(save_dir=out_path, save_dict={'network': model}, save_interval=1)
                         ],
     )
-
-    how_many_batches = len(dl_train.dataset) // batch_size
 
     iterLosses = []
     batchSizes = []
     epoch_loss_values = []
     metric_values = []
+    mean_dice_values = []
+    mean_val_acc = []
+
+
+    @evaluator.on(Events.EPOCH_COMPLETED)
+    def log_validation(engine):
+        mean_dice_values.append(engine.state.metrics["val_mean_dice"])
+        mean_val_acc.append(engine.state.metrics["val_acc"])
 
     @trainer.on(Events.ITERATION_COMPLETED)
     def log_training(engine):
-        batch_loss = engine.state.output
         loss = np.average([o["loss"] for o in engine.state.output])
         batch_len = len(engine.state.batch[0])
 
@@ -155,10 +189,11 @@ def train(dl_train, dl_val, model, optimizer, max_epochs, out_path, device):
         engine.state.iteration = 0
 
         # fetch and report the validation metrics
-        print(
-            f"evaluation for epoch {engine.state.epoch}: averageLoss: {overallAverageLoss}, epoch_loss_values: {epoch_loss_values}, training accuracy: {train_acc}")
+        logging.info(f"evaluation for epoch {engine.state.epoch}: averageLoss: {overallAverageLoss}, epoch_loss_values: {epoch_loss_values}, training accuracy: {train_acc}")
 
     trainer.run()
+
+    return epoch_loss_values, metric_values, mean_dice_values, mean_val_acc
 
 def wrap_data(train_data, val_data, test_data, slide_annotations, labels, label_key, batch_size, workers, is_profiling):
     logging.info('Creating dataset')
@@ -283,9 +318,11 @@ def main():
 
     logging.info('Creating dataset')
     train_data, val_data, test_data = build_file_list(args.src_dir, args.file_list_path)
-    train_data = train_data[:args.batch_size * 2]
-    val_data = val_data[:args.batch_size * 2]
-    test_data = test_data[:args.batch_size]
+    if args.debug_mode:
+        logging.warn("Debug mode enabled!")
+        train_data = train_data[:args.batch_size * 2]
+        val_data = val_data[:args.batch_size * 2]
+        test_data = test_data[:args.batch_size]
     dl_train, dl_val, dl_test = wrap_data(train_data, val_data, test_data, slide_annotations, labels, args.label_key, args.batch_size, args.workers, args.is_profiling)
 
     model = InceptionV4(num_classes=128)
@@ -302,8 +339,16 @@ def main():
         logging.info("=> creating model '{}'".format('x64'))
         optimizer = torch.optim.Adam(model.parameters(), args.lr)
         logging.info('Model builder done')
-        epoch_loss_values, metric_values, mean_dice_values, mean_val_acc = train(dl_train, dl_val, model, optimizer, args.epochs, out_path, device)
-
+        writer = SummaryWriter(log_dir=os.path.join(out_path, "runs"))
+        epoch_loss_values, metric_values, mean_dice_values, mean_val_acc = train(dl_train, dl_val, model, optimizer, args.epochs, out_path, writer, device)
+        writer.add_scalar("size of dataset", len(train_data), 0)
+        writer.add_scalar("batch size", args.batch_size, 0)
+        writer.add_text("model name", "inception")
+        writer.add_text("data dir", data_dir_name)
+        writer.add_text("label_key", args.label_key)
+        writer.add_scalar("learning rate", args.lr, 0)
+        writer.flush()
+        logging.info(f"=> Model builder done, wrote model to '{model_path}'")
         plot_train_data(epoch_loss_values, metric_values, mean_dice_values, mean_val_acc, args.out_dir)
 
     predictions = []
