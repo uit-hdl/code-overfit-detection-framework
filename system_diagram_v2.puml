@@ -10,11 +10,13 @@ node "Model developer" as developer {
     }
 }
 
+/'
 node <img:MONAI-logo-color.png> as monai {
     node "Imageloader" as imageloader
     node "PyTorch <img:pytorch.png{scale=.2}>" as pytorch
     node "Distributed trainer\n\t<img:distributed.png{scale=.10}>"
 }
+'/
 
 node "Model SSL training" as trainer {
     hexagon "Conditional Sampler" as sampler
@@ -33,15 +35,17 @@ map "Analysis output" as analysis {
 
 }
 
+/'
 monai -left[hidden]-> developer
 monai -left[hidden]-> trainer
 monai -down[hidden]-> overfit
 monai -down[hidden]-> analysis
+monai .d. trainer
+monai .. overfit
+'/
 train --> trainer
 sens --> sampler
-monai .d. trainer
 trainer --> models
 models --> overfit
-monai .. overfit
 overfit --> analysis
 ```
