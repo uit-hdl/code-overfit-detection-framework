@@ -11,6 +11,8 @@
 import logging
 import os
 import sys
+from collections import defaultdict
+
 import tfplot
 
 import numpy as np
@@ -107,7 +109,7 @@ def assign_labels(ds, labels, annotations, label_key):
         entry[CommonKeys.LABEL] = labels[annotations.loc[slide_id, label_key]]
         del entry['q']
         del entry['k']
-        del entry['filename']
+        #del entry['filename']
 
 def train(dl_train, dl_val, model, optimizer, max_epochs, out_path, writer, device):
     val_postprocessing = Compose([EnsureTyped(keys=CommonKeys.PRED),
@@ -353,6 +355,7 @@ def main():
     predictions = []
     gts = []
     logging.info('Evaluating model')
+    wrong_predictions = defaultdict(list)
     with eval_mode(model):
         for item in tqdm(dl_test):
             prob = model(item["image"].to(device)).detach().to("cpu")
@@ -361,6 +364,30 @@ def main():
 
             gt = item["label"].detach().cpu().numpy()
             gts += list(x for x in gt)
+            for i,(p,g) in enumerate(zip(pred, gt)):
+                if p != g:
+                    wrong_predictions[labels[g]].append((item["filename"][i], g, p))
+
+    i = 1
+    grid_size = min(10, min(map(lambda l: len(l), wrong_predictions.values())))
+    fig, axes = plt.subplots(nrows=len(wrong_predictions), ncols=grid_size, figsize=(10, 10), sharex=True, sharey=True)
+    plt.setp(axes, xticks=[], yticks=[])
+    fontsize = 6
+    for row,w in enumerate(wrong_predictions):
+        if len(wrong_predictions) == 1:
+            axes[row].set_ylabel(f"GT: {w}", fontsize=fontsize)
+        else:
+            axes[row][0].set_ylabel(f"GT: {w}", fontsize=fontsize)
+        for col in range(grid_size):
+            image_filename, g, p = wrong_predictions[w][col]
+            if len(wrong_predictions) == 1:
+                axes[col].imshow(plt.imread(image_filename))
+                axes[col].set_title("pred: {}".format(labels[p]), fontsize=fontsize)
+            else:
+                axes[row][col].imshow(plt.imread(image_filename))
+                axes[row][col].set_title("pred: {}".format(labels[p]))
+            i += 1
+    writer.add_figure("Wrong Predictions", fig, 0)
 
     roc = roc_curve(gts, predictions)
     # check if roc[0] or roc[1] contains nan
