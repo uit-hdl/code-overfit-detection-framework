@@ -273,7 +273,7 @@ def main():
 
     model_path = os.path.join(out_path, f"network_epoch={args.epochs}.pt")
     model = densenet121(spatial_dims=2, in_channels=3, out_channels=2, pretrained=True).to(device)
-    if os.path.exists(model_path) and False:
+    if os.path.exists(model_path):
         logging.info(f"=> loading model '{model_path}'")
         model.load_state_dict(torch.load(model_path, map_location=device))
         logging.info('Model builder done, placed on cuda()')

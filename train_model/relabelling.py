@@ -11,6 +11,7 @@
 import logging
 import os
 import sys
+import tfplot
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -42,7 +43,7 @@ from monai.transforms import Compose, Activationsd, AsDiscreted, EnsureTyped
 from monai.handlers import StatsHandler, from_engine, ValidationHandler, CheckpointSaver, MeanDice, \
     TensorBoardImageHandler, TensorBoardStatsHandler
 from monai.handlers.tensorboard_handlers import SummaryWriter
-from sklearn.metrics import roc_curve, confusion_matrix, ConfusionMatrixDisplay
+from sklearn.metrics import roc_curve, confusion_matrix, ConfusionMatrixDisplay, roc_auc_score
 from ignite.metrics import Accuracy, Loss
 
 parser = argparse.ArgumentParser(description='Extract embeddings ')
@@ -99,7 +100,6 @@ def attach_layers(model, num_neurons_in_layers, out_classes):
     return model
 
 def assign_labels(ds, labels, annotations, label_key):
-    logging.info("Processing annotations")
     labels = {l: i for i, l in enumerate(labels)}
     for entry in ds:
         filename = entry[CommonKeys.IMAGE]
@@ -108,7 +108,6 @@ def assign_labels(ds, labels, annotations, label_key):
         del entry['q']
         del entry['k']
         del entry['filename']
-    logging.info("Annotations complete")
 
 def train(dl_train, dl_val, model, optimizer, max_epochs, out_path, writer, device):
     val_postprocessing = Compose([EnsureTyped(keys=CommonKeys.PRED),
@@ -319,10 +318,10 @@ def main():
     logging.info('Creating dataset')
     train_data, val_data, test_data = build_file_list(args.src_dir, args.file_list_path)
     if args.debug_mode:
-        logging.warn("Debug mode enabled!")
+        logging.warning("Debug mode enabled!")
         train_data = train_data[:args.batch_size * 2]
         val_data = val_data[:args.batch_size * 2]
-        test_data = test_data[:args.batch_size]
+        test_data = test_data[:args.batch_size * 4]
     dl_train, dl_val, dl_test = wrap_data(train_data, val_data, test_data, slide_annotations, labels, args.label_key, args.batch_size, args.workers, args.is_profiling)
 
     model = InceptionV4(num_classes=128)
@@ -331,7 +330,8 @@ def main():
     model.to(device)
 
     model_path = os.path.join(out_path, f"network_epoch={args.epochs}.pt")
-    if os.path.exists(model_path) and False:
+    writer = SummaryWriter(log_dir=os.path.join(out_path, "runs"))
+    if os.path.exists(model_path):
         logging.info(f"=> loading model '{model_path}'")
         model.load_state_dict(torch.load(model_path, map_location=device))
         logging.info('Model builder done')
@@ -339,7 +339,6 @@ def main():
         logging.info("=> creating model '{}'".format('x64'))
         optimizer = torch.optim.Adam(model.parameters(), args.lr)
         logging.info('Model builder done')
-        writer = SummaryWriter(log_dir=os.path.join(out_path, "runs"))
         epoch_loss_values, metric_values, mean_dice_values, mean_val_acc = train(dl_train, dl_val, model, optimizer, args.epochs, out_path, writer, device)
         writer.add_scalar("size of dataset", len(train_data), 0)
         writer.add_scalar("batch size", args.batch_size, 0)
@@ -364,18 +363,25 @@ def main():
             gts += list(x for x in gt)
 
     roc = roc_curve(gts, predictions)
-    plt.figure()
-    plt.title("ROC Curve")
-    plt.xlabel("False Positive Rate")
-    plt.ylabel("True Positive Rate")
-    plt.plot(roc[0], roc[1])
+    # check if roc[0] or roc[1] contains nan
+    if np.isnan(roc[0]).any() or np.isnan(roc[1]).any():
+        logging.warning("ROC curve contains nan values - omitting from tensorboard")
+    else:
+        plt.title("ROC Curve")
+        plt.xlabel("False Positive Rate")
+        plt.ylabel("True Positive Rate")
+        plt.plot(roc[0], roc[1])
+        writer.add_figure("ROC Curve - Test data", plt.gcf(), 0)
+        auc = roc_auc_score(gts, predictions)
+        writer.add_scalar("AUC - Test data", auc, 0)
 
     labels = slide_annotations[args.label_key].unique().tolist()
     cm = confusion_matrix(gts, predictions, labels=list(range(len(labels))))
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=labels)
-    disp.plot(ax=plt.subplots(1, 1, facecolor="white")[1])
+    cmd = disp.plot(ax=plt.subplots(1, 1, facecolor="white")[1])
+    writer.add_figure("Confusion Matrix - Test data", cmd.figure_)
 
-    plt.show()
+    #plt.show()
 
 if __name__ == '__main__':
     logging.basicConfig(stream=sys.stdout, level=logging.INFO)
