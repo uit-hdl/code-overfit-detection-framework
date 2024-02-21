@@ -370,7 +370,7 @@ def main():
 
     i = 1
     grid_size = min(10, min(map(lambda l: len(l), wrong_predictions.values())))
-    fig, axes = plt.subplots(nrows=len(wrong_predictions), ncols=grid_size, figsize=(10, 10), sharex=True, sharey=True)
+    fig, axes = plt.subplots(nrows=len(wrong_predictions), ncols=grid_size, figsize=(16, 16), sharex=True, sharey=True)
     plt.setp(axes, xticks=[], yticks=[])
     fontsize = 6
     for row,w in enumerate(wrong_predictions):
