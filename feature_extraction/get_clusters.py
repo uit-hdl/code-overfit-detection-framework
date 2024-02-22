@@ -30,13 +30,17 @@ from global_util import ensure_dir_exists
 parser = argparse.ArgumentParser(description='Get cluster features')
 reducer = umap.UMAP(random_state=42)
 
-parser.add_argument('--embeddings_path', default='./out/MoCo/lung_scc/embeddings/test_lung_scc_embedding.pkl', type=str, help="location of embedding pkl from feature_extraction.py")
-parser.add_argument('--number_of_images', default=3, type=int, help="how many images to sample for the UMAP plot")
-parser.add_argument('--histogram_bins', default=10, type=int, help="how many histogram buckets to use in each (x,y) dimension (e.g. 10 means 100 buckets in total)")
-parser.add_argument('--clinical_path', default='./annotations/TCGA/clinical.tsv', type=str, help="location of file containing clinical data")
-parser.add_argument('--thumbnail_path', default='/Data/TCGA_LUSC/thumbnails', type=str, help="location of directory containing thumbnails")
-parser.add_argument('--n_cluster', default=50, type=int)
-parser.add_argument('--out_dir', default='./out', type=str)
+parser.add_argument('--embeddings-path', default='./out/MoCo/lung_scc/embeddings/test_lung_scc_embedding.pkl', type=str, help="location of embedding pkl from feature_extraction.py")
+parser.add_argument('--number-of-images', default=30, type=int, help="how many images to sample for the UMAP plot")
+parser.add_argument('--histogram-bins', default=10, type=int, help="how many histogram buckets to use in each (x,y) dimension (e.g. 10 means 100 buckets in total)")
+parser.add_argument('--clinical-path', default='./annotations/TCGA/clinical.tsv', type=str, help="location of file containing clinical data")
+parser.add_argument('--thumbnail-path', default='/Data/TCGA_LUSC/thumbnails', type=str, help="location of directory containing thumbnails")
+parser.add_argument('--slide_annotation_file', default=os.path.join('annotations', 'slide_label', 'gdc_sample_sheet.2023-08-14.tsv'), type=str,
+                    help='"Sample sheet" from TCGA, see README.md for instructions on how to get sheet')
+parser.add_argument('--n-cluster', default=50, type=int)
+parser.add_argument('--out-dir', default='./out', type=str)
+
+# TODO: add another graph for tissue normal vs tumor
 
 # color by gender
 
@@ -164,7 +168,7 @@ def compute_histograms_overlap(plot_data, data_key, unique_labels, no_bins):
     mean_overlap = np.mean([x["all"] for x in overlaps.values()])
     return overlaps, mean_overlap
 
-def umap_slice(names, features, cluster, clinical):
+def umap_slice(names, features, cluster, clinical, slide_annotations):
     values = [[x[0] for x in features[name]] for name in names]
     if not all(values):
         raise RuntimeError("One of the keys did not lead anywhere!")
@@ -186,11 +190,13 @@ def umap_slice(names, features, cluster, clinical):
     names_labels = [[names[i]] * (i_e - i_s) for i,(i_s,i_e) in enumerate(zip(slices, slices[1:]))]
     names_labels = [item for sublist in names_labels for item in sublist]
     case_submitter_ids = ["-".join(name.split("-")[:3]) for name in names_labels]
-    gender_labels = [clinical['gender'][case][0] for case in case_submitter_ids]
+    gender_labels = [clinical['gender'][case].iloc[0] for case in case_submitter_ids]
     site_of_resection_labels = [clinical['site_of_resection_or_biopsy'][case][0] for case in case_submitter_ids]
-    path_stage_t = [clinical['ajcc_pathologic_t'][case][0] for case in case_submitter_ids]
-    path_stage_m = [clinical['ajcc_pathologic_m'][case][0] for case in case_submitter_ids]
-    race_labels = [clinical['race'][case][0] for case in case_submitter_ids]
+    path_stage_t = [clinical['ajcc_pathologic_t'][case].iloc[0] for case in case_submitter_ids]
+    path_stage_m = [clinical['ajcc_pathologic_m'][case].iloc[0] for case in case_submitter_ids]
+    race_labels = [clinical['race'][case].iloc[0] for case in case_submitter_ids]
+    tissue_type = list(map(lambda l: slide_annotations[os.path.basename(os.path.dirname(l))], tile_names))
+
     # If you want to see what the codes refer to https://gdc.cancer.gov/resources-tcga-users/tcga-code-tables/tissue-source-site-codes
     institution_labels = [case.split("-")[1] for case in case_submitter_ids]
     patient_labels = [case.split("-")[2] for case in case_submitter_ids]
@@ -204,6 +210,7 @@ def umap_slice(names, features, cluster, clinical):
         'resection': site_of_resection_labels,
         'path_stage_m': path_stage_m,
         'path_stage_t': path_stage_t,
+        'tissue_type': tissue_type,
         'slide': names_labels,
         'patient': patient_labels,
         'image_url': tile_names,
@@ -365,6 +372,12 @@ def viz_data(mapper, data, names, knn, knc, cpd, thumbnail_path, out_html, umap_
 def main(clinical_path, embeddings_path, thumbnail_path, histogram_bins, n_cluster, number_of_images, out_dir):
     clinical = pd.read_csv(clinical_path, sep='\t')
     clinical = clinical.set_index('case_submitter_id')
+    # TODO: append tissue type to "clinical"
+    slide_annotations = pd.read_csv(args.slide_annotation_file, sep='\t', header=0)
+    slide_annotations["my_slide_id"] = slide_annotations["File Name"].map(lambda s: s.split(".")[0])
+    # Generate a dictionary using "my_slide_id" as key and "Sample Type" as value
+    slide_annotations = slide_annotations.set_index("my_slide_id")
+    slide_annotations = slide_annotations["Sample Type"].to_dict()
 
     features = pickle.load(open(embeddings_path, 'rb'))
 
@@ -398,7 +411,7 @@ def main(clinical_path, embeddings_path, thumbnail_path, histogram_bins, n_clust
             d = pickle.load(open(pickle_out, 'rb'))
             mapper, data, knn, knc, cpd = d["mapper"], d["data"], d["knn"], d["knc"], d["cpd"]
         else:
-            mapper, data, knn, knc, cpd = umap_slice(keys_chosen, features, cluster, clinical)
+            mapper, data, knn, knc, cpd = umap_slice(keys_chosen, features, cluster, clinical, slide_annotations)
             #pickle_obj = {"mapper": mapper, "data": data, "knn": knn, "knc": knc, "cpd": cpd}
             #pickle.dump(pickle_obj, open(pickle_out, 'wb'), protocol=4)
 
@@ -412,6 +425,7 @@ def main(clinical_path, embeddings_path, thumbnail_path, histogram_bins, n_clust
             ('gender', "Gender"),
             #('cluster_id', "GMM Cluster"),
             ('resection', "Resection Site"),
+            ('tissue_type', "Tissue Type"),
             ('path_stage_t', "Pathological Stage T"),
             ('path_stage_m', "Pathological Stage M")
         ]:
