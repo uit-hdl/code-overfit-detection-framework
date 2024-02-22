@@ -65,11 +65,13 @@ def load_model(net, model_path, device):
     else:
         net.last_linear = nn.Sequential(
             nn.Linear(1536, 500),
-            nn.ReLU(),
-            nn.Linear(500, 200),
+            #nn.ReLU(),
+            #nn.Linear(500, 200),
             #nn.ReLU(),
             #nn.Linear(200, 2),
         )
+        del checkpoint['last_linear.2.weight']
+        del checkpoint['last_linear.2.bias']
         del checkpoint['last_linear.4.weight']
         del checkpoint['last_linear.4.bias']
         net.load_state_dict(checkpoint)

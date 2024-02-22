@@ -191,7 +191,7 @@ def umap_slice(names, features, cluster, clinical, slide_annotations):
     names_labels = [item for sublist in names_labels for item in sublist]
     case_submitter_ids = ["-".join(name.split("-")[:3]) for name in names_labels]
     gender_labels = [clinical['gender'][case].iloc[0] for case in case_submitter_ids]
-    site_of_resection_labels = [clinical['site_of_resection_or_biopsy'][case][0] for case in case_submitter_ids]
+    site_of_resection_labels = [clinical['site_of_resection_or_biopsy'][case].iloc[0] for case in case_submitter_ids]
     path_stage_t = [clinical['ajcc_pathologic_t'][case].iloc[0] for case in case_submitter_ids]
     path_stage_m = [clinical['ajcc_pathologic_m'][case].iloc[0] for case in case_submitter_ids]
     race_labels = [clinical['race'][case].iloc[0] for case in case_submitter_ids]
@@ -372,13 +372,13 @@ def viz_data(mapper, data, names, knn, knc, cpd, thumbnail_path, out_html, umap_
 def main(clinical_path, embeddings_path, thumbnail_path, histogram_bins, n_cluster, number_of_images, out_dir):
     clinical = pd.read_csv(clinical_path, sep='\t')
     clinical = clinical.set_index('case_submitter_id')
-    # TODO: append tissue type to "clinical"
     slide_annotations = pd.read_csv(args.slide_annotation_file, sep='\t', header=0)
     slide_annotations["my_slide_id"] = slide_annotations["File Name"].map(lambda s: s.split(".")[0])
     # Generate a dictionary using "my_slide_id" as key and "Sample Type" as value
     slide_annotations = slide_annotations.set_index("my_slide_id")
     slide_annotations = slide_annotations["Sample Type"].to_dict()
 
+    print(f"Loading embeddings from {embeddings_path}")
     features = pickle.load(open(embeddings_path, 'rb'))
 
     cluster_dst = os.path.join(out_dir, 'cluster', f'gmm_{n_cluster}.pkl')

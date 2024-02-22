@@ -317,6 +317,10 @@ def main():
     slide_annotations["my_inst"] = slide_annotations["File Name"].map(lambda s: s.split("-")[1])
     labels = slide_annotations[args.label_key].unique().tolist()
 
+    # https://www.nature.com/articles/s41591-019-0508-1#Equ1
+    # positive = negative
+
+
     logging.info('Creating dataset')
     train_data, val_data, test_data = build_file_list(args.src_dir, args.file_list_path)
     if args.debug_mode:
