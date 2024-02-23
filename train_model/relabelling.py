@@ -47,6 +47,7 @@ from monai.handlers import StatsHandler, from_engine, ValidationHandler, Checkpo
 from monai.handlers.tensorboard_handlers import SummaryWriter
 from sklearn.metrics import roc_curve, confusion_matrix, ConfusionMatrixDisplay, roc_auc_score
 from ignite.metrics import Accuracy, Loss
+import torch.nn.functional as F
 
 parser = argparse.ArgumentParser(description='Extract embeddings ')
 
@@ -316,10 +317,7 @@ def main():
     slide_annotations = slide_annotations.set_index("my_slide_id")
     slide_annotations["my_inst"] = slide_annotations["File Name"].map(lambda s: s.split("-")[1])
     labels = slide_annotations[args.label_key].unique().tolist()
-
-    # https://www.nature.com/articles/s41591-019-0508-1#Equ1
-    # positive = negative
-
+    assert labels[0] == "Solid Tissue Normal" # making 0 the benign class
 
     logging.info('Creating dataset')
     train_data, val_data, test_data = build_file_list(args.src_dir, args.file_list_path)
@@ -360,15 +358,23 @@ def main():
     gts = []
     logging.info('Evaluating model')
     wrong_predictions = defaultdict(list)
+    predictions_per_slide = defaultdict(lambda: np.array([], dtype=np.int32))
+    gt_for_slide = {}
     with eval_mode(model):
         for item in tqdm(dl_test):
-            prob = model(item["image"].to(device)).detach().to("cpu")
+            y = model(item["image"].to(device))
+            prob = F.softmax(y).detach().to("cpu")
             pred = torch.argmax(prob, dim=1).numpy()
+            # only extract "positive", i.e. probability of being malignant
+            pred_p = prob[:, 1].numpy()
             predictions += list(x for x in pred)
 
             gt = item["label"].detach().cpu().numpy()
             gts += list(x for x in gt)
             for i,(p,g) in enumerate(zip(pred, gt)):
+                slide_name = os.path.basename(os.path.dirname(item["filename"][i]))
+                gt_for_slide[slide_name] = g
+                predictions_per_slide[slide_name] = np.append(predictions_per_slide[slide_name], pred_p[i])
                 if p != g:
                     wrong_predictions[labels[g]].append((item["filename"][i], g, p))
 
@@ -393,6 +399,34 @@ def main():
             i += 1
     writer.add_figure("Wrong Predictions", fig, 0)
 
+    labels = slide_annotations[args.label_key].unique().tolist()
+    plot_results(gts, predictions, labels, "Test data - Tile level", writer)
+
+    # https://www.nature.com/articles/s41591-019-0508-1#Equ1
+    # benign = negative
+    w_n = 0.75 # TODO: find actual weight to use
+    w_p = 1 - w_n
+    # Calculate cross-entropy from predictions and gts
+    loss_per_slide = defaultdict(lambda: np.array([], dtype=np.float32))
+    predictions_per_slide = {k: np.max(v) for k,v in predictions_per_slide.items()}
+    for slide, p in predictions_per_slide.items():
+        yi = gt_for_slide[slide]
+        yi_tilde = p
+        l = -w_n * yi * (np.log(yi_tilde) if yi_tilde != 0.0 else -100.0) - w_p * (1 - yi) * (np.log(1 - yi_tilde) if yi_tilde != 1 else -100)
+        loss_per_slide[slide] = np.append(loss_per_slide[slide], l)
+
+    loss_per_slide = {k: int(np.sort(v)[-1] <= 0.5) for k,v in loss_per_slide.items()}
+
+    # iterate over loss_per_slide  and gt_for_slide simultaneously
+    a = np.array([[l,gt_for_slide[s]] for s,l in loss_per_slide.items()])
+    predictions = a[:,0].astype(np.int32)
+    gts = a[:,1].astype(np.int32)
+
+    plot_results(gts, predictions, labels, "Test data - Slide level", writer)
+
+    #plt.show()
+
+def plot_results(gts, predictions, labels, title, writer):
     roc = roc_curve(gts, predictions)
     # check if roc[0] or roc[1] contains nan
     if np.isnan(roc[0]).any() or np.isnan(roc[1]).any():
@@ -402,17 +436,14 @@ def main():
         plt.xlabel("False Positive Rate")
         plt.ylabel("True Positive Rate")
         plt.plot(roc[0], roc[1])
-        writer.add_figure("ROC Curve - Test data", plt.gcf(), 0)
+        writer.add_figure(f"ROC Curve - {title}", plt.gcf(), 0)
         auc = roc_auc_score(gts, predictions)
-        writer.add_scalar("AUC - Test data", auc, 0)
+        writer.add_scalar(f"AUC - {title}", auc, 0)
 
-    labels = slide_annotations[args.label_key].unique().tolist()
     cm = confusion_matrix(gts, predictions, labels=list(range(len(labels))))
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=labels)
     cmd = disp.plot(ax=plt.subplots(1, 1, facecolor="white")[1])
-    writer.add_figure("Confusion Matrix - Test data", cmd.figure_)
-
-    #plt.show()
+    writer.add_figure(f"Confusion Matrix - {title}", cmd.figure_)
 
 if __name__ == '__main__':
     logging.basicConfig(stream=sys.stdout, level=logging.INFO)
