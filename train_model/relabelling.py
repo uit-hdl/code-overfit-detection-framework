@@ -343,6 +343,7 @@ def main():
         logging.info("=> creating model '{}'".format('x64'))
         optimizer = torch.optim.Adam(model.parameters(), args.lr)
         logging.info('Model builder done')
+        # TODO: add weights during training, similar to https://github.com/MSKCC-Computational-Pathology/MIL-nature-medicine-2019/blob/daecb7293b5ea886ba222008f2592e1e29e9dac6/MIL_train.py#L42
         epoch_loss_values, metric_values, mean_dice_values, mean_val_acc = train(dl_train, dl_val, model, optimizer, args.epochs, out_path, writer, device)
         writer.add_scalar("size of dataset", len(train_data), 0)
         writer.add_scalar("batch size", args.batch_size, 0)
@@ -409,6 +410,7 @@ def main():
     # Calculate cross-entropy from predictions and gts
     loss_per_slide = defaultdict(lambda: np.array([], dtype=np.float32))
     predictions_per_slide = {k: np.max(v) for k,v in predictions_per_slide.items()}
+    #FIXME: not supposed to use the loss function here, just softmax
     for slide, p in predictions_per_slide.items():
         yi = gt_for_slide[slide]
         yi_tilde = p
