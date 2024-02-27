@@ -13,8 +13,6 @@ import os
 import sys
 from collections import defaultdict
 
-import tfplot
-
 import numpy as np
 from matplotlib import pyplot as plt
 from monai.data import DataLoader, Dataset
@@ -48,6 +46,7 @@ from monai.handlers.tensorboard_handlers import SummaryWriter
 from sklearn.metrics import roc_curve, confusion_matrix, ConfusionMatrixDisplay, roc_auc_score
 from ignite.metrics import Accuracy, Loss
 import torch.nn.functional as F
+from global_util import ensure_dir_exists
 
 parser = argparse.ArgumentParser(description='Extract embeddings ')
 
@@ -304,10 +303,12 @@ def main():
     data_dir_name = list(filter(None, args.src_dir.split(os.sep)))[-1]
     out_path = os.path.join(args.out_dir, condssl.builder.MoCo.__name__, data_dir_name, 'model', 'relabelled_{}'.format(os.path.basename(args.feature_extractor)))
 
+    logfile_path = os.path.join(out_path, "output.log")
+    ensure_dir_exists(logfile_path)
     logging.basicConfig(
         level=logging.INFO,
         handlers=[
-            logging.FileHandler(os.path.join(out_path, "output.log")),
+            logging.FileHandler(logfile_path),
             logging.StreamHandler()
         ]
     )
