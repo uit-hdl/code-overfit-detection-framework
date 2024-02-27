@@ -51,13 +51,13 @@ import torch.nn.functional as F
 
 parser = argparse.ArgumentParser(description='Extract embeddings ')
 
-parser.add_argument('--epochs', default=100, type=int, metavar='N', help='number of total epochs to run')
+parser.add_argument('--epochs', default=10, type=int, metavar='N', help='number of total epochs to run')
 parser.add_argument('--feature_extractor', default='./model_out2b1413ba2b3df0bcd9e2c56bdbea8d2c7f875d1e/MoCo/tiles/model/checkpoint_MoCo_tiles_0200_True_m256_n0_o4_K256.pth.tar', type=str, help='path to feature extractor, which will extract features from tiles')
 parser.add_argument('--tcga_annotation_file', default=os.path.join('out', 'annotation', 'recurrence_annotation_tcga.pkl'), type=str, help='path to TCGA annotations')
 parser.add_argument('--file-list-path', default=os.path.join('out', 'files.csv'), type=str, help='path to list of file splits')
 parser.add_argument('--label-key', default='Sample Type', type=str, help='default key to use for doing fine-tuning. If set to "my_inst", will retrain using institution as label')
-parser.add_argument('--src_dir', default=os.path.join('Data', 'TCGA_LUSC', 'preprocessed', 'TCGA', 'tiles'), type=str, help='path to preprocessed slide images')
-parser.add_argument('--out_dir', default='./out', type=str, help='path to save extracted embeddings')
+parser.add_argument('--src-dir', default=os.path.join('Data', 'TCGA_LUSC', 'preprocessed', 'TCGA', 'tiles'), type=str, help='path to preprocessed slide images')
+parser.add_argument('--out-dir', default='./out', type=str, help='path to save extracted embeddings')
 parser.add_argument('--slide_annotation_file', default=os.path.join('annotations', 'slide_label', 'gdc_sample_sheet.2023-08-14.tsv'), type=str,
                     help='"Sample sheet" from TCGA, see README.md for instructions on how to get sheet')
 parser.add_argument('-b', '--batch-size', default=64, type=int,
@@ -112,7 +112,7 @@ def assign_labels(ds, labels, annotations, label_key):
         del entry['k']
         #del entry['filename']
 
-def train(dl_train, dl_val, model, optimizer, max_epochs, out_path, writer, device):
+def train(dl_train, dl_val, model, optimizer, max_epochs, ratio_of_positives, out_path, writer, device):
     val_postprocessing = Compose([EnsureTyped(keys=CommonKeys.PRED),
                                   # AsDiscreted(keys=CommonKeys.PRED, argmax=True),
                                   ])
@@ -134,16 +134,19 @@ def train(dl_train, dl_val, model, optimizer, max_epochs, out_path, writer, devi
     )
 
 
+    # TODO: verify that I am indeed freezing most of the layers
     params = generate_param_groups(network=model, layer_matches=[lambda x: x.last_linear], match_types=["select"], lr_values=[1e-3])
 
-    # TODO: am I supposed to keep using the training data now, or just from test data?
+    w = torch.Tensor([1 - ratio_of_positives, ratio_of_positives])
+    loss = nn.CrossEntropyLoss(w).cuda()
+
     trainer = SupervisedTrainer(
         device=device,
         max_epochs=max_epochs,
         train_data_loader=dl_train,
         network=model,
         optimizer=optimizer,
-        loss_function=torch.nn.CrossEntropyLoss(),
+        loss_function=loss,
         inferer=SimpleInferer(),
         key_train_metric={"train_acc": Accuracy(output_transform=from_engine([CommonKeys.PRED, CommonKeys.LABEL]))},
         additional_metrics={"train_loss": Loss(output_transform=from_engine([CommonKeys.PRED, CommonKeys.LABEL], first=False), loss_fn=nn.NLLLoss())},
@@ -160,7 +163,6 @@ def train(dl_train, dl_val, model, optimizer, max_epochs, out_path, writer, devi
     metric_values = []
     mean_dice_values = []
     mean_val_acc = []
-
 
     @evaluator.on(Events.EPOCH_COMPLETED)
     def log_validation(engine):
@@ -298,6 +300,17 @@ def plot_train_data(epoch_loss_values, metric_values, mean_dice_values, mean_val
 
 def main():
     args = parser.parse_args()
+
+    data_dir_name = list(filter(None, args.src_dir.split(os.sep)))[-1]
+    out_path = os.path.join(args.out_dir, condssl.builder.MoCo.__name__, data_dir_name, 'model', 'relabelled_{}'.format(os.path.basename(args.feature_extractor)))
+
+    logging.basicConfig(
+        level=logging.INFO,
+        handlers=[
+            logging.FileHandler(os.path.join(out_path, "output.log")),
+            logging.StreamHandler()
+        ]
+    )
     if not torch.cuda.is_available():
         print('No GPU device available')
         #sys.exit(1)
@@ -306,10 +319,6 @@ def main():
         sys.exit(1)
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
-    # # note that we split the train data again, not the entire dataset
-    data_dir_name = list(filter(None, args.src_dir.split(os.sep)))[-1]
-    out_path = os.path.join(args.out_dir, condssl.builder.MoCo.__name__, data_dir_name, 'model', 'relabelled_{}'.format(os.path.basename(args.feature_extractor)))
 
     logging.info('Process annotations')
     slide_annotations = pd.read_csv(args.slide_annotation_file, sep='\t', header=0)
@@ -326,6 +335,7 @@ def main():
         train_data = train_data[:args.batch_size * 2]
         val_data = val_data[:args.batch_size * 2]
         test_data = test_data[:args.batch_size * 4]
+
     dl_train, dl_val, dl_test = wrap_data(train_data, val_data, test_data, slide_annotations, labels, args.label_key, args.batch_size, args.workers, args.is_profiling)
 
     model = InceptionV4(num_classes=128)
@@ -343,11 +353,19 @@ def main():
         logging.info("=> creating model '{}'".format('x64'))
         optimizer = torch.optim.Adam(model.parameters(), args.lr)
         logging.info('Model builder done')
-        # TODO: add weights during training, similar to https://github.com/MSKCC-Computational-Pathology/MIL-nature-medicine-2019/blob/daecb7293b5ea886ba222008f2592e1e29e9dac6/MIL_train.py#L42
-        epoch_loss_values, metric_values, mean_dice_values, mean_val_acc = train(dl_train, dl_val, model, optimizer, args.epochs, out_path, writer, device)
+        ratio_of_positives = 1 / (len(train_data) / len(list(filter(lambda l: l["label"] == 1, train_data))))
+        if not args.debug_mode and (ratio_of_positives > 0.9 or ratio_of_positives < 0.1):
+            logging.error(f"Ratio of positives ({ratio_of_positives}) is very high/low, consider adjusting the dataset. Exiting in case this was a mistake :)")
+            sys.exit(1)
+        elif args.debug_mode:
+            ratio_of_positives = 0.5
+            logging.warning("Debug mode enabled, setting ratio_of_positives to 0.5")
+        epoch_loss_values, metric_values, mean_dice_values, mean_val_acc = train(dl_train, dl_val, model, optimizer, args.epochs, ratio_of_positives, out_path, writer, device)
         writer.add_scalar("size of dataset", len(train_data), 0)
         writer.add_scalar("batch size", args.batch_size, 0)
+        writer.add_scalar("ratio_of_positives_train", ratio_of_positives, 0)
         writer.add_text("model name", "inception")
+        writer.add_text("model_path", model_path)
         writer.add_text("data dir", data_dir_name)
         writer.add_text("label_key", args.label_key)
         writer.add_scalar("learning rate", args.lr, 0)
@@ -403,24 +421,13 @@ def main():
     labels = slide_annotations[args.label_key].unique().tolist()
     plot_results(gts, predictions, labels, "Test data - Tile level", writer)
 
-    # https://www.nature.com/articles/s41591-019-0508-1#Equ1
     # benign = negative
-    w_n = 0.75 # TODO: find actual weight to use
-    w_p = 1 - w_n
     # Calculate cross-entropy from predictions and gts
-    loss_per_slide = defaultdict(lambda: np.array([], dtype=np.float32))
     predictions_per_slide = {k: np.max(v) for k,v in predictions_per_slide.items()}
-    #FIXME: not supposed to use the loss function here, just softmax
-    for slide, p in predictions_per_slide.items():
-        yi = gt_for_slide[slide]
-        yi_tilde = p
-        l = -w_n * yi * (np.log(yi_tilde) if yi_tilde != 0.0 else -100.0) - w_p * (1 - yi) * (np.log(1 - yi_tilde) if yi_tilde != 1 else -100)
-        loss_per_slide[slide] = np.append(loss_per_slide[slide], l)
-
-    loss_per_slide = {k: int(np.sort(v)[-1] <= 0.5) for k,v in loss_per_slide.items()}
+    predictions_per_slide = {k: int(v > 0.5) for k,v in predictions_per_slide.items()}
 
     # iterate over loss_per_slide  and gt_for_slide simultaneously
-    a = np.array([[l,gt_for_slide[s]] for s,l in loss_per_slide.items()])
+    a = np.array([[l,gt_for_slide[s]] for s,l in predictions_per_slide.items()])
     predictions = a[:,0].astype(np.int32)
     gts = a[:,1].astype(np.int32)
 
@@ -448,6 +455,4 @@ def plot_results(gts, predictions, labels, title, writer):
     writer.add_figure(f"Confusion Matrix - {title}", cmd.figure_)
 
 if __name__ == '__main__':
-    logging.basicConfig(stream=sys.stdout, level=logging.INFO)
-    #get_logger("train_log")
     main()
