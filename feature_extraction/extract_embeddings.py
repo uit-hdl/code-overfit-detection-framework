@@ -118,7 +118,7 @@ def main():
 
     for name, data in list(zip(['train', 'val', 'test'], [train_data, val_data, test_data]))[2:]:
         print(name)
-        dl = DataLoader(dataset=Dataset(data, transformations), batch_size=256, num_workers=torch.cuda.device_count(), shuffle=True)
+        dl = DataLoader(dataset=Dataset(data, transformations), batch_size=32, num_workers=torch.cuda.device_count(), shuffle=True)
         embedding_dict = get_embeddings_bagging(feature_extractor, dl, device)
         embedding_dest_path = os.path.join(args.out_dir, model_name,  "embeddings", f"{name}_{data_dir_name}_embedding.pkl")
         ensure_dir_exists(embedding_dest_path)

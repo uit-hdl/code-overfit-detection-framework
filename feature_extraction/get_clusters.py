@@ -17,7 +17,7 @@ from bokeh.models import OpenURL, TapTool, ColumnDataSource
 from bokeh.models.widgets import Div, DataTable, TableColumn
 from bokeh.plotting import output_file, save, figure
 from scipy.spatial import distance
-from scipy.stats import spearmanr
+from scipy.stats import spearmanr, skew
 from sklearn.mixture import GaussianMixture
 from sklearn.neighbors import NearestNeighbors
 import scipy.stats
@@ -39,8 +39,6 @@ parser.add_argument('--slide_annotation_file', default=os.path.join('annotations
                     help='"Sample sheet" from TCGA, see README.md for instructions on how to get sheet')
 parser.add_argument('--n-cluster', default=50, type=int)
 parser.add_argument('--out-dir', default='./out', type=str)
-
-# TODO: add another graph for tissue normal vs tumor
 
 # color by gender
 
@@ -137,9 +135,13 @@ def compute_histograms_overlap(plot_data, data_key, unique_labels, no_bins):
     _, edges = np.histogram(plot_data[["x", "y"]], bins=no_bins**2)
 
     counts = []
+    skewness = {}
     for l in unique_labels:
         histo_count, _ = np.histogram(plot_data[plot_data[data_key] == l][["x", "y"]], bins=edges)
+        non_zero_bins = list(filter(lambda x: x != 0, histo_count))
+        skewness[l] = skew(non_zero_bins)
         counts.append((l, histo_count))
+    skewness["all"] = np.mean(list(skewness.values()))
     overlaps = defaultdict(lambda: defaultdict(list))
     all_counts = np.sum([x[1] for x in counts])
     for (label_left,count_left) in counts:
@@ -166,7 +168,7 @@ def compute_histograms_overlap(plot_data, data_key, unique_labels, no_bins):
             overlaps[label_left]["all"] = np.mean(list(overlaps[label_left].values()))
 
     mean_overlap = np.mean([x["all"] for x in overlaps.values()])
-    return overlaps, mean_overlap
+    return overlaps, mean_overlap, skewness
 
 def umap_slice(names, features, cluster, clinical, slide_annotations):
     values = [[x[0] for x in features[name]] for name in names]
@@ -284,6 +286,7 @@ class UmapPlot:
         self.text_search = text_search
         self.multibox_input = multibox_input
         self.distribution_plot = distribution_plot
+        self.skewness = None
 
         if len(self.unique_labels) > 5:
             p.legend.visible = False
@@ -302,6 +305,9 @@ class UmapPlot:
             counts.append(dst_array)
         self.overlaps = counts
         self.mean_overlap = mean_overlap
+
+    def set_skewness(self, skewness):
+        self.skewness = skewness
 
     def render_to_bokeh(self):
         return [[self.p, self.ph, self.distribution_plot], [self.pv], [self.text_search, self.multibox_input]]
@@ -359,9 +365,21 @@ def viz_data(mapper, data, names, knn, knc, cpd, thumbnail_path, out_html, umap_
 
     mean_overlaps_box = Div(text="""<p style="font-size: 300%">{}</p>""".format(mean_overlaps))
 
+
+    data_tables_skewness = []
+    for plot in umap_plots:
+        d = plot.skewness
+        data = {'ids': list(d.keys()), 'values': list(d.values())}
+        source = ColumnDataSource(data)
+        columns = [
+            TableColumn(field="ids", title=plot.title),
+            TableColumn(field="values", title="Skewness"),
+        ]
+        data_tables_skewness.append(DataTable(source=source, columns=columns, width=800, height=280))
+
     #gp = layout([[image_thumbnail], [p1, pv1], [ph1], [p3, pv3], [ph3], [stat_box], [data_table]])
     components = [plot.render_to_bokeh() for plot in umap_plots]
-    gp = layout([[image_thumbnail]] + components +  [[stat_box], [data_tables] + [[mean_overlaps_box]]])
+    gp = layout([[image_thumbnail]] + components +  [[stat_box], [data_tables] + [[mean_overlaps_box]], [data_tables_skewness]])
     tt = TapTool()
     tt.callback = OpenURL(url="@image_url")
     umap_plots[0].p.tools.append(tt)
@@ -432,8 +450,9 @@ def main(clinical_path, embeddings_path, thumbnail_path, histogram_bins, n_clust
             unique_labels = np.unique(data[key])
             title += (" ({} unique colors)".format(len(unique_labels)))
             plot = UmapPlot(mapper, data, key, title, unique_labels, histogram_bins)
-            overlaps, mean_overlap = compute_histograms_overlap(plot.plot_data, key, unique_labels, histogram_bins)
+            overlaps, mean_overlap, skewness = compute_histograms_overlap(plot.plot_data, key, unique_labels, histogram_bins)
             plot.set_overlaps(overlaps, mean_overlap)
+            plot.set_skewness(skewness)
             umap_plots.append(plot)
 
         out_html = os.path.join(out_dir, "web", "condssl_out_{}_{}.html".format(number_of_images, histogram_bins))
@@ -445,6 +464,9 @@ def main(clinical_path, embeddings_path, thumbnail_path, histogram_bins, n_clust
 
 if __name__ == "__main__":
     args = parser.parse_args()
+    # TODO: update histogram ticks to be sideways so that they show and not get crunched for large values
+    # TODO: would be sick if I updated the histograms on click-select of group
+    # TODO: should highlight best and worst results in the table
     main(args.clinical_path, args.embeddings_path, args.thumbnail_path, args.histogram_bins, args.n_cluster, args.number_of_images, args.out_dir)
 
     #keys_randomized = random.sample(keys_sorted, len(keys_sorted))
