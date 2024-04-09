@@ -23,6 +23,7 @@ import argparse
 import pickle
 import torch
 import pandas as pd
+import torch.nn as nn
 from tqdm import tqdm
 from network.inception_v4 import InceptionV4
 import monai.transforms as mt
@@ -31,7 +32,9 @@ from fairlearn.metrics import demographic_parity_difference, equalized_odds_diff
 
 parser = argparse.ArgumentParser(description='Demographic parities')
 
-parser.add_argument('--feature_extractor', default='./model_out2b1413ba2b3df0bcd9e2c56bdbea8d2c7f875d1e/MoCo/tiles/model/checkpoint_MoCo_tiles_0200_True_m256_n0_o4_K256.pth.tar', type=str, help='path to feature extractor, which will extract features from tiles')
+
+#parser.add_argument('--feature_extractor', default='out/MoCo/tiles/model/relabelled_checkpoint_MoCo_tiles_0200_True_m256_n0_o4_K256.pth.tar/network_epoch=10.pt', type=str, help='path to feature extractor, which will extract features from tiles')
+parser.add_argument('--feature_extractor', default='out/MoCo/tiles/model/relabelled_checkpoint_MoCo_tiles_0200_False_m256_n0_o0_K256.pth.tar/network_epoch=10.pt', type=str, help='path to feature extractor, which will extract features from tiles')
 parser.add_argument('--tcga_annotation_file', default='./out/annotation/recurrence_annotation_tcga.pkl', type=str, help='path to TCGA annotations')
 parser.add_argument('--cptac_annotation_file', default='./out/annotation/recurrence_annotation_cptac.pkl', type=str, help='path to CPTAC annotations')
 parser.add_argument('--slide_annotation_file', default='annotations/slide_label/gdc_sample_sheet.2023-08-14.tsv', type=str, help='"Sample sheet" from TCGA, see README.md for instructions on how to get sheet')
@@ -39,17 +42,24 @@ parser.add_argument('--file-list-path', default='./out/files.csv', type=str, hel
 parser.add_argument('--src_dir', default='/Data/TCGA_LUSC/preprocessed/TCGA/tiles/', type=str, help='path to preprocessed slide images')
 parser.add_argument('--out_dir', default='./out', type=str, help='path to save extracted embeddings')
 
-
 def load_model(net, model_path, device):
     # original
     checkpoint = torch.load(model_path, map_location=device)
     model_state_dict = {k.replace("encoder_q.", ""): v for k, v in checkpoint['state_dict'].items() if
                         "encoder_q" in k}
     net.load_state_dict(model_state_dict)
-    net.to(device)
     #net.last_linear = nn.Identity() # the linear layer removes our dependency/link to the key encoder
     # i.e. we can write net(input) instead of net.encoder_q(input)
 
+def attach_layers(model, num_neurons_in_layers, out_classes):
+    model.last_linear = nn.Sequential(
+        nn.Linear(1536, 500),
+        nn.ReLU(),
+        nn.Linear(500, 200),
+        nn.ReLU(),
+        nn.Linear(200, out_classes),
+    )
+    return model
 
 def main():
     args = parser.parse_args()
@@ -57,7 +67,6 @@ def main():
 
     # # note that we split the train data again, not the entire dataset
     data_dir_name = list(filter(None, args.src_dir.split(os.sep)))[-1]
-    model_filename = os.path.join(args.out_dir, condssl.builder.MoCo.__name__, data_dir_name, 'model', 'relabelled_{}'.format(os.path.basename(args.feature_extractor)))
 
     slide_annotations = pd.read_csv(args.slide_annotation_file, sep='\t', header=0)
     slide_annotations["my_slide_id"] = slide_annotations["File Name"].map(lambda s: s.split(".")[0])
@@ -65,7 +74,6 @@ def main():
     tissue_types = slide_annotations["Sample Type"].unique().tolist()
 
     logging.info("Processing annotations")
-    # TODO: this is slow. Can speed up the lookups?
     train_data, val_data, test_data = build_file_list(args.src_dir, args.file_list_path)
     for ds in [train_data, val_data, test_data]:
         for i in range(len(ds)):
@@ -76,7 +84,11 @@ def main():
     logging.info("Annotations complete")
 
     model = InceptionV4(num_classes=128)
-    load_model(model, args.feature_extractor, device)
+    model = attach_layers(model, [500, 200], 2)
+    logging.info(f"=> loading model '{args.feature_extractor}'")
+    model.load_state_dict(torch.load(args.feature_extractor, map_location=device))
+    logging.info('Model builder done')
+    model.to(device)
 
     transformations = mt.Compose(
         [
@@ -88,9 +100,11 @@ def main():
         ])
 
     inferer = SimpleInferer()
-    # TODO: remove
-    print("warn: only using subset of data")
-    dl_test = DataLoader(dataset=Dataset(test_data[:65], transformations), batch_size=64, num_workers=0, shuffle=False, drop_last=False)
+    # # TODO: remove
+    # print("warn: only using subset of data")
+    # import random
+    # random.shuffle(test_data)
+    dl_test = DataLoader(dataset=Dataset(test_data, transformations), batch_size=64, num_workers=0, shuffle=False, drop_last=False)
     y_pred = []
     y_true = []
     sf_data = []
@@ -99,16 +113,15 @@ def main():
     with torch.no_grad():
         for item in tqdm(dl_test):
             pred = inferer(inputs=item["image"], network=model).squeeze()
-            if pred.shape == (128,):
+            if pred.shape == (2,):
                 am = pred.argmax().detach().cpu()
-                y_pred.append(am.item() % 2)
+                y_pred.append(am.item())
                 y_true.append(item["label"].item())
                 institutions = os.path.basename(os.path.dirname(item["filename"][0])).split("-")[1]
                 sf_data.append(institutions)
             else:
                 am = pred.argmax(dim=1)
-                # TODO: update with model that has two output classes only
-                y_pred += list(map(lambda l: l % 2, am.tolist()))
+                y_pred += am.tolist()
                 y_true += item["label"].tolist()
                 institutions = list(map(lambda f: os.path.basename(os.path.dirname(f)).split("-")[1], item["filename"]))
                 sf_data += institutions
@@ -143,12 +156,13 @@ def main():
             f"Equalized Opportunity {tissue_types[0]}": [equalized_opportunity_negative],
             }
     df = pd.DataFrame(data)
-    out_path = os.path.join(args.out_dir, "fairness.csv")
+    #out_path = os.path.join(args.out_dir, "fairness.csv")
+    out_path = os.path.join(args.out_dir, os.path.basename(os.path.dirname(args.feature_extractor)) + "_fairness.csv")
     ensure_dir_exists(out_path)
-    df.to_csv(out_path)
+    df.to_csv(out_path, index=False)
     logging.info(f"Results (also written to {out_path}):")
     pd.set_option('display.width', None)
-    print(df)
+    print(df.to_string(index=False))
 
 if __name__ == "__main__":
     logging.basicConfig(stream=sys.stdout, level=logging.INFO)
