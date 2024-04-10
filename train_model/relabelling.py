@@ -138,7 +138,10 @@ def train(dl_train, dl_val, model, optimizer, max_epochs, ratio_of_positives, ou
     # TODO: verify that I am indeed freezing most of the layers
     params = generate_param_groups(network=model, layer_matches=[lambda x: x.last_linear], match_types=["select"], lr_values=[1e-3])
 
-    w = torch.Tensor([1 - ratio_of_positives, ratio_of_positives])
+    if ratio_of_positives:
+        w = torch.Tensor([1 - ratio_of_positives, ratio_of_positives])
+    else:
+        w = None
     loss = nn.CrossEntropyLoss(w).cuda()
 
     trainer = SupervisedTrainer(
@@ -303,7 +306,7 @@ def main():
     args = parser.parse_args()
 
     data_dir_name = list(filter(None, args.src_dir.split(os.sep)))[-1]
-    out_path = os.path.join(args.out_dir, condssl.builder.MoCo.__name__, data_dir_name, 'model', 'relabelled_{}'.format(os.path.basename(args.feature_extractor)))
+    out_path = os.path.join(args.out_dir, condssl.builder.MoCo.__name__, data_dir_name, 'model', 'relabelled_{}_{}'.format(args.label_key, os.path.basename(args.feature_extractor)))
 
     logfile_path = os.path.join(out_path, "output.log")
     ensure_dir_exists(logfile_path)
@@ -316,7 +319,7 @@ def main():
     )
     if not torch.cuda.is_available():
         print('No GPU device available')
-        #sys.exit(1)
+        sys.exit(1)
     if not os.path.exists(args.slide_annotation_file):
         logging.error("TCGA annotation file not found: {}".format(args.tcga_annotation_file))
         sys.exit(1)
@@ -329,7 +332,8 @@ def main():
     slide_annotations = slide_annotations.set_index("my_slide_id")
     slide_annotations["my_inst"] = slide_annotations["File Name"].map(lambda s: s.split("-")[1])
     labels = slide_annotations[args.label_key].unique().tolist()
-    assert labels[0] == "Solid Tissue Normal" # making 0 the benign class
+    labels.sort()
+    assert args.label_key != 'Sample Type' or labels[0] == "Solid Tissue Normal" # making 0 the benign class if using 'sample type'
 
     logging.info('Creating dataset')
     train_data, val_data, test_data = build_file_list(args.src_dir, args.file_list_path)
@@ -356,17 +360,20 @@ def main():
         logging.info("=> creating model '{}'".format('x64'))
         optimizer = torch.optim.Adam(model.parameters(), args.lr)
         logging.info('Model builder done')
-        ratio_of_positives = 1 / (len(train_data) / len(list(filter(lambda l: l["label"] == 1, train_data))))
-        if not args.debug_mode and (ratio_of_positives > 0.9 or ratio_of_positives < 0.1):
-            logging.error(f"Ratio of positives ({ratio_of_positives}) is very high/low, consider adjusting the dataset. Exiting in case this was a mistake :)")
-            sys.exit(1)
-        elif args.debug_mode:
-            ratio_of_positives = 0.5
-            logging.warning("Debug mode enabled, setting ratio_of_positives to 0.5")
+        if args.label_key == 'Sample Type':
+            ratio_of_positives = 1 / (len(train_data) / len(list(filter(lambda l: l["label"] == 1, train_data))))
+            if not args.debug_mode and (ratio_of_positives > 0.9 or ratio_of_positives < 0.1):
+                logging.error(f"Ratio of positives ({ratio_of_positives}) is very high/low, consider adjusting the dataset. Exiting in case this was a mistake :)")
+                sys.exit(1)
+            elif args.debug_mode:
+                ratio_of_positives = 0.5
+                logging.warning("Debug mode enabled, setting ratio_of_positives to 0.5")
+            writer.add_scalar("ratio_of_positives_train", ratio_of_positives, 0)
+        else:
+            ratio_of_positives = None
         epoch_loss_values, metric_values, mean_dice_values, mean_val_acc = train(dl_train, dl_val, model, optimizer, args.epochs, ratio_of_positives, out_path, writer, device)
         writer.add_scalar("size of dataset", len(train_data), 0)
         writer.add_scalar("batch size", args.batch_size, 0)
-        writer.add_scalar("ratio_of_positives_train", ratio_of_positives, 0)
         writer.add_text("model name", "inception")
         writer.add_text("model_path", model_path)
         writer.add_text("data dir", data_dir_name)
@@ -387,8 +394,8 @@ def main():
             y = model(item["image"].to(device))
             prob = F.softmax(y).detach().to("cpu")
             pred = torch.argmax(prob, dim=1).numpy()
-            # only extract "positive", i.e. probability of being malignant
-            pred_p = prob[:, 1].numpy()
+
+            pred_p = prob[:, 1].numpy() # only extract "positive", i.e. probability of being malignant
             predictions += list(x for x in pred)
 
             gt = item["label"].detach().cpu().numpy()
@@ -434,27 +441,38 @@ def main():
     predictions = a[:,0].astype(np.int32)
     gts = a[:,1].astype(np.int32)
 
+    # TODO: what about inference accuracy overall?
+    # calculate accuracy of predictions in gts
+    overall_accuracy = np.mean(predictions == gts)
+    writer.add_scalar("test_acc", overall_accuracy, 0)
+
     plot_results(gts, predictions, labels, "Test data - Slide level", writer)
 
     #plt.show()
 
 def plot_results(gts, predictions, labels, title, writer):
-    roc = roc_curve(gts, predictions)
-    # check if roc[0] or roc[1] contains nan
-    if np.isnan(roc[0]).any() or np.isnan(roc[1]).any():
-        logging.warning("ROC curve contains nan values - omitting from tensorboard")
+    if len(labels) == 2:
+        roc = roc_curve(gts, predictions)
+        # check if roc[0] or roc[1] contains nan
+        if np.isnan(roc[0]).any() or np.isnan(roc[1]).any():
+            logging.warning("ROC curve contains nan values - omitting from tensorboard")
+        else:
+            plt.title("ROC Curve")
+            plt.xlabel("False Positive Rate")
+            plt.ylabel("True Positive Rate")
+            plt.plot(roc[0], roc[1])
+            writer.add_figure(f"ROC Curve - {title}", plt.gcf(), 0)
+            auc = roc_auc_score(gts, predictions)
+            writer.add_scalar(f"AUC - {title}", auc, 0)
     else:
-        plt.title("ROC Curve")
-        plt.xlabel("False Positive Rate")
-        plt.ylabel("True Positive Rate")
-        plt.plot(roc[0], roc[1])
-        writer.add_figure(f"ROC Curve - {title}", plt.gcf(), 0)
-        auc = roc_auc_score(gts, predictions)
-        writer.add_scalar(f"AUC - {title}", auc, 0)
+        logging.info("not plotting ROC curve as there are more than 2 classes")
 
     cm = confusion_matrix(gts, predictions, labels=list(range(len(labels))))
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=labels)
     cmd = disp.plot(ax=plt.subplots(1, 1, facecolor="white")[1])
+    fig = cmd.ax_.get_figure()
+    fig.set_figwidth(20)
+    fig.set_figheight(20)
     writer.add_figure(f"Confusion Matrix - {title}", cmd.figure_)
 
 if __name__ == '__main__':
