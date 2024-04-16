@@ -134,10 +134,6 @@ def train(dl_train, dl_val, model, optimizer, max_epochs, ratio_of_positives, ou
         postprocessing=val_postprocessing,
     )
 
-
-    # TODO: verify that I am indeed freezing most of the layers
-    params = generate_param_groups(network=model, layer_matches=[lambda x: x.last_linear], match_types=["select"], lr_values=[1e-3])
-
     if ratio_of_positives:
         w = torch.Tensor([1 - ratio_of_positives, ratio_of_positives])
     else:
@@ -339,8 +335,11 @@ def main():
     train_data, val_data, test_data = build_file_list(args.src_dir, args.file_list_path)
     if args.debug_mode:
         logging.warning("Debug mode enabled!")
-        train_data = train_data[:args.batch_size * 2]
-        val_data = val_data[:args.batch_size * 2]
+        np.random.shuffle(train_data)
+        np.random.shuffle(val_data)
+        np.random.shuffle(test_data)
+        train_data = train_data[:args.batch_size * 4]
+        val_data = val_data[:args.batch_size * 4]
         test_data = test_data[:args.batch_size * 4]
 
     dl_train, dl_val, dl_test = wrap_data(train_data, val_data, test_data, slide_annotations, labels, args.label_key, args.batch_size, args.workers, args.is_profiling)
@@ -358,7 +357,10 @@ def main():
         logging.info('Model builder done')
     else:
         logging.info("=> creating model '{}'".format('x64'))
-        optimizer = torch.optim.Adam(model.parameters(), args.lr)
+        #TODO: verify that I am indeed freezing most of the layers
+        params = generate_param_groups(network=model, layer_matches=[lambda x: x.last_linear], match_types=["select"],
+                                       lr_values=[1e-3])
+        optimizer = torch.optim.Adam(params, args.lr)
         logging.info('Model builder done')
         if args.label_key == 'Sample Type':
             ratio_of_positives = 1 / (len(train_data) / len(list(filter(lambda l: l["label"] == 1, train_data))))
@@ -395,15 +397,18 @@ def main():
             prob = F.softmax(y).detach().to("cpu")
             pred = torch.argmax(prob, dim=1).numpy()
 
-            pred_p = prob[:, 1].numpy() # only extract "positive", i.e. probability of being malignant
-            predictions += list(x for x in pred)
+            pred_positive = prob[:, 1].numpy() # only extract "positive", i.e. probability of being malignant
+            predictions += list(labels[x] for x in pred)
 
-            gt = item["label"].detach().cpu().numpy()
-            gts += list(x for x in gt)
+            gt = item[CommonKeys.LABEL].detach().cpu().numpy()
+            gts += list(labels[x] for x in gt)
             for i,(p,g) in enumerate(zip(pred, gt)):
                 slide_name = os.path.basename(os.path.dirname(item["filename"][i]))
                 gt_for_slide[slide_name] = g
-                predictions_per_slide[slide_name] = np.append(predictions_per_slide[slide_name], pred_p[i])
+                if args.label_key == "Sample Type":
+                    predictions_per_slide[slide_name] = np.append(predictions_per_slide[slide_name], pred_positive[i])
+                else:
+                    predictions_per_slide[slide_name] = np.append(predictions_per_slide[slide_name], p)
                 if p != g:
                     wrong_predictions[labels[g]].append((item["filename"][i], g, p))
 
@@ -413,13 +418,13 @@ def main():
     plt.setp(axes, xticks=[], yticks=[])
     fontsize = 6
     for row,w in enumerate(wrong_predictions):
-        if len(wrong_predictions) == 1:
+        if len(wrong_predictions) == 1 or grid_size == 1:
             axes[row].set_ylabel(f"GT: {w}", fontsize=fontsize)
         else:
             axes[row][0].set_ylabel(f"GT: {w}", fontsize=fontsize)
         for col in range(grid_size):
             image_filename, g, p = wrong_predictions[w][col]
-            if len(wrong_predictions) == 1:
+            if len(wrong_predictions) == 1 or grid_size == 1:
                 axes[col].imshow(plt.imread(image_filename))
                 axes[col].set_title("pred: {}".format(labels[p]), fontsize=fontsize)
             else:
@@ -428,20 +433,27 @@ def main():
             i += 1
     writer.add_figure("Wrong Predictions", fig, 0)
 
-    labels = slide_annotations[args.label_key].unique().tolist()
+    # re-acquire the labels to filter out ones that aren't used
+    #labels = slide_annotations[args.label_key].unique().tolist()
+    #labels.sort()
     plot_results(gts, predictions, labels, "Test data - Tile level", writer)
 
     # benign = negative
     # Calculate cross-entropy from predictions and gts
-    predictions_per_slide = {k: np.max(v) for k,v in predictions_per_slide.items()}
-    predictions_per_slide = {k: int(v > 0.5) for k,v in predictions_per_slide.items()}
+    if args.label_key == 'Sample Type':
+        predictions_per_slide = {k: np.max(v) for k,v in predictions_per_slide.items()}
+        predictions_per_slide = {k: int(v > 0.5) for k,v in predictions_per_slide.items()}
+    else:
+        # Find the value that occurs the most in each "v" in predictions_per_slide
+        predictions_per_slide = {k: np.bincount(v).argmax() for k,v in predictions_per_slide.items()}
 
     # iterate over loss_per_slide  and gt_for_slide simultaneously
     a = np.array([[l,gt_for_slide[s]] for s,l in predictions_per_slide.items()])
     predictions = a[:,0].astype(np.int32)
+    predictions = list(labels[x] for x in predictions)
     gts = a[:,1].astype(np.int32)
+    gts = list(labels[x] for x in gts)
 
-    # TODO: what about inference accuracy overall?
     # calculate accuracy of predictions in gts
     overall_accuracy = np.mean(predictions == gts)
     writer.add_scalar("test_acc", overall_accuracy, 0)
@@ -467,7 +479,8 @@ def plot_results(gts, predictions, labels, title, writer):
     else:
         logging.info("not plotting ROC curve as there are more than 2 classes")
 
-    cm = confusion_matrix(gts, predictions, labels=list(range(len(labels))))
+    lookup_labels = {l: i for i, l in enumerate(labels)}
+    cm = confusion_matrix([lookup_labels[i] for i in gts], [lookup_labels[i] for i in predictions], labels=list(range(len(labels))))
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=labels)
     cmd = disp.plot(ax=plt.subplots(1, 1, facecolor="white")[1])
     fig = cmd.ax_.get_figure()
