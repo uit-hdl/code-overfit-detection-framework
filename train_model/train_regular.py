@@ -283,7 +283,7 @@ def main():
         logging.info('Model builder done, placed on cuda()')
         log_dir = os.path.join(out_path, "runs")
         writer = SummaryWriter(log_dir=log_dir)
-        epoch_loss_values, metric_values, mean_dice_values, mean_val_acc = train(dl_train, dl_val, model, optimizer, args.epochs, out_path, writer, device)
+        epoch_loss_values, metric_values, mean_val_acc = train(dl_train, dl_val, model, optimizer, args.epochs, out_path, writer, device)
         writer.add_scalar("size of dataset", len(train_data), 0)
         writer.add_scalar("batch size", args.batch_size, 0)
         writer.add_text("model name", model_name)

@@ -8,10 +8,12 @@
 # other guide:
 #https://github.com/Project-MONAI/tutorials/blob/main/modules/layer_wise_learning_rate.ipynb
 
+
 import logging
 import os
 import sys
 from collections import defaultdict
+from monai.networks.nets import densenet121, resnet152
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -47,6 +49,7 @@ from sklearn.metrics import roc_curve, confusion_matrix, ConfusionMatrixDisplay,
 from ignite.metrics import Accuracy, Loss
 import torch.nn.functional as F
 from global_util import ensure_dir_exists
+from monai.networks.nets import densenet121
 
 parser = argparse.ArgumentParser(description='Extract embeddings ')
 
@@ -69,7 +72,7 @@ parser.add_argument('--debug-mode', default=False, type=bool, action=argparse.Bo
                     metavar='D', help='turn debugging on or off. Will limit amount of data used. Development only', dest='debug_mode')
 parser.add_argument('-j', '--workers', default=0, type=int, metavar='N',
                     help='number of data loading workers')
-parser.add_argument('--lr', '--learning-rate', default=0.03, type=float,
+parser.add_argument('--lr', '--learning-rate', default=1e-05, type=float,
                     metavar='LR', help='initial learning rate', dest='lr')
 parser.add_argument('-p', '--print-freq', default=10, type=int,
                     metavar='N', help='print frequency (default: 10)')
@@ -127,9 +130,8 @@ def train(dl_train, dl_val, model, optimizer, max_epochs, ratio_of_positives, ou
             TensorBoardStatsHandler(writer, output_transform=lambda x: x),
             CheckpointSaver(save_dir=os.path.join(out_path, "runs"), save_dict={"net": model}, save_key_metric=True),
             ],
-        additional_metrics={"val_acc": Accuracy(output_transform=from_engine([CommonKeys.PRED, CommonKeys.LABEL]))},
         key_val_metric={
-            "val_mean_dice": MeanDice(output_transform=from_engine_custom(keys=[CommonKeys.PRED, CommonKeys.LABEL], device=device))
+            "val_acc": Accuracy(output_transform=from_engine([CommonKeys.PRED, CommonKeys.LABEL]))
         },
         postprocessing=val_postprocessing,
     )
@@ -149,7 +151,7 @@ def train(dl_train, dl_val, model, optimizer, max_epochs, ratio_of_positives, ou
         loss_function=loss,
         inferer=SimpleInferer(),
         key_train_metric={"train_acc": Accuracy(output_transform=from_engine([CommonKeys.PRED, CommonKeys.LABEL]))},
-        additional_metrics={"train_loss": Loss(output_transform=from_engine([CommonKeys.PRED, CommonKeys.LABEL], first=False), loss_fn=nn.NLLLoss())},
+        additional_metrics={"train_loss": Loss(output_transform=from_engine([CommonKeys.PRED, CommonKeys.LABEL], first=False), loss_fn=loss)},
         train_handlers=[StatsHandler(tag_name="train_loss", output_transform=from_engine([CommonKeys.LOSS], first=True)),
                         TensorBoardStatsHandler(writer, output_transform=lambda x: x),
                         ValidationHandler(1, evaluator),
@@ -161,12 +163,10 @@ def train(dl_train, dl_val, model, optimizer, max_epochs, ratio_of_positives, ou
     batchSizes = []
     epoch_loss_values = []
     metric_values = []
-    mean_dice_values = []
     mean_val_acc = []
 
     @evaluator.on(Events.EPOCH_COMPLETED)
     def log_validation(engine):
-        mean_dice_values.append(engine.state.metrics["val_mean_dice"])
         mean_val_acc.append(engine.state.metrics["val_acc"])
 
     @trainer.on(Events.ITERATION_COMPLETED)
@@ -197,7 +197,7 @@ def train(dl_train, dl_val, model, optimizer, max_epochs, ratio_of_positives, ou
 
     trainer.run()
 
-    return epoch_loss_values, metric_values, mean_dice_values, mean_val_acc
+    return epoch_loss_values, metric_values, mean_val_acc
 
 def wrap_data(train_data, val_data, test_data, slide_annotations, labels, label_key, batch_size, workers, is_profiling):
     logging.info('Creating dataset')
@@ -259,7 +259,7 @@ def wrap_data(train_data, val_data, test_data, slide_annotations, labels, label_
     logging.info("Number of batches in train DL: {}".format(len(dl_train)))
     return dl_train, dl_val, dl_test
 
-def plot_train_data(epoch_loss_values, metric_values, mean_dice_values, mean_val_acc, out_dir):
+def plot_train_data(epoch_loss_values, metric_values, mean_val_acc, out_dir):
     fig = plt.figure(1, (24, 6))
     fig.subplots_adjust(hspace=0.4, wspace=0.4)
     ax = fig.add_subplot(2, 2, 1)
@@ -270,20 +270,6 @@ def plot_train_data(epoch_loss_values, metric_values, mean_dice_values, mean_val
     ax.xaxis.set_major_locator(mticker.MaxNLocator(integer=True))
     ax.plot(range(len(y)), y)
     ax.xaxis.set_major_locator(mticker.MaxNLocator(integer=True))
-    ax = fig.add_subplot(2, 2, 2)
-    ax.set_title("Val Mean Dice")
-    y = metric_values
-    ax.axes.set_xlabel("Iteration")
-    ax.plot(y)
-    ax = fig.add_subplot(2, 2, 3)
-    # plot the mean dice values
-    ax.set_title("Val Mean Dice")
-    ax.xaxis.set_major_locator(mticker.MultipleLocator(1))
-    x = len(mean_dice_values)
-    y = mean_dice_values
-    ax.axes.set_xlabel("Epoch")
-    ax.axes.set_ylim(0, 1)
-    ax.plot(y)
     ax = fig.add_subplot(2, 2, 4)
     # plot the mean validation accuracy
     ax.set_title("Val Accuracy")
@@ -351,16 +337,21 @@ def main():
 
     model_path = os.path.join(out_path, f"network_epoch={args.epochs}.pt")
     writer = SummaryWriter(log_dir=os.path.join(out_path, "runs"))
-    if os.path.exists(model_path):
+    # TODO: re-enable when training is good
+    if False and os.path.exists(model_path):
         logging.info(f"=> loading model '{model_path}'")
         model.load_state_dict(torch.load(model_path, map_location=device))
         logging.info('Model builder done')
     else:
         logging.info("=> creating model '{}'".format('x64'))
         #TODO: verify that I am indeed freezing most of the layers
-        params = generate_param_groups(network=model, layer_matches=[lambda x: x.last_linear], match_types=["select"],
-                                       lr_values=[1e-3])
-        optimizer = torch.optim.Adam(params, args.lr)
+        model = densenet121(spatial_dims=2, in_channels=3, out_channels=len(labels), pretrained=True)
+        model.to(device)
+
+        #params = generate_param_groups(network=model, layer_matches=[lambda x: x.last_linear], match_types=["select"],
+                                       #lr_values=[1e-3])
+        #optimizer = torch.optim.Adam(params, args.lr)
+        optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
         logging.info('Model builder done')
         if args.label_key == 'Sample Type':
             ratio_of_positives = 1 / (len(train_data) / len(list(filter(lambda l: l["label"] == 1, train_data))))
@@ -373,7 +364,7 @@ def main():
             writer.add_scalar("ratio_of_positives_train", ratio_of_positives, 0)
         else:
             ratio_of_positives = None
-        epoch_loss_values, metric_values, mean_dice_values, mean_val_acc = train(dl_train, dl_val, model, optimizer, args.epochs, ratio_of_positives, out_path, writer, device)
+        epoch_loss_values, metric_values, mean_val_acc = train(dl_train, dl_val, model, optimizer, args.epochs, ratio_of_positives, out_path, writer, device)
         writer.add_scalar("size of dataset", len(train_data), 0)
         writer.add_scalar("batch size", args.batch_size, 0)
         writer.add_text("model name", "inception")
@@ -383,7 +374,7 @@ def main():
         writer.add_scalar("learning rate", args.lr, 0)
         writer.flush()
         logging.info(f"=> Model builder done, wrote model to '{model_path}'")
-        plot_train_data(epoch_loss_values, metric_values, mean_dice_values, mean_val_acc, args.out_dir)
+        plot_train_data(epoch_loss_values, metric_values, mean_val_acc, args.out_dir)
 
     predictions = []
     gts = []
@@ -433,9 +424,6 @@ def main():
             i += 1
     writer.add_figure("Wrong Predictions", fig, 0)
 
-    # re-acquire the labels to filter out ones that aren't used
-    #labels = slide_annotations[args.label_key].unique().tolist()
-    #labels.sort()
     plot_results(gts, predictions, labels, "Test data - Tile level", writer)
 
     # benign = negative
@@ -447,19 +435,13 @@ def main():
         # Find the value that occurs the most in each "v" in predictions_per_slide
         predictions_per_slide = {k: np.bincount(v).argmax() for k,v in predictions_per_slide.items()}
 
-    # iterate over loss_per_slide  and gt_for_slide simultaneously
     a = np.array([[l,gt_for_slide[s]] for s,l in predictions_per_slide.items()])
     predictions = a[:,0].astype(np.int32)
     predictions = list(labels[x] for x in predictions)
     gts = a[:,1].astype(np.int32)
     gts = list(labels[x] for x in gts)
 
-    # calculate accuracy of predictions in gts
-    overall_accuracy = np.mean(predictions == gts)
-    writer.add_scalar("test_acc", overall_accuracy, 0)
-
     plot_results(gts, predictions, labels, "Test data - Slide level", writer)
-
     #plt.show()
 
 def plot_results(gts, predictions, labels, title, writer):
@@ -479,8 +461,11 @@ def plot_results(gts, predictions, labels, title, writer):
     else:
         logging.info("not plotting ROC curve as there are more than 2 classes")
 
-    lookup_labels = {l: i for i, l in enumerate(labels)}
-    cm = confusion_matrix([lookup_labels[i] for i in gts], [lookup_labels[i] for i in predictions], labels=list(range(len(labels))))
+    cm = confusion_matrix(gts, predictions, labels=labels)
+    correct_classifications = sum([cm[i][i] for i in range(len(labels))])
+    wrong_classifications = len(gts) - correct_classifications
+    total = correct_classifications + wrong_classifications
+    writer.add_scalar("Overall - " + title, correct_classifications / total, 0)
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=labels)
     cmd = disp.plot(ax=plt.subplots(1, 1, facecolor="white")[1])
     fig = cmd.ax_.get_figure()
