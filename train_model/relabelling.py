@@ -13,7 +13,7 @@ import logging
 import os
 import sys
 from collections import defaultdict
-from monai.networks.nets import densenet121, resnet152
+from monai.networks.utils import freeze_layers
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -64,7 +64,7 @@ parser.add_argument('--src-dir', default=os.path.join('Data', 'TCGA_LUSC', 'prep
 parser.add_argument('--out-dir', default='./out', type=str, help='path to save extracted embeddings')
 parser.add_argument('--slide_annotation_file', default=os.path.join('annotations', 'slide_label', 'gdc_sample_sheet.2023-08-14.tsv'), type=str,
                     help='"Sample sheet" from TCGA, see README.md for instructions on how to get sheet')
-parser.add_argument('-b', '--batch-size', default=64, type=int,
+parser.add_argument('-b', '--batch-size', default=128, type=int,
                     metavar='N', help=f'batch size, this is the total batch size of all GPUs on the current node when using Data Parallel or Distributed Data Parallel')
 parser.add_argument('--profile', default=False, type=bool, action=argparse.BooleanOptionalAction,
                     metavar='P', help='whether to profile training or not', dest='is_profiling')
@@ -333,6 +333,7 @@ def main():
     model = InceptionV4(num_classes=128)
     load_model(model, args.feature_extractor, device)
     model = attach_layers(model, [500, 200], len(labels))
+    freeze_layers(model, exclude_vars="last_linear")
     model.to(device)
 
     model_path = os.path.join(out_path, f"network_epoch={args.epochs}.pt")
@@ -344,14 +345,12 @@ def main():
         logging.info('Model builder done')
     else:
         logging.info("=> creating model '{}'".format('x64'))
-        #TODO: verify that I am indeed freezing most of the layers
-        model = densenet121(spatial_dims=2, in_channels=3, out_channels=len(labels), pretrained=True)
-        model.to(device)
-
-        #params = generate_param_groups(network=model, layer_matches=[lambda x: x.last_linear], match_types=["select"],
-                                       #lr_values=[1e-3])
-        #optimizer = torch.optim.Adam(params, args.lr)
-        optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+        #model = densenet121(spatial_dims=2, in_channels=3, out_channels=len(labels), pretrained=True)
+        #model.to(device)
+        params = generate_param_groups(network=model, layer_matches=[lambda x: x.last_linear], match_types=["select"],
+                                       lr_values=[1e-3])
+        optimizer = torch.optim.Adam(params, args.lr)
+        #optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
         logging.info('Model builder done')
         if args.label_key == 'Sample Type':
             ratio_of_positives = 1 / (len(train_data) / len(list(filter(lambda l: l["label"] == 1, train_data))))

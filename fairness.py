@@ -30,7 +30,9 @@ from tqdm import tqdm
 from network.inception_v4 import InceptionV4
 import monai.transforms as mt
 from monai.inferers import SimpleInferer
-from fairlearn.metrics import demographic_parity_difference, equalized_odds_difference
+from fairlearn.metrics import demographic_parity_difference, equalized_odds_difference, MetricFrame, selection_rate
+from sklearn.metrics import accuracy_score
+#MetricFrame(metrics{"equalized_odds_difference": equalized_odds_difference}, y_true
 
 parser = argparse.ArgumentParser(description='Demographic parities')
 
@@ -94,6 +96,7 @@ def main():
             clinical_row = clinicalTable.loc[patient_id]
             ann = slide_annotations.loc[slide_id]
             ds[i][CommonKeys.LABEL] = tissue_types.index(ann["Sample Type"])
+            # can I use clincal_row.at() instead? or speed up the index?
             ds[i]["gender"] = clinical_row['gender']
     logging.info("Annotations complete")
 
@@ -143,6 +146,12 @@ def main():
     for name,group in [("Institution", sf_data), ("Gender", gender_data)]:
         demographic_parity = demographic_parity_difference(y_true, y_pred, sensitive_features=group)
         equalized_odds = equalized_odds_difference(y_true, y_pred, sensitive_features=group)
+        metrics_dict = {"accuracy": accuracy_score, "selection_rate": selection_rate}
+        mf2 = MetricFrame( metrics=metrics_dict, y_true=y_true, y_pred=y_pred, sensitive_features=group)
+        print(mf2)
+        # TODO: I need confirm if instutition 90 always yields bad results
+        # TODO: I need to see TP and FP rates for each institution
+        # TODO: I should see what the numbers look like without institution 90
         y_true_positive = []
         y_pred_for_positive = []
         sf_for_positive = []
@@ -228,10 +237,9 @@ def main():
             print(df)
             out_path = os.path.join(args.out_dir, os.path.basename(os.path.dirname(args.feature_extractor)) + f"_{name}_distributions_fairness.csv")
             ensure_dir_exists(out_path)
+            # only print using three decimals
+            df = df.round(3)
             df.to_csv(out_path, index=True)
-            # # collect normal vs primary tumor samples
-            # # calculate the ratio of primary tumor samples
-            # # calculate overall ratio
             pass
 
 
