@@ -30,7 +30,7 @@ from tqdm import tqdm
 from network.inception_v4 import InceptionV4
 import monai.transforms as mt
 from monai.inferers import SimpleInferer
-from fairlearn.metrics import demographic_parity_difference, equalized_odds_difference, MetricFrame, selection_rate
+from fairlearn.metrics import demographic_parity_difference, equalized_odds_difference, MetricFrame, selection_rate, count, mean_prediction, true_positive_rate, true_negative_rate, false_positive_rate, false_negative_rate
 from sklearn.metrics import accuracy_score
 #MetricFrame(metrics{"equalized_odds_difference": equalized_odds_difference}, y_true
 
@@ -70,9 +70,6 @@ def main():
     args = parser.parse_args()
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    # # note that we split the train data again, not the entire dataset
-    data_dir_name = list(filter(None, args.src_dir.split(os.sep)))[-1]
-
     clinicalTable = pd.read_csv(args.clinical_path, sep='\t').set_index('case_submitter_id')
 
     slide_annotations = pd.read_csv(args.slide_annotation_file, sep='\t', header=0)
@@ -96,7 +93,6 @@ def main():
             clinical_row = clinicalTable.loc[patient_id]
             ann = slide_annotations.loc[slide_id]
             ds[i][CommonKeys.LABEL] = tissue_types.index(ann["Sample Type"])
-            # can I use clincal_row.at() instead? or speed up the index?
             ds[i]["gender"] = clinical_row['gender']
     logging.info("Annotations complete")
 
@@ -109,11 +105,10 @@ def main():
 
     transformations = mt.Compose(
         [
-            mt.LoadImaged("image", image_only=True),
-            mt.EnsureChannelFirstd("image"),
-            mt.ToTensord("image", track_meta=False),
-            # doesnt work?
-            mt.ToDeviceD(keys="image", device=device),
+            mt.LoadImaged(CommonKeys.IMAGE, image_only=True),
+            mt.EnsureChannelFirstd(CommonKeys.IMAGE),
+            mt.ToTensord(CommonKeys.IMAGE, track_meta=False),
+            mt.ToDeviceD(keys=CommonKeys.IMAGE, device=device),
         ])
 
     inferer = SimpleInferer()
@@ -146,116 +141,44 @@ def main():
     for name,group in [("Institution", sf_data), ("Gender", gender_data)]:
         demographic_parity = demographic_parity_difference(y_true, y_pred, sensitive_features=group)
         equalized_odds = equalized_odds_difference(y_true, y_pred, sensitive_features=group)
-        metrics_dict = {"accuracy": accuracy_score, "selection_rate": selection_rate}
-        mf2 = MetricFrame( metrics=metrics_dict, y_true=y_true, y_pred=y_pred, sensitive_features=group)
-        print(mf2)
-        # TODO: I need confirm if instutition 90 always yields bad results
-        # TODO: I need to see TP and FP rates for each institution
-        # TODO: I should see what the numbers look like without institution 90
-        y_true_positive = []
-        y_pred_for_positive = []
-        sf_for_positive = []
-        y_true_negative = []
-        y_pred_for_negative = []
-        sf_for_negative = []
-        for yt,yp,sf in zip(y_true, y_pred, group):
-            if yt == 1:
-                y_true_positive.append(yt)
-                y_pred_for_positive.append(yp)
-                sf_for_positive.append(sf)
-            else:
-                y_true_negative.append(yt)
-                y_pred_for_negative.append(yp)
-                sf_for_negative.append(sf)
+        metrics_dict = {"accuracy": accuracy_score, "selection_rate": selection_rate, "count": count, "tp_rate": true_positive_rate, "tn_rate": true_negative_rate, "fp_rate": false_positive_rate, "fn_rate": false_negative_rate, "mean_pred": mean_prediction}
+        mf = MetricFrame(metrics=metrics_dict, y_true=y_true, y_pred=y_pred, sensitive_features=group)
+        out_path = os.path.join(args.out_dir, os.path.basename(os.path.dirname(args.feature_extractor)) + f"_{name}_distributions_fairness.csv")
+        ensure_dir_exists(out_path)
+        df = mf.by_group
+        df = df.round(3)
+        df.to_csv(out_path, index=True)
 
-        if name == "Gender":
-            ratio_males_in_positive = len(list(filter(lambda x: x == 'male', sf_for_positive))) / (len(sf_for_positive) / 100)
-            print()
-            print(f"In test data inference: {ratio_males_in_positive:.2f}% of primary tumor slides are from males ({100.0-ratio_males_in_positive:.2f}% females)")
-            number_of_positives_for_males = len(list(filter(lambda x: x == 'male', sf_for_positive)))
-            number_of_negatives_for_males = len(list(filter(lambda x: x == 'male', sf_for_negative)))
-            total = number_of_positives_for_males + number_of_negatives_for_males
-            ratio_positive_for_male = number_of_positives_for_males / (total / 100)
-            print(f"Of {total} slides for males, {ratio_positive_for_male:.2f}% are primary tumors ({100.0-ratio_positive_for_male}% are benign)")
-            ratio_females_in_positive = len(list(filter(lambda x: x == 'female', sf_for_positive))) / (len(sf_for_positive) / 100)
-            number_of_positives_for_females = len(list(filter(lambda x: x == 'female', sf_for_positive)))
-            number_of_negatives_for_females = len(list(filter(lambda x: x == 'female', sf_for_negative)))
-            total = number_of_positives_for_females + number_of_negatives_for_females
-            ratio_positive_for_female = number_of_positives_for_females / (total / 100)
-            print(f"Of {total} slides for females, {ratio_positive_for_female:.2f}% are primary tumors ({100.0-ratio_positive_for_female:.2f}% are benign)")
-            print()
-        else:
-            print()
-            counts_positive = defaultdict(int)
-            counts_negative = defaultdict(int)
-            df = pd.DataFrame(data=set(group), columns=[name]).set_index(name)
+        # tweak to your needs if there is a singular (or plural) that dominates the scores
+        # indices = []
+        # for i in range(len(sf_data)):
+        #     if sf_data[i] == "90":
+        #         indices.append(i)
+        # indices.reverse()
+        # for i in indices:
+        #     del sf_data[i]
+        #     del y_true[i]
+        #     del y_pred[i]
+        # demographic_parity = demographic_parity_difference(y_true, y_pred, sensitive_features=group)
+        # equalized_odds = equalized_odds_difference(y_true, y_pred, sensitive_features=group)
+        # metrics_dict = {"accuracy": accuracy_score, "selection_rate": selection_rate, "count": count, "tp_rate": true_positive_rate, "tn_rate": true_negative_rate, "fp_rate": false_positive_rate, "fn_rate": false_negative_rate, "mean_pred": mean_prediction}
+        # mf2 = MetricFrame(metrics=metrics_dict, y_true=y_true, y_pred=y_pred, sensitive_features=group)
+        # out_path = os.path.join(args.out_dir, os.path.basename(os.path.dirname(args.feature_extractor)) + f"_{name}_distributions_fairness.csv")
+        # ensure_dir_exists(out_path)
+        # df = mf2.by_group
+        # df = df.round(3)
+        # df.to_csv(out_path, index=True)
 
-            for inst,prediction in zip(group, y_pred):
-                if prediction == 1:
-                    counts_positive[inst] += 1
-                else:
-                    counts_negative[inst] += 1
-            ratio_positives = {}
-            overall_ratio_positive = {}
-            overall_ratio_negative = {}
-            for inst in set(group):
-                total = counts_positive[inst] + counts_negative[inst]
-                ratio_positives[inst] = counts_positive[inst] / (total / 100)
-                overall_ratio_positive[inst] = float(counts_positive[inst]) / (len(sf_for_positive) / 100)
-                overall_ratio_negative[inst] = float(counts_negative[inst]) / (len(sf_for_negative) / 100)
-
-            df[tissue_types[1]] = ratio_positives
-            df[tissue_types[0]] = {k: 100.0-v for k, v in ratio_positives.items()}
-            df['Overall (pred) ratio positive'] = overall_ratio_positive
-            df['Overall (pred) ratio negative'] = overall_ratio_negative
-
-            counts_positive = defaultdict(int)
-            counts_negative = defaultdict(int)
-            for inst,prediction in zip(group, y_true):
-                if prediction == 1:
-                    counts_positive[inst] += 1
-                else:
-                    counts_negative[inst] += 1
-            ratio_positives = {}
-            overall_ratio_positive = {}
-            overall_ratio_negative = {}
-            overall_slide_count = {}
-            for inst in set(group):
-                total = counts_positive[inst] + counts_negative[inst]
-                ratio_positives[inst] = counts_positive[inst] / (total / 100)
-                overall_ratio_positive[inst] = float(counts_positive[inst]) / (len(sf_for_positive) / 100)
-                overall_ratio_negative[inst] = float(counts_negative[inst]) / (len(sf_for_negative) / 100)
-                overall_slide_count[inst] = (counts_positive[inst] + counts_negative[inst]) / ((len(sf_for_positive) + len(sf_for_negative)) / 100)
-
-            df["GT " + tissue_types[1]] = ratio_positives
-            df["GT " + tissue_types[0]] = {k: 100.0-v for k, v in ratio_positives.items()}
-            df['Overall (GT) ratio positive'] = overall_ratio_positive
-            df['Overall (GT) ratio negative'] = overall_ratio_negative
-
-            df['Overall slide percentage'] = overall_slide_count
-
-            print(df)
-            out_path = os.path.join(args.out_dir, os.path.basename(os.path.dirname(args.feature_extractor)) + f"_{name}_distributions_fairness.csv")
-            ensure_dir_exists(out_path)
-            # only print using three decimals
-            df = df.round(3)
-            df.to_csv(out_path, index=True)
-            pass
-
-
-
-        equalized_opportunity = equalized_odds_difference(y_true_positive, y_pred_for_positive, sensitive_features=sf_for_positive)
-        equalized_opportunity_negative = equalized_odds_difference(y_true_negative, y_pred_for_negative, sensitive_features=sf_for_negative)
+        equalized_opportunity = equalized_odds_difference(y_true, y_pred, sensitive_features=group)
 
         data = {"Demographic Parity": [demographic_parity],
                 "Equalized Odds": [equalized_odds],
                 f"Equalized Opportunity {tissue_types[1]}": [equalized_opportunity],
-                f"Equalized Opportunity {tissue_types[0]}": [equalized_opportunity_negative],
                 }
         df = pd.DataFrame(data)
-        #out_path = os.path.join(args.out_dir, "fairness.csv")
         out_path = os.path.join(args.out_dir, os.path.basename(os.path.dirname(args.feature_extractor)) + f"_{name}_fairness.csv")
         ensure_dir_exists(out_path)
+        df = df.round(3)
         df.to_csv(out_path, index=False)
         logging.info(f"Results (also written to {out_path}):")
         pd.set_option('display.width', None)
@@ -283,5 +206,4 @@ def main():
 
 if __name__ == "__main__":
     logging.basicConfig(stream=sys.stdout, level=logging.INFO)
-    #get_logger("train_log")
     main()
