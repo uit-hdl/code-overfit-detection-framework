@@ -30,7 +30,9 @@ from misc.global_util import ensure_dir_exists
 
 parser = argparse.ArgumentParser(description='Get cluster features')
 
-parser.add_argument('--embeddings-path', default='./out/MoCo/lung_scc/embeddings/test_lung_scc_embedding.pkl', type=str, help="location of embedding pkl from feature_extraction.py")
+parser.add_argument('--embeddings-path-test', default='./out/inceptionv4/embeddings/test_tiles_embedding.pkl', type=str, help="location of embedding pkl from feature_extraction.py")
+parser.add_argument('--embeddings-path-train', default='./out/inceptionv4/embeddings/train_tiles_embedding.pkl', type=str, help="location of embedding pkl from feature_extraction.py")
+parser.add_argument('--embeddings-path-val', default='./out/inceptionv4/embeddings/val_tiles_embedding.pkl', type=str, help="location of embedding pkl from feature_extraction.py")
 parser.add_argument('--number-of-images', default=30, type=int, help="how many images to sample for the UMAP plot")
 parser.add_argument('--histogram-bins', default=10, type=int, help="how many histogram buckets to use in each (x,y) dimension (e.g. 10 means 100 buckets in total)")
 parser.add_argument('--clinical-path', default='./annotations/TCGA/clinical.tsv', type=str, help="location of file containing clinical data")
@@ -165,7 +167,7 @@ def compute_histograms_overlap(plot_data, data_key, unique_labels, no_bins):
     mean_overlap = np.mean([x["all"] for x in overlaps.values()])
     return overlaps, mean_overlap, skewness
 
-def umap_slice(names, features, cluster, clinical, slide_annotations):
+def umap_slice(names, features, clinical, slide_annotations):
     values = [[x[0] for x in features[name]] for name in names]
     if not all(values):
         raise RuntimeError("One of the keys did not lead anywhere!")
@@ -227,9 +229,6 @@ def plot_umap_scatter(umap_projection, data, data_key, title, no_bins):
                               interactive_text_search=True, interactive_text_search_columns=[data_key])
 
     plot_href, plot_vref = compute_scatter_histograms(umap_projection, labels, plot_data, data_key, no_bins)
-    """https://github.com/bokeh/bokeh/blob/d37c647d170cc4b03a13db1a944372724b00c171/examples/server/app/selection_histogram.py#L4"""
-    hhist, hedges = np.histogram(umap_projection[:, 0], bins=no_bins)
-    LINE_ARGS = dict(color="#3A5785", line_color=None)
 
     ph = figure(toolbar_location=None, width=p.width, height=200, min_border=10, min_border_left=50, y_axis_location="right", x_range=plot_href["hedges"], y_axis_label="no. of points")
     ph.yaxis.axis_label_text_align = "left"
@@ -382,7 +381,7 @@ def viz_data(mapper, data, names, knn, knc, cpd, thumbnail_path, out_html, umap_
 
     save(gp)
 
-def main(clinical_path, embeddings_path, thumbnail_path, histogram_bins, n_cluster, number_of_images, out_dir):
+def main(clinical_path, embeddings_path_test, embeddings_path_val, embeddings_path_train, thumbnail_path, histogram_bins, number_of_images, out_dir):
     clinical = pd.read_csv(clinical_path, sep='\t')
     clinical = clinical.set_index('case_submitter_id')
     slide_annotations = pd.read_csv(args.slide_annotation_file, sep='\t', header=0)
@@ -391,8 +390,14 @@ def main(clinical_path, embeddings_path, thumbnail_path, histogram_bins, n_clust
     slide_annotations = slide_annotations.set_index("my_slide_id")
     slide_annotations = slide_annotations["Sample Type"].to_dict()
 
-    print(f"Loading embeddings from {embeddings_path}")
-    features = pickle.load(open(embeddings_path, 'rb'))
+    print(f"Loading embeddings from {embeddings_path_test}")
+    features = pickle.load(open(embeddings_path_test, 'rb'))
+
+    # TODO: experimental
+    features_val = pickle.load(open(embeddings_path_val, 'rb'))
+    features_train = pickle.load(open(embeddings_path_train, 'rb'))
+    features.update(features_val)
+    features.update(features_train)
 
     keys_sorted = list(sorted(features.keys()))
     for i in range(1):
@@ -405,14 +410,14 @@ def main(clinical_path, embeddings_path, thumbnail_path, histogram_bins, n_clust
         #keys_chosen = ["TCGA-39-5035-01A-01-BS1", "TCGA-85-8664-01A-01-TS1", "TCGA-39-5024-01A-01-BS1", "TCGA-66-2756-11A-01-BS1", "TCGA-33-4532-01A-01-TS1", "TCGA-85-7950-01A-01-TS1", "TCGA-60-2725-01A-01-BS1", "TCGA-56-6545-01A-01-BS1", "TCGA-22-4596-01A-01-TS1", "TCGA-XC-AA0X-01A-03-TS3", "TCGA-39-5035-01A-01-BS1", "TCGA-60-2698-01A-01-TS1", "TCGA-63-A5MG-01A-01-TSA", "TCGA-63-7022-01A-01-BS1", "TCGA-18-3406-11A-01-TS1", "TCGA-90-7767-11A-01-TS1", "TCGA-39-5011-01A-01-BS1", "TCGA-33-4533-01A-01-TS1", "TCGA-66-2783-01A-01-TS1", "TCGA-77-6845-01A-01-BS1"]
         #keys_chosen = ["TCGA-77-A5GH-01A-01-TS1", "TCGA-60-2725-01A-01-BS1", "TCGA-60-2714-11A-01-BS1", "TCGA-NC-A5HP-01A-01-TS1", "TCGA-77-8139-01A-01-TS1", "TCGA-98-A53D-01A-03-TS3", "TCGA-39-5039-01A-01-BS1"] + keys_sorted[:2]
 
-        print ("There are {} images in the dataset: using {} in analysis...".format(len(keys_sorted), number_of_images))
+        print ("There are {} slides in the dataset: using {} in analysis...".format(len(keys_sorted), number_of_images))
         #keys_chosen = keys_sorted
         pickle_out = os.path.join(args.out_dir, f"tmp_pickle_{len(keys_chosen)}.pkl")
         if os.path.exists(pickle_out) and 1 == 0:
             d = pickle.load(open(pickle_out, 'rb'))
             mapper, data, knn, knc, cpd = d["mapper"], d["data"], d["knn"], d["knc"], d["cpd"]
         else:
-            mapper, data, knn, knc, cpd = umap_slice(keys_chosen, features, cluster, clinical, slide_annotations)
+            mapper, data, knn, knc, cpd = umap_slice(keys_chosen, features, clinical, slide_annotations)
             #pickle_obj = {"mapper": mapper, "data": data, "knn": knn, "knc": knc, "cpd": cpd}
             #pickle.dump(pickle_obj, open(pickle_out, 'wb'), protocol=4)
 
@@ -422,12 +427,12 @@ def main(clinical_path, embeddings_path, thumbnail_path, histogram_bins, n_clust
             ('slide', "Slide"),
             ('patient', 'Patient'),
             ('institution', "Institution"),
-            ('race', "Race"),
+            #('race', "Race"),
             ('gender', "Gender"),
-            ('resection', "Resection Site"),
+            #('resection', "Resection Site"),
             ('tissue_type', "Tissue Type"),
-            ('path_stage_t', "Pathological Stage T"),
-            ('path_stage_m', "Pathological Stage M")
+            #('path_stage_t', "Pathological Stage T"),
+            #('path_stage_m', "Pathological Stage M")
         ]:
             unique_labels = np.unique(data[key])
             title += (" ({} unique colors)".format(len(unique_labels)))
@@ -449,6 +454,6 @@ if __name__ == "__main__":
     # TODO: update histogram ticks to be sideways so that they show and not get crunched for large values
     # TODO: would be sick if I updated the histograms on click-select of group
     # TODO: should highlight best and worst results in the table
-    main(args.clinical_path, args.embeddings_path, args.thumbnail_path, args.histogram_bins, args.n_cluster, args.number_of_images, args.out_dir)
+    main(args.clinical_path, args.embeddings_path_test, args.embeddings_path_val, args.embeddings_path_train, args.thumbnail_path, args.histogram_bins, args.number_of_images, args.out_dir)
 
     #keys_randomized = random.sample(keys_sorted, len(keys_sorted))

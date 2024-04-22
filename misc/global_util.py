@@ -863,16 +863,23 @@ def build_file_list(data_dir, file_list_path):
             all_data += add_dir(directory)
         for d in all_data:
             patient = '-'.join(d['filename'].split(os.sep)[-2].split('-')[1:3])
+            inst = d['filename'].split(os.sep)[-2].split('-')[1]
             if patient not in group_by_patient:
                 group_by_patient[patient] = []
+            if patient not in group_by_inst:
+                group_by_inst[inst] = []
             group_by_patient[patient].append(d)
+            group_by_inst[inst].append(d)
 
         train_data, val_data, test_data = [], [], []
         patients = list(group_by_patient.keys())
+        institutions = list(group_by_inst.keys())
         # impose (a more) random ordering
         random.shuffle(patients)
+        random.shuffle(institutions)
         splits = lambda x: [int(x * 0.7), int(x * 0.1), int(x * 0.2)]
         splits = splits(len(patients))
+        #splits = splits(len(all_data))
         for i, patient in enumerate(patients):
             d = group_by_patient[patient]
             if i < splits[0]:
@@ -881,6 +888,15 @@ def build_file_list(data_dir, file_list_path):
                 val_data += d
             else:
                 test_data += d
+        # for inst in institutions:
+        #     d = group_by_inst[inst]
+        #     if i < splits[0]:
+        #         train_data += d
+        #     elif i < splits[0] + splits[1]:
+        #         val_data += d
+        #     else:
+        #         test_data += d
+        #     i += len(d)
 
         if not train_data:
             raise RuntimeError(f"Found no data in {data_dir}")
