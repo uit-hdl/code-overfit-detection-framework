@@ -13,16 +13,16 @@ import logging
 import os
 import sys
 from collections import defaultdict
-from monai.networks.utils import freeze_layers
 
 import numpy as np
 from matplotlib import pyplot as plt
 from monai.data import DataLoader, Dataset
 from monai.networks import eval_mode
-
-from global_util import build_file_list
+from monai.networks.utils import freeze_layers
 
 sys.path.append('./')
+from misc.global_util import build_file_list, ensure_dir_exists
+
 
 import pandas as pd
 import condssl.builder
@@ -35,21 +35,16 @@ import torch.nn as nn
 from tqdm import tqdm
 from network.inception_v4 import InceptionV4
 import monai.transforms as mt
-from monai.handlers import StatsHandler, from_engine, CheckpointSaver, ValidationHandler
 from monai.engines import SupervisedTrainer, SupervisedEvaluator
 from monai.inferers import SimpleInferer
 from monai.optimizers import generate_param_groups
 from ignite.engine import Events
-from ignite.metrics import Accuracy
-from monai.transforms import Compose, Activationsd, AsDiscreted, EnsureTyped
-from monai.handlers import StatsHandler, from_engine, ValidationHandler, CheckpointSaver, MeanDice, \
-    TensorBoardImageHandler, TensorBoardStatsHandler
+from monai.transforms import Compose, EnsureTyped
+from monai.handlers import StatsHandler, from_engine, ValidationHandler, CheckpointSaver, TensorBoardStatsHandler
 from monai.handlers.tensorboard_handlers import SummaryWriter
 from sklearn.metrics import roc_curve, confusion_matrix, ConfusionMatrixDisplay, roc_auc_score
 from ignite.metrics import Accuracy, Loss
 import torch.nn.functional as F
-from global_util import ensure_dir_exists
-from monai.networks.nets import densenet121
 
 parser = argparse.ArgumentParser(description='Extract embeddings ')
 

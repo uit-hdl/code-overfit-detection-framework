@@ -1,4 +1,3 @@
-import glob
 import os
 import sys
 
@@ -6,9 +5,8 @@ import numpy as np
 from monai.data import DataLoader, Dataset
 
 sys.path.append('./')
-from global_util import build_file_list, ensure_dir_exists
+from misc.global_util import build_file_list, ensure_dir_exists
 
-import condssl.builder
 import argparse
 import pickle
 import torch
@@ -16,9 +14,7 @@ import torch.nn as nn
 from collections import defaultdict
 from tqdm import tqdm
 from network.inception_v4 import InceptionV4
-from pathlib import Path
 import monai.transforms as mt
-from sklearn.mixture import GaussianMixture
 
 parser = argparse.ArgumentParser(description='Extract embeddings ')
 

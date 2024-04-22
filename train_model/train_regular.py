@@ -37,7 +37,8 @@ from monai.networks.nets import densenet121
 from monai.transforms import Compose, Activationsd, AsDiscreted, EnsureTyped, EnsureChannelFirstd
 from sklearn.metrics import roc_curve, confusion_matrix, ConfusionMatrixDisplay
 
-from global_util import build_file_list, ensure_dir_exists, institution_lookup
+sys.path.append('./')
+from misc.global_util import build_file_list, ensure_dir_exists, institution_lookup
 
 from train_util import *
 from monai.utils import Range, CommonKeys

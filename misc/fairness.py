@@ -11,18 +11,14 @@
 import logging
 import os
 import sys
-from collections import defaultdict
 
 from monai.data import DataLoader, Dataset
 from monai.utils import CommonKeys
 
-from global_util import build_file_list, ensure_dir_exists
-
 sys.path.append('./')
+from misc.global_util import build_file_list, ensure_dir_exists
 
-import condssl.builder
 import argparse
-import pickle
 import torch
 import pandas as pd
 import torch.nn as nn

@@ -14,12 +14,12 @@ import torchvision.transforms as transforms
 from monai.data import DataLoader, Dataset, set_track_meta
 from torch.utils.data import Sampler
 
-import samplers
-
-sys.path.append("../")
+sys.path.append('./')
 import condssl.builder
 import condssl.loader
-from global_util import build_file_list, ensure_dir_exists
+import samplers
+
+from misc.global_util import build_file_list, ensure_dir_exists
 
 from network.inception_v4 import InceptionV4
 from train_util import *

@@ -5,12 +5,13 @@ import operator
 import os
 import pickle
 import random
+import sys
 from collections import defaultdict
 from itertools import accumulate
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import scipy.stats
 import umap
 from bokeh.layouts import layout
 from bokeh.models import OpenURL, TapTool, ColumnDataSource
@@ -18,13 +19,12 @@ from bokeh.models.widgets import Div, DataTable, TableColumn
 from bokeh.plotting import output_file, save, figure
 from scipy.spatial import distance
 from scipy.stats import spearmanr, skew
-from sklearn.mixture import GaussianMixture
 from sklearn.neighbors import NearestNeighbors
-import scipy.stats
 
 import umap_plot
 
-from global_util import ensure_dir_exists
+sys.path.append('./')
+from misc.global_util import ensure_dir_exists
 
 
 parser = argparse.ArgumentParser(description='Get cluster features')

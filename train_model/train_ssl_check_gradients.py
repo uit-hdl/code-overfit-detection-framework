@@ -1,42 +1,32 @@
 import argparse
-import glob
+import csv
 import os.path
 import random
-import csv
-import tempfile
 import sys
+import tempfile
 import time
 import warnings
-from collections import defaultdict
-
-import monai.utils
-from sklearn.model_selection import train_test_split
 
 import monai.transforms as mt
 import torch.backends.cudnn as cudnn
 import torch.nn as nn
 import torchvision.transforms as transforms
-from monai.data import DataLoader, Dataset, set_track_meta, CacheDataset, PersistentDataset, SmartCacheDataset, ImageDataset, CacheNTransDataset
-from torch.utils.data import Sampler, DistributedSampler
+from monai.data import DataLoader, Dataset, set_track_meta
+from torch.utils.data import Sampler
 
 import samplers
-sys.path.append("../")
+
+sys.path.append("./")
 import condssl.builder
 import condssl.loader
 import numpy as np
-from global_util import build_file_list, ensure_dir_exists
+from misc.global_util import build_file_list, ensure_dir_exists
 
 from network.inception_v4 import InceptionV4
 from train_util import *
-import nvtx
-import monai.utils
 from monai.utils import Range
 import contextlib
 no_profiling = contextlib.nullcontext()
-
-from itertools import zip_longest
-
-
 
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
 # parser.add_argument('data', metavar='DIR',
