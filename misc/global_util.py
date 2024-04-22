@@ -858,10 +858,11 @@ def build_file_list(data_dir, file_list_path):
         number_of_slides = len(glob.glob(f"{data_dir}{os.sep}*"))
         all_data = []
         group_by_patient = {}
+        group_by_inst = {}
         for i, directory in enumerate(glob.glob(f"{data_dir}{os.sep}*")):
             all_data += add_dir(directory)
         for d in all_data:
-            patient = d['filename'].split(os.sep)[-2]
+            patient = '-'.join(d['filename'].split(os.sep)[-2].split('-')[1:3])
             if patient not in group_by_patient:
                 group_by_patient[patient] = []
             group_by_patient[patient].append(d)

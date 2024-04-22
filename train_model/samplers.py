@@ -18,7 +18,7 @@ class MySampler(Sampler):
     """
 
     def __init__(self, data_source, batch_size, batch_slide_num, batch_inst_num, is_profiling=False):
-        super().__init__(data_source)
+        super().__init__()
         self.data_source = data_source
         self.batch_size = batch_size
         self.batch_slide_num = batch_slide_num

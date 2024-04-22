@@ -1,4 +1,5 @@
 import itertools
+import logging
 import math
 import os
 from collections import defaultdict
@@ -9,6 +10,7 @@ import psutil
 from PIL import Image
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
+import logging
 
 from itertools import zip_longest
 
@@ -59,8 +61,8 @@ class MyDataLoader(DataLoader):
             img_arr = Image.open(os.path.join(self.tcga_dir, tile_name))
             self.tile_list[i] = img_arr
             if i % 1000 == 0:
-                print("Iterating images: {}/{}".format(i, len(self.batch_ordering)))
-                print('RAM Used (GB):', psutil.virtual_memory()[3] / 1000000000)
+                logging.debug("Iterating images: {}/{}".format(i, len(self.batch_ordering)))
+                logging.debug('RAM Used (GB):', psutil.virtual_memory()[3] / 1000000000)
 
     def __getitem__(self, index):
         image = self.tile_list[index]
@@ -123,8 +125,8 @@ class TCGA_CPTAC_Dataset(Dataset):
             img_arr = Image.open(os.path.join(self.tcga_dir, tile_name))
             self.tile_list[i] = img_arr
             if i % 1000 == 0:
-                print("Iterating images: {}/{}".format(i, len(self.batch_ordering)))
-                print('RAM Used (GB):', psutil.virtual_memory()[3] / 1000000000)
+                logging.debug("Iterating images: {}/{}".format(i, len(self.batch_ordering)))
+                logging.debug('RAM Used (GB):', psutil.virtual_memory()[3] / 1000000000)
 
     def __getitem__(self, index):
         image = self.tile_list[index]
