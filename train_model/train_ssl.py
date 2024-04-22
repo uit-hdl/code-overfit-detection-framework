@@ -78,8 +78,8 @@ parser.add_argument("--local_rank", type=int, default=0)
 # moco specific configs:
 parser.add_argument('--moco-dim', default=128, type=int,
                     help='feature dimension (default: 128)')
-parser.add_argument('--moco-k', default=256, type=int,
-                    help='queue size; number of negative keys (default moco: 65536, default here: 256)')
+parser.add_argument('--moco-k', default=65536, type=int,
+                    help='queue size; number of negative keys (default moco: 65536)')
 parser.add_argument('--moco-m', default=0.999, type=float,
                     help='moco momentum of updating key encoder (default: 0.999)')
 parser.add_argument('--moco-t', default=0.07, type=float,
