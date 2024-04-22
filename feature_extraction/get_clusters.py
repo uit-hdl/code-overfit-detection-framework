@@ -2,6 +2,7 @@
 
 import argparse
 import operator
+import math
 import os
 import pickle
 import random
@@ -28,7 +29,6 @@ from misc.global_util import ensure_dir_exists
 
 
 parser = argparse.ArgumentParser(description='Get cluster features')
-reducer = umap.UMAP(random_state=42)
 
 parser.add_argument('--embeddings-path', default='./out/MoCo/lung_scc/embeddings/test_lung_scc_embedding.pkl', type=str, help="location of embedding pkl from feature_extraction.py")
 parser.add_argument('--number-of-images', default=30, type=int, help="how many images to sample for the UMAP plot")
@@ -37,7 +37,6 @@ parser.add_argument('--clinical-path', default='./annotations/TCGA/clinical.tsv'
 parser.add_argument('--thumbnail-path', default='/Data/TCGA_LUSC/thumbnails', type=str, help="location of directory containing thumbnails")
 parser.add_argument('--slide_annotation_file', default=os.path.join('annotations', 'slide_label', 'gdc_sample_sheet.2023-08-14.tsv'), type=str,
                     help='"Sample sheet" from TCGA, see README.md for instructions on how to get sheet')
-parser.add_argument('--n-cluster', default=50, type=int)
 parser.add_argument('--out-dir', default='./out', type=str)
 
 # color by gender
@@ -53,10 +52,6 @@ TOOLTIPS = """
         </div>
         <div>
             <span style="font-size: 17px; font-weight: bold;">@slide</span>
-        </div>
-        <div>
-            <span style="font-size: 15px;">GMM Cluster:</span>
-            <span style="font-size: 15px;">@cluster_id</span>
         </div>
         <div>
             <span style="font-size: 15px;">Gender:</span>
@@ -174,11 +169,12 @@ def umap_slice(names, features, cluster, clinical, slide_annotations):
     values = [[x[0] for x in features[name]] for name in names]
     if not all(values):
         raise RuntimeError("One of the keys did not lead anywhere!")
-    cluster_labels = [item for sublist in [cluster.predict(y) for y in values] for item in sublist] if cluster else [0] * sum([len(x) for x in values])
     tile_names = [[x[1] for x in features[name]] for name in names]
     file_root = os.path.abspath("/").replace(os.sep, "/")
     tile_names = ["file:///" + file_root + x for x in np.concatenate(tile_names, axis=0)]
     features_flattened = np.concatenate(values, axis=0)
+    perplexity_score = math.floor(len(features_flattened) / 100)
+    reducer = umap.UMAP(random_state=42, n_neighbors=perplexity_score, min_dist=1.0)
     umap_projection = reducer.fit_transform(features_flattened)
     #mapper = reducer.fit(features_flattened)
 
@@ -205,7 +201,6 @@ def umap_slice(names, features, cluster, clinical, slide_annotations):
 
     data = pd.DataFrame({
         'index': np.arange(len(features_flattened)),
-        'cluster_id': cluster_labels,
         'gender': gender_labels,
         'race': race_labels,
         'institution': institution_labels,
@@ -399,18 +394,6 @@ def main(clinical_path, embeddings_path, thumbnail_path, histogram_bins, n_clust
     print(f"Loading embeddings from {embeddings_path}")
     features = pickle.load(open(embeddings_path, 'rb'))
 
-    cluster_dst = os.path.join(out_dir, 'cluster', f'gmm_{n_cluster}.pkl')
-    if os.path.exists(cluster_dst):
-        cluster = pickle.load(open(cluster_dst, 'rb'))
-        print("Loaded cluster from {}".format(cluster_dst))
-    else:
-        print("Making gmm cluster...")
-        #cluster = GaussianMixture(n_components=n_cluster, random_state=42).fit([item[0] for sublist in features.values() for item in sublist])
-        cluster = None
-        ensure_dir_exists(cluster_dst)
-        #pickle.dump(cluster, open(cluster_dst, 'wb'))
-        print("Loaded cluster from {}".format(cluster_dst))
-
     keys_sorted = list(sorted(features.keys()))
     for i in range(1):
         keys_random = random.sample(keys_sorted, len(keys_sorted))
@@ -441,7 +424,6 @@ def main(clinical_path, embeddings_path, thumbnail_path, histogram_bins, n_clust
             ('institution', "Institution"),
             ('race', "Race"),
             ('gender', "Gender"),
-            #('cluster_id', "GMM Cluster"),
             ('resection', "Resection Site"),
             ('tissue_type', "Tissue Type"),
             ('path_stage_t', "Pathological Stage T"),
