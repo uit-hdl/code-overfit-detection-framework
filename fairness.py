@@ -32,7 +32,6 @@ import monai.transforms as mt
 from monai.inferers import SimpleInferer
 from fairlearn.metrics import demographic_parity_difference, equalized_odds_difference, MetricFrame, selection_rate, count, mean_prediction, true_positive_rate, true_negative_rate, false_positive_rate, false_negative_rate
 from sklearn.metrics import accuracy_score
-#MetricFrame(metrics{"equalized_odds_difference": equalized_odds_difference}, y_true
 
 parser = argparse.ArgumentParser(description='Demographic parities')
 
@@ -139,28 +138,43 @@ def main():
     logging.info("Inference complete")
 
     for name,group in [("Institution", sf_data), ("Gender", gender_data)]:
-        demographic_parity = demographic_parity_difference(y_true, y_pred, sensitive_features=group)
-        equalized_odds = equalized_odds_difference(y_true, y_pred, sensitive_features=group)
         metrics_dict = {"accuracy": accuracy_score, "selection_rate": selection_rate, "count": count, "tp_rate": true_positive_rate, "tn_rate": true_negative_rate, "fp_rate": false_positive_rate, "fn_rate": false_negative_rate, "mean_pred": mean_prediction}
         mf = MetricFrame(metrics=metrics_dict, y_true=y_true, y_pred=y_pred, sensitive_features=group)
+        print(f"Metrics: {name}:")
+        print(mf.overall)
         out_path = os.path.join(args.out_dir, os.path.basename(os.path.dirname(args.feature_extractor)) + f"_{name}_distributions_fairness.csv")
         ensure_dir_exists(out_path)
         df = mf.by_group
         df = df.round(3)
         df.to_csv(out_path, index=True)
 
+        demographic_parity = demographic_parity_difference(y_true, y_pred, sensitive_features=group)
+        equalized_odds = equalized_odds_difference(y_true, y_pred, sensitive_features=group)
+        indices_with_gt_positive = []
+        for i in range(len(sf_data)):
+            if y_true[i] == 1:
+                indices_with_gt_positive.append(i)
+        equalized_opportunity = equalized_odds_difference([y_true[i] for i in indices_with_gt_positive], [y_pred[i] for i in indices_with_gt_positive], sensitive_features=[group[i] for i in indices_with_gt_positive])
+
+        data = {"Demographic Parity": [demographic_parity],
+                "Equalized Odds": [equalized_odds],
+                f"Equalized Opportunity {tissue_types[1]}": [equalized_opportunity],
+                }
+        df = pd.DataFrame(data)
+        print(df.to_string())
+
         # tweak to your needs if there is a singular (or plural) that dominates the scores
         # indices = []
         # for i in range(len(sf_data)):
         #     if sf_data[i] == "90":
         #         indices.append(i)
-        # indices.reverse()
-        # for i in indices:
-        #     del sf_data[i]
-        #     del y_true[i]
-        #     del y_pred[i]
-        # demographic_parity = demographic_parity_difference(y_true, y_pred, sensitive_features=group)
-        # equalized_odds = equalized_odds_difference(y_true, y_pred, sensitive_features=group)
+        # indices = dict.fromkeys(indices)
+        # demographic_parity = demographic_parity_difference([y_true[i] for i in range(len(y_true)) if i not in indices], [y_pred[i] for i in range(len(y_true)) if i not in indices],
+        #                                                    sensitive_features=[group[i] for i in range(len(y_true)) if i not in indices])
+        # equalized_odds = equalized_odds_difference([y_true[i] for i in range(len(y_true)) if i not in indices], [y_pred[i] for i in range(len(y_true)) if i not in indices],
+        #                                                    sensitive_features=[group[i] for i in range(len(y_true)) if i not in indices])
+        # equalized_opportunity = equalized_odds_difference([y_true[i] for i in indices_with_gt_positive if i not in indices], [y_pred[i] for i in indices_with_gt_positive if i not in indices],
+        #                                                    sensitive_features=[group[i] for i in indices_with_gt_positive if i not in indices])
         # metrics_dict = {"accuracy": accuracy_score, "selection_rate": selection_rate, "count": count, "tp_rate": true_positive_rate, "tn_rate": true_negative_rate, "fp_rate": false_positive_rate, "fn_rate": false_negative_rate, "mean_pred": mean_prediction}
         # mf2 = MetricFrame(metrics=metrics_dict, y_true=y_true, y_pred=y_pred, sensitive_features=group)
         # out_path = os.path.join(args.out_dir, os.path.basename(os.path.dirname(args.feature_extractor)) + f"_{name}_distributions_fairness.csv")
@@ -170,7 +184,8 @@ def main():
         # df.to_csv(out_path, index=True)
 
         equalized_opportunity = equalized_odds_difference(y_true, y_pred, sensitive_features=group)
-
+        demographic_parity = demographic_parity_difference(y_true, y_pred, sensitive_features=group)
+        equalized_odds = equalized_odds_difference(y_true, y_pred, sensitive_features=group)
         data = {"Demographic Parity": [demographic_parity],
                 "Equalized Odds": [equalized_odds],
                 f"Equalized Opportunity {tissue_types[1]}": [equalized_opportunity],

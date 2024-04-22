@@ -339,7 +339,7 @@ def main():
     model_path = os.path.join(out_path, f"network_epoch={args.epochs}.pt")
     writer = SummaryWriter(log_dir=os.path.join(out_path, "runs"))
     # TODO: re-enable when training is good
-    if False and os.path.exists(model_path):
+    if os.path.exists(model_path):
         logging.info(f"=> loading model '{model_path}'")
         model.load_state_dict(torch.load(model_path, map_location=device))
         logging.info('Model builder done')
@@ -348,7 +348,7 @@ def main():
         #model = densenet121(spatial_dims=2, in_channels=3, out_channels=len(labels), pretrained=True)
         #model.to(device)
         params = generate_param_groups(network=model, layer_matches=[lambda x: x.last_linear], match_types=["select"],
-                                       lr_values=[1e-3])
+                                       lr_values=[args.lr])
         optimizer = torch.optim.Adam(params, args.lr)
         #optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
         logging.info('Model builder done')
