@@ -78,8 +78,8 @@ parser.add_argument("--local_rank", type=int, default=0)
 # moco specific configs:
 parser.add_argument('--moco-dim', default=128, type=int,
                     help='feature dimension (default: 128)')
-parser.add_argument('--moco-k', default=65536, type=int,
-                    help='queue size; number of negative keys (default moco: 65536)')
+parser.add_argument('--moco-k', default=256, type=int,
+                    help='queue size; number of negative keys (default moco: 65536, here: 256)')
 parser.add_argument('--moco-m', default=0.999, type=float,
                     help='moco momentum of updating key encoder (default: 0.999)')
 parser.add_argument('--moco-t', default=0.07, type=float,
@@ -285,6 +285,7 @@ def main():
     logging.info("Model dest filename: %s" % model_filename)
 
     writer = SummaryWriter(log_dir=model_filename.replace("_#NUM#", "") + "_runs")
+    writer.add_text("git_sha", os.popen('git rev-parse HEAD').read().strip())
     writer.add_scalar("is_distributed", int(not is_distributed))
 
     train_data, val_data, _ = build_file_list(args.data_dir, args.file_list_path)
