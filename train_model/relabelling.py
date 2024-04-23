@@ -333,7 +333,6 @@ def main():
 
     model_path = os.path.join(out_path, f"network_epoch={args.epochs}.pt")
     writer = SummaryWriter(log_dir=os.path.join(out_path, "runs"))
-    # TODO: re-enable when training is good
     if os.path.exists(model_path):
         logging.info(f"=> loading model '{model_path}'")
         model.load_state_dict(torch.load(model_path, map_location=device))

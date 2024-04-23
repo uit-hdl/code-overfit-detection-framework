@@ -59,7 +59,7 @@ for d in ds:
                            'age': int(clinicalRow['age_at_diagnosis']) if clinicalRow['age_at_diagnosis'].isnumeric() else None,
                            'gender':clinicalRow['gender'],
                            'followup_days': int(clinicalRow['days_to_last_follow_up'].replace(".0", "")) if clinicalRow['days_to_last_follow_up'].isnumeric() else None,
-                          'patient_id': patient_id}
+                           'patient_id': patient_id}
 out_file = os.path.join(os.path.join(args.out_dir, 'annotation', 'recurrence_annotation_cptac.pkl'))
 ensure_dir_exists(out_file)
 pickle.dump(annotation, open(out_file, 'wb'))

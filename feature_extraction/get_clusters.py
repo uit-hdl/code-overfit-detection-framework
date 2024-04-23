@@ -34,7 +34,7 @@ parser.add_argument('--embeddings-path-test', default='./out/inceptionv4/embeddi
 parser.add_argument('--embeddings-path-train', default='./out/inceptionv4/embeddings/train_tiles_embedding.pkl', type=str, help="location of embedding pkl from feature_extraction.py")
 parser.add_argument('--embeddings-path-val', default='./out/inceptionv4/embeddings/val_tiles_embedding.pkl', type=str, help="location of embedding pkl from feature_extraction.py")
 parser.add_argument('--number-of-images', default=30, type=int, help="how many images to sample for the UMAP plot")
-parser.add_argument('--histogram-bins', default=10, type=int, help="how many histogram buckets to use in each (x,y) dimension (e.g. 10 means 100 buckets in total)")
+parser.add_argument('--histogram-bins', default=20, type=int, help="how many histogram buckets to use in each (x,y) dimension (e.g. 10 means 100 buckets in total)")
 parser.add_argument('--clinical-path', default='./annotations/TCGA/clinical.tsv', type=str, help="location of file containing clinical data")
 parser.add_argument('--thumbnail-path', default='/Data/TCGA_LUSC/thumbnails', type=str, help="location of directory containing thumbnails")
 parser.add_argument('--slide_annotation_file', default=os.path.join('annotations', 'slide_label', 'gdc_sample_sheet.2023-08-14.tsv'), type=str,
@@ -400,7 +400,9 @@ def main(clinical_path, embeddings_path_test, embeddings_path_val, embeddings_pa
     features.update(features_train)
 
     keys_sorted = list(sorted(features.keys()))
-    for i in range(1):
+    splits = math.floor(keys_sorted / 1000) + 1
+
+    for i in range(len(keys_sorted) / 2):
         keys_random = random.sample(keys_sorted, len(keys_sorted))
 
         number_of_images = min(number_of_images, len(keys_sorted))
