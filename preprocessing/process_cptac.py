@@ -29,7 +29,7 @@ data = []
 for i, filename in enumerate(glob.glob(f"{args.wsi_path}{os.sep}*")):
     #for filename in glob.glob(f"{directory}{os.sep}**{os.sep}*", recursive=True):
         if os.path.isfile(filename):
-            data.append({'filename': filename, 'patient': '-'.join(os.path.basename(filename).split('.')[0].split("-")[:-1])})
+            data.append({'filename': filename, 'patient': '-'.join(os.path.basename(filename).split('.')[0].split("-"))})
 ds = Dataset(data, transform=None)
 
 for slide_id in ds:

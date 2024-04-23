@@ -55,22 +55,18 @@ parser.add_argument('--feature_extractor',
 parser.add_argument('--tcga_annotation_file', default=os.path.join('out', 'annotation', 'recurrence_annotation_tcga.pkl'), type=str, help='path to TCGA annotations')
 parser.add_argument('--file-list-path', default=os.path.join('out', 'files.csv'), type=str, help='path to list of file splits')
 parser.add_argument('--label-key', default='Sample Type', type=str, help='default key to use for doing fine-tuning. If set to "my_inst", will retrain using institution as label')
-parser.add_argument('--src-dir', default=os.path.join('Data', 'TCGA_LUSC', 'preprocessed', 'TCGA', 'tiles'), type=str, help='path to preprocessed slide images')
+parser.add_argument('--src-dir', default=os.path.join('Data', 'TCGA_LUSC', 'tiles'), type=str, help='path to preprocessed slide images')
 parser.add_argument('--out-dir', default='./out', type=str, help='path to save extracted embeddings')
 parser.add_argument('--slide_annotation_file', default=os.path.join('annotations', 'slide_label', 'gdc_sample_sheet.2023-08-14.tsv'), type=str,
                     help='"Sample sheet" from TCGA, see README.md for instructions on how to get sheet')
 parser.add_argument('-b', '--batch-size', default=128, type=int,
                     metavar='N', help=f'batch size, this is the total batch size of all GPUs on the current node when using Data Parallel or Distributed Data Parallel')
-parser.add_argument('--profile', default=False, type=bool, action=argparse.BooleanOptionalAction,
-                    metavar='P', help='whether to profile training or not', dest='is_profiling')
 parser.add_argument('--debug-mode', default=False, type=bool, action=argparse.BooleanOptionalAction,
                     metavar='D', help='turn debugging on or off. Will limit amount of data used. Development only', dest='debug_mode')
 parser.add_argument('-j', '--workers', default=0, type=int, metavar='N',
                     help='number of data loading workers')
 parser.add_argument('--lr', '--learning-rate', default=1e-05, type=float,
                     metavar='LR', help='initial learning rate', dest='lr')
-parser.add_argument('-p', '--print-freq', default=10, type=int,
-                    metavar='N', help='print frequency (default: 10)')
 
 def from_engine_custom(keys, device):
     """
@@ -298,7 +294,7 @@ def main():
         print('No GPU device available')
         sys.exit(1)
     if not os.path.exists(args.slide_annotation_file):
-        logging.error("TCGA annotation file not found: {}".format(args.tcga_annotation_file))
+        logging.error("TCGA annotation file not found: {}".format(args.slide_annotation_file))
         sys.exit(1)
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -310,7 +306,7 @@ def main():
     slide_annotations["my_inst"] = slide_annotations["File Name"].map(lambda s: s.split("-")[1])
     labels = slide_annotations[args.label_key].unique().tolist()
     labels.sort()
-    assert args.label_key != 'Sample Type' or labels[0] == "Solid Tissue Normal" # making 0 the benign class if using 'sample type'
+    assert len(labels) > 2 or labels[0] == "Solid Tissue Normal" # making 0 the benign class if using 'sample type'
 
     logging.info('Creating dataset')
     train_data, val_data, test_data = build_file_list(args.src_dir, args.file_list_path)
