@@ -30,21 +30,16 @@ from misc.global_util import ensure_dir_exists
 
 parser = argparse.ArgumentParser(description='Get cluster features')
 
-#parser.add_argument('--embeddings-path-test', default='out/inceptionv4/checkpoint_MoCo_tiles_0200_False_m256_n0_o0_K256.pth.tar/test_tiles_embedding.pkl', type=str, help="location of embedding pkl from feature_extraction.py")
-#parser.add_argument('--embeddings-path-test', default='out/inceptionv4/checkpoint_MoCo_tiles_0020_False_m256_n0_o0_K256.pth.tar/test_tiles_embedding.pkl', type=str, help="location of embedding pkl from feature_extraction.py")
-parser.add_argument('--embeddings-path-test', default='out/inceptionv4/checkpoint_MoCo_tiles_0020_True_m256_n0_o4_K256.pth.tar/test_tiles_embedding.pkl', type=str, help="location of embedding pkl from feature_extraction.py")
-parser.add_argument('--embeddings-path-train', default='out/inceptionv4/checkpoint_MoCo_tiles_0200_False_m256_n0_o0_K256.pth.tar/train_tiles_embedding.pkl', type=str, help="location of embedding pkl from feature_extraction.py")
-parser.add_argument('--embeddings-path-val', default='out/inceptionv4/checkpoint_MoCo_tiles_0200_False_m256_n0_o0_K256.pth.tar/val_tiles_embedding.pkl', type=str, help="location of embedding pkl from feature_extraction.py")
-#parser.add_argument('--embeddings-path-test', default='out/inceptionv4/checkpoint_MoCo_tiles_0200_True_m256_n0_o4_K256.pth.tar/test_tiles_embedding.pkl', type=str, help="location of embedding pkl from feature_extraction.py")
-#parser.add_argument('--embeddings-path-train', default='out/inceptionv4/checkpoint_MoCo_tiles_0200_True_m256_n0_o4_K256.pth.tar/train_tiles_embedding.pkl', type=str, help="location of embedding pkl from feature_extraction.py")
-#parser.add_argument('--embeddings-path-val', default='out/inceptionv4/checkpoint_MoCo_tiles_0200_True_m256_n0_o4_K256.pth.tar/val_tiles_embedding.pkl', type=str, help="location of embedding pkl from feature_extraction.py")
-parser.add_argument('--number-of-images', default=30, type=int, help="how many images to sample for the UMAP plot")
+parser.add_argument('--embeddings-path-test-true', default='out/inceptionv4/checkpoint_MoCo_tiles_0200_True_m256_n0_o4_K256.pth.tar/cptac_tiles_embedding.pkl', type=str, help="location of embedding pkl from feature_extraction.py")
+parser.add_argument('--embeddings-path-test-false', default='out/inceptionv4/checkpoint_MoCo_tiles_0200_False_m256_n0_o0_K256.pth.tar/cptac_tiles_embedding.pkl', type=str, help="location of embedding pkl from feature_extraction.py")
+parser.add_argument('--number-of-images', default=2999, type=int, help="how many images to sample for the UMAP plot")
 parser.add_argument('--histogram-bins', default=20, type=int, help="how many histogram buckets to use in each (x,y) dimension (e.g. 10 means 100 buckets in total)")
-parser.add_argument('--clinical-path', default='./annotations/TCGA/clinical.tsv', type=str, help="location of file containing clinical data")
 parser.add_argument('--thumbnail-path', default='/Data/TCGA_LUSC/thumbnails', type=str, help="location of directory containing thumbnails")
-parser.add_argument('--slide_annotation_file', default=os.path.join('annotations', 'slide_label', 'gdc_sample_sheet.2023-08-14.tsv'), type=str,
-                    help='"Sample sheet" from TCGA, see README.md for instructions on how to get sheet')
 parser.add_argument('--out-dir', default='./out', type=str)
+parser.add_argument('--slide_annotation_file', default=os.path.join('annotations', 'CPTAC', 'slide.tsv'), type=str,
+                    help='"Slide sheet", containing sample information, see README.md for instructions on how to get sheet')
+parser.add_argument('--sample_annotation_file', default=os.path.join('annotations', 'CPTAC', 'sample.tsv'), type=str,
+                    help='"Slide sheet", containing sample information, see README.md for instructions on how to get sheet')
 
 # color by gender
 
@@ -59,30 +54,6 @@ TOOLTIPS = """
         </div>
         <div>
             <span style="font-size: 17px; font-weight: bold;">@slide</span>
-        </div>
-        <div>
-            <span style="font-size: 15px;">Gender:</span>
-            <span style="font-size: 15px;">@gender</span>
-        </div>
-        <div>
-            <span style="font-size: 15px;">Institution:</span>
-            <span style="font-size: 15px;">@institution</span>
-        </div>
-        <div>
-            <span style="font-size: 15px;">Race:</span>
-            <span style="font-size: 15px;">@race</span>
-        </div>
-        <div>
-            <span style="font-size: 15px;">Path_m:</span>
-            <span style="font-size: 15px;">@path_stage_m</span>
-        </div>
-        <div>
-            <span style="font-size: 15px;">Path_t:</span>
-            <span style="font-size: 15px;">@path_stage_t</span>
-        </div>
-        <div>
-            <span style="font-size: 15px;">Resection site</span>
-            <span style="font-size: 15px;">@resection</span>
         </div>
         <div>
             <span style="font-size: 15px;">Location</span>
@@ -172,18 +143,15 @@ def compute_histograms_overlap(plot_data, data_key, unique_labels, no_bins):
     mean_overlap = np.mean([x["all"] for x in overlaps.values()])
     return overlaps, mean_overlap, skewness
 
-def umap_slice(names, features, clinical, slide_annotations):
+def umap_slice(names, features, slide_annotations):
     values = [[x[0] for x in features[name]] for name in names]
     if not all(values):
         raise RuntimeError("One of the keys did not lead anywhere!")
     tile_names = [[x[1] for x in features[name]] for name in names]
-    if len(tile_names[0]) < 10:
-        print(f"Skipping {names}, too few tiles")
-        return None, None, None, None, None
     file_root = os.path.abspath("/").replace(os.sep, "/")
     tile_names = ["file:///" + file_root + x for x in np.concatenate(tile_names, axis=0)]
     features_flattened = np.concatenate(values, axis=0)
-    perplexity_score = math.floor(len(features_flattened) / 100) if len(features_flattened) > 200 else 2
+    perplexity_score = math.floor(len(features_flattened) / 100)
     reducer = umap.UMAP(random_state=42, n_neighbors=perplexity_score, min_dist=1.0)
     umap_projection = reducer.fit_transform(features_flattened)
     #mapper = reducer.fit(features_flattened)
@@ -198,28 +166,15 @@ def umap_slice(names, features, clinical, slide_annotations):
     names_labels = [[names[i]] * (i_e - i_s) for i,(i_s,i_e) in enumerate(zip(slices, slices[1:]))]
     names_labels = [item for sublist in names_labels for item in sublist]
     case_submitter_ids = ["-".join(name.split("-")[:3]) for name in names_labels]
-    gender_labels = [clinical['gender'][case].iloc[0] for case in case_submitter_ids]
-    site_of_resection_labels = [clinical['site_of_resection_or_biopsy'][case].iloc[0] for case in case_submitter_ids]
-    path_stage_t = [clinical['ajcc_pathologic_t'][case].iloc[0] for case in case_submitter_ids]
-    path_stage_m = [clinical['ajcc_pathologic_m'][case].iloc[0] for case in case_submitter_ids]
-    race_labels = [clinical['race'][case].iloc[0] for case in case_submitter_ids]
-    tissue_type = list(map(lambda l: slide_annotations[os.path.basename(os.path.dirname(l))], tile_names))
+    tissue_type = list(map(lambda l: slide_annotations.loc[l]['sample_type'], names_labels))
 
-    # If you want to see what the codes refer to https://gdc.cancer.gov/resources-tcga-users/tcga-code-tables/tissue-source-site-codes
-    institution_labels = [case.split("-")[1] for case in case_submitter_ids]
-    patient_labels = [case.split("-")[2] for case in case_submitter_ids]
+    patient_labels = [case.split("-")[1] for case in case_submitter_ids]
 
     data = pd.DataFrame({
         'index': np.arange(len(features_flattened)),
-        'gender': gender_labels,
-        'race': race_labels,
-        'institution': institution_labels,
-        'resection': site_of_resection_labels,
-        'path_stage_m': path_stage_m,
-        'path_stage_t': path_stage_t,
-        'tissue_type': tissue_type,
         'slide': names_labels,
         'patient': patient_labels,
+        'tissue_type': tissue_type,
         'image_url': tile_names,
     })
     return umap_projection, data, knn_fractions, knc_fractions, cpd
@@ -389,98 +344,53 @@ def viz_data(mapper, data, names, knn, knc, cpd, thumbnail_path, out_html, umap_
 
     save(gp)
 
-def main(clinical_path, embeddings_path_test, embeddings_path_val, embeddings_path_train, thumbnail_path, histogram_bins, number_of_images, out_dir):
-    clinical = pd.read_csv(clinical_path, sep='\t')
-    clinical = clinical.set_index('case_submitter_id')
+def main(embeddings_path_test_true, embeddings_path_test_false, thumbnail_path, histogram_bins, number_of_images, out_dir):
     slide_annotations = pd.read_csv(args.slide_annotation_file, sep='\t', header=0)
-    slide_annotations["my_slide_id"] = slide_annotations["File Name"].map(lambda s: s.split(".")[0])
-    # Generate a dictionary using "my_slide_id" as key and "Sample Type" as value
-    slide_annotations = slide_annotations.set_index("my_slide_id")
-    slide_annotations = slide_annotations["Sample Type"].to_dict()
+    slide_annotations = slide_annotations[['slide_submitter_id', 'sample_id']]
 
-    print(f"Loading embeddings from {embeddings_path_test}")
-    features = pickle.load(open(embeddings_path_test, 'rb'))
+    sample_annotations = pd.read_csv(args.sample_annotation_file, sep='\t', header=0)
+    sample_annotations = sample_annotations[['sample_id', 'sample_type']]
 
-    # TODO: experimental
-    features_val = pickle.load(open(embeddings_path_val, 'rb'))
-    features_train = pickle.load(open(embeddings_path_train, 'rb'))
-    #features.update(features_val)
-    #features.update(features_train)
-    #features = pickle.load(open(embeddings_path_train, 'rb'))
+    df = slide_annotations.merge(sample_annotations, on='sample_id')
+    df = df.set_index('slide_submitter_id')
 
-    keys_sorted = list(sorted(features.keys()))
-    cutoff = 400
-    splits = [0]
-    while splits[-1] < len(keys_sorted):
-        i = splits[-1] + cutoff
-        if i >= len(keys_sorted):
-            splits.append(len(keys_sorted))
-            break
-        inst_at_split = keys_sorted[i].split("-")[1]
-        next_inst = inst_at_split
-        while inst_at_split == next_inst:
-            i += 1
-            next_inst = keys_sorted[i].split("-")[1]
-        splits.append(i)
+    for label,embeddings_path_test in [("true", embeddings_path_test_true), ("false", embeddings_path_test_false)]:
+        print(f"Loading embeddings from {embeddings_path_test}")
+        features = pickle.load(open(embeddings_path_test, 'rb'))
 
-    skewers = pd.DataFrame(columns=["slide", "skewness"])
-    for i,j  in zip(splits, splits[1:]):
-    #for i, j in zip(range(len(keys_sorted)), range(1, len(keys_sorted) + 1)):
-        keys_chosen = keys_sorted[i:j]
-        number_of_images = j-i
-        out_html = os.path.join(out_dir, "web", f"condssl_out_{i}_{number_of_images}_{histogram_bins}.html")
-        ensure_dir_exists(out_html)
-        #if os.path.exists(out_html):
-            #print(f"not regenerating {out_html}: file exists")
-            #continue
+        keys_sorted = list(sorted(features.keys()))
+        keys_chosen = keys_sorted
+        number_of_images = len(keys_chosen)
         print ("There are {} slides in the dataset: using {} in analysis...".format(len(keys_sorted), number_of_images))
         pickle_out = os.path.join(args.out_dir, f"tmp_pickle_{len(keys_chosen)}.pkl")
         if os.path.exists(pickle_out) and 1 == 0:
             d = pickle.load(open(pickle_out, 'rb'))
             mapper, data, knn, knc, cpd = d["mapper"], d["data"], d["knn"], d["knc"], d["cpd"]
         else:
-            mapper, data, knn, knc, cpd = umap_slice(keys_chosen, features, clinical, slide_annotations)
-            if mapper is None:
-                continue
+            mapper, data, knn, knc, cpd = umap_slice(keys_chosen, features, df)
             #pickle_obj = {"mapper": mapper, "data": data, "knn": knn, "knc": knc, "cpd": cpd}
             #pickle.dump(pickle_obj, open(pickle_out, 'wb'), protocol=4)
+
 
         umap_plots = []
         for key,title in [
             ('slide', "Slide"),
             ('patient', 'Patient'),
-            ('institution', "Institution"),
-            #('race', "Race"),
-            #('gender', "Gender"),
-            #('resection', "Resection Site"),
             ('tissue_type', "Tissue Type"),
-            #('path_stage_t', "Pathological Stage T"),
-            #('path_stage_m', "Pathological Stage M")
         ]:
             unique_labels = np.unique(data[key])
             title += (" ({} unique colors)".format(len(unique_labels)))
             plot = UmapPlot(mapper, data, key, title, unique_labels, histogram_bins)
             overlaps, mean_overlap, skewness = compute_histograms_overlap(plot.plot_data, key, unique_labels, histogram_bins)
             plot.set_overlaps(overlaps, mean_overlap)
-            # sort skewness by value, reversed
-            #sorted_skewness = sorted(skewness.items(), key=lambda item: item[1], reverse=True)
-            # print 10% of items from sorted_skewness
-            #skewness = sorted_skewness[:math.ceil(len(sorted_skewness) * 0.1)]
             plot.set_skewness(skewness)
-            skewers.loc[len(skewers.index)] = [keys_chosen[0], skewness]
             umap_plots.append(plot)
 
-        inst_umap_overlap = str(100*list(filter(lambda x: x.data_key == "institution", umap_plots))[0].mean_overlap)[:2]
-        out_html = out_html.replace(".html", "_{}.html".format(inst_umap_overlap))
+        out_html = os.path.join(out_dir, "web", "cptac", f"condssl_out_{label}_{number_of_images}_{histogram_bins}.html")
+        ensure_dir_exists(out_html)
 
         viz_data(mapper, data, keys_chosen, knn, knc, cpd, thumbnail_path, out_html, umap_plots)
-    skewers.to_csv(os.path.join(out_dir, "skewness.csv"))
 
 if __name__ == "__main__":
     args = parser.parse_args()
-    # TODO: update histogram ticks to be sideways so that they show and not get crunched for large values
-    # TODO: would be sick if I updated the histograms on click-select of group
-    # TODO: should highlight best and worst results in the table
-    main(args.clinical_path, args.embeddings_path_test, args.embeddings_path_val, args.embeddings_path_train, args.thumbnail_path, args.histogram_bins, args.number_of_images, args.out_dir)
-
-    #keys_randomized = random.sample(keys_sorted, len(keys_sorted))
+    main(args.embeddings_path_test_true, args.embeddings_path_test_false, args.thumbnail_path, args.histogram_bins, args.number_of_images, args.out_dir)

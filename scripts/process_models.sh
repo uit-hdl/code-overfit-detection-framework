@@ -34,7 +34,7 @@ do
   out_dir="${analysis_dir}/out${m}${n}${K}${o}${c}"
   set -xe
   #ipython feature_extraction/extract_embeddings.py -- --src-dir "${SRC_DIR}" --feature-extractor "${model}" --out-dir "${out_dir}"
-  #ipython feature_extraction/get_clusters.py -- --embeddings-path "${out_dir}/inceptionv4/embeddings/test_tiles_embedding.pkl" --out-dir "${out_dir}" --number-of-images 20 --histogram-bins 20
+  #ipython feature_extraction/get_clusters.py -- --embeddings-path "${out_dir}/inceptionv4_true/embeddings/test_tiles_embedding.pkl" --out-dir "${out_dir}" --number-of-images 20 --histogram-bins 20
   ipython feature_extraction/get_clusters.py -- --embeddings-path "${out_dir}/inceptionv4/embeddings/test_tiles_embedding.pkl" --out-dir "${out_dir}" --number-of-images 2999 --histogram-bins 20
   set +xe
 done

@@ -1,8 +1,10 @@
+import glob
 import os
 import sys
 import logging
 
 import numpy as np
+import pandas as pd
 from monai.data import DataLoader, Dataset
 
 sys.path.append('./')
@@ -20,10 +22,17 @@ from monai.utils import CommonKeys
 
 parser = argparse.ArgumentParser(description='Extract embeddings ')
 
-parser.add_argument('--feature-extractor', default='./out/', type=str, help='path to feature extractor, which will extract features from tiles')
-parser.add_argument('--src-dir', default=os.path.join(os.path.abspath(os.sep), 'Data', 'TCGA_LUSC', 'tiles'), type=str, help='path to save extracted embeddings')
+parser.add_argument('--feature-extractor', 
+        default='./model_out2b1413ba2b3df0bcd9e2c56bdbea8d2c7f875d1e/MoCo/tiles/model/checkpoint_MoCo_tiles_0200_False_m256_n0_o0_K256.pth.tar',
+        # default='./model_out2b1413ba2b3df0bcd9e2c56bdbea8d2c7f875d1e/MoCo/tiles/model/checkpoint_MoCo_tiles_0200_True_m256_n0_o4_K256.pth.tar',
+        type=str, help='path to feature extractor, which will extract features from tiles')
+parser.add_argument('--src-dir', default=os.path.join(os.path.abspath(os.sep), 'Data', 'CPTAC', 'tiles'), type=str, help='path to save extracted embeddings')
 parser.add_argument('--out-dir', default='out', type=str, help='path to save extracted embeddings')
-parser.add_argument('--file-list-path', default=os.path.join('out', 'files.csv'), type=str, help='path to list of file splits')
+parser.add_argument('--label-key', default='sample_type', type=str, help='default key to use for getting labels')
+parser.add_argument('--slide_annotation_file', default=os.path.join('annotations', 'CPTAC', 'slide.tsv'), type=str,
+                    help='"Slide sheet", containing sample information, see README.md for instructions on how to get sheet')
+parser.add_argument('--sample_annotation_file', default=os.path.join('annotations', 'CPTAC', 'sample.tsv'), type=str,
+                    help='"Slide sheet", containing sample information, see README.md for instructions on how to get sheet')
 
 args = parser.parse_args()
 
@@ -81,14 +90,28 @@ def main():
     feature_extractor.to(device)
     feature_extractor = nn.DataParallel(feature_extractor)
 
-    _train_data, _val_data, _test_data = build_file_list(args.src_dir, args.file_list_path)
-    train_data, val_data, test_data = [], [], []
-    for (li,dst) in [(_train_data,train_data), (_val_data,val_data), (_test_data,test_data)]:
-        for entry in li:
-            filename = entry['filename']
-            slide_id = os.path.basename(filename.split(os.sep)[-2])
-            dst.append({CommonKeys.IMAGE: filename, "tile_id": filename, "slide_id": slide_id})
+    logging.info('Process annotations')
+    slide_annotations = pd.read_csv(args.slide_annotation_file, sep='\t', header=0)
+    slide_annotations = slide_annotations[['slide_submitter_id', 'sample_id']]
 
+    sample_annotations = pd.read_csv(args.sample_annotation_file, sep='\t', header=0)
+    sample_annotations = sample_annotations[['sample_id', 'sample_type']]
+
+    df = slide_annotations.merge(sample_annotations, on='sample_id')
+    df = df.set_index('slide_submitter_id')
+
+    # TODO: I can consider to do percent_tumor_nuclei filtering
+
+    logging.info('Creating dataset')
+    all_data = []
+    for filename in glob.glob(f"{args.src_dir}{os.sep}**{os.sep}*", recursive=True):
+        if os.path.isfile(filename):
+            sample_submitter_id = os.path.basename(os.path.dirname(filename))
+            if sample_submitter_id in df.index:
+                all_data.append({CommonKeys.IMAGE: filename, "tile_id": filename, "slide_id": sample_submitter_id})
+
+    if len(all_data) == 0:
+        raise ValueError("No data found, check your paths")
     transformations = mt.Compose(
         [
             mt.LoadImaged(CommonKeys.IMAGE, image_only=True),
@@ -101,14 +124,12 @@ def main():
     model_name = "inceptionv4"
     data_dir_name = list(filter(None, args.src_dir.split(os.sep)))[-1]
 
-    for name, data in list(zip(['train', 'val', 'test'], [train_data, val_data, test_data]))[2:]:
-        logging.info(name)
-        dl = DataLoader(dataset=Dataset(data, transformations), batch_size=128, num_workers=torch.cuda.device_count(), shuffle=True)
-        embedding_dict = get_embeddings_bagging(feature_extractor, dl, device)
-        embedding_dest_path = os.path.join(args.out_dir, model_name, os.path.basename(args.feature_extractor),  f"{name}_{data_dir_name}_embedding.pkl")
-        ensure_dir_exists(embedding_dest_path)
-        pickle.dump(embedding_dict, open(embedding_dest_path, 'wb'), protocol=4)
-        logging.info(f"Wrote embeddings to {embedding_dest_path}")
+    dl = DataLoader(dataset=Dataset(all_data, transformations), batch_size=128, num_workers=torch.cuda.device_count(), shuffle=False)
+    embedding_dict = get_embeddings_bagging(feature_extractor, dl, device)
+    embedding_dest_path = os.path.join(args.out_dir, model_name, os.path.basename(args.feature_extractor),  f"cptac_{data_dir_name}_embedding.pkl")
+    ensure_dir_exists(embedding_dest_path)
+    pickle.dump(embedding_dict, open(embedding_dest_path, 'wb'), protocol=4)
+    logging.info(f"Wrote embeddings to {embedding_dest_path}")
 
 if __name__ == "__main__":
     main()

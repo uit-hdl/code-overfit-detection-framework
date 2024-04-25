@@ -30,9 +30,7 @@ from misc.global_util import ensure_dir_exists
 
 parser = argparse.ArgumentParser(description='Get cluster features')
 
-#parser.add_argument('--embeddings-path-test', default='out/inceptionv4/checkpoint_MoCo_tiles_0200_False_m256_n0_o0_K256.pth.tar/test_tiles_embedding.pkl', type=str, help="location of embedding pkl from feature_extraction.py")
-#parser.add_argument('--embeddings-path-test', default='out/inceptionv4/checkpoint_MoCo_tiles_0020_False_m256_n0_o0_K256.pth.tar/test_tiles_embedding.pkl', type=str, help="location of embedding pkl from feature_extraction.py")
-parser.add_argument('--embeddings-path-test', default='out/inceptionv4/checkpoint_MoCo_tiles_0020_True_m256_n0_o4_K256.pth.tar/test_tiles_embedding.pkl', type=str, help="location of embedding pkl from feature_extraction.py")
+parser.add_argument('--embeddings-path-test', default='out/inceptionv4/checkpoint_MoCo_tiles_0200_False_m256_n0_o0_K256.pth.tar/test_tiles_embedding.pkl', type=str, help="location of embedding pkl from feature_extraction.py")
 parser.add_argument('--embeddings-path-train', default='out/inceptionv4/checkpoint_MoCo_tiles_0200_False_m256_n0_o0_K256.pth.tar/train_tiles_embedding.pkl', type=str, help="location of embedding pkl from feature_extraction.py")
 parser.add_argument('--embeddings-path-val', default='out/inceptionv4/checkpoint_MoCo_tiles_0200_False_m256_n0_o0_K256.pth.tar/val_tiles_embedding.pkl', type=str, help="location of embedding pkl from feature_extraction.py")
 #parser.add_argument('--embeddings-path-test', default='out/inceptionv4/checkpoint_MoCo_tiles_0200_True_m256_n0_o4_K256.pth.tar/test_tiles_embedding.pkl', type=str, help="location of embedding pkl from feature_extraction.py")
@@ -404,8 +402,8 @@ def main(clinical_path, embeddings_path_test, embeddings_path_val, embeddings_pa
     # TODO: experimental
     features_val = pickle.load(open(embeddings_path_val, 'rb'))
     features_train = pickle.load(open(embeddings_path_train, 'rb'))
-    #features.update(features_val)
-    #features.update(features_train)
+    features.update(features_val)
+    features.update(features_train)
     #features = pickle.load(open(embeddings_path_train, 'rb'))
 
     keys_sorted = list(sorted(features.keys()))
@@ -424,8 +422,8 @@ def main(clinical_path, embeddings_path_test, embeddings_path_val, embeddings_pa
         splits.append(i)
 
     skewers = pd.DataFrame(columns=["slide", "skewness"])
-    for i,j  in zip(splits, splits[1:]):
-    #for i, j in zip(range(len(keys_sorted)), range(1, len(keys_sorted) + 1)):
+    #for i,j  in zip(splits, splits[1:]):
+    for i, j in zip(range(len(keys_sorted)), range(1, len(keys_sorted) + 1)):
         keys_chosen = keys_sorted[i:j]
         number_of_images = j-i
         out_html = os.path.join(out_dir, "web", f"condssl_out_{i}_{number_of_images}_{histogram_bins}.html")
@@ -448,12 +446,12 @@ def main(clinical_path, embeddings_path_test, embeddings_path_val, embeddings_pa
         umap_plots = []
         for key,title in [
             ('slide', "Slide"),
-            ('patient', 'Patient'),
-            ('institution', "Institution"),
+            #('patient', 'Patient'),
+            #('institution', "Institution"),
             #('race', "Race"),
             #('gender', "Gender"),
             #('resection', "Resection Site"),
-            ('tissue_type', "Tissue Type"),
+            #('tissue_type', "Tissue Type"),
             #('path_stage_t', "Pathological Stage T"),
             #('path_stage_m', "Pathological Stage M")
         ]:
@@ -470,11 +468,13 @@ def main(clinical_path, embeddings_path_test, embeddings_path_val, embeddings_pa
             skewers.loc[len(skewers.index)] = [keys_chosen[0], skewness]
             umap_plots.append(plot)
 
-        inst_umap_overlap = str(100*list(filter(lambda x: x.data_key == "institution", umap_plots))[0].mean_overlap)[:2]
-        out_html = out_html.replace(".html", "_{}.html".format(inst_umap_overlap))
+        #inst_umap_overlap = str(100*list(filter(lambda x: x.data_key == "institution", umap_plots))[0].mean_overlap)[:2]
+        #out_html = out_html.replace(".html", "_{}.html".format(inst_umap_overlap))
 
         viz_data(mapper, data, keys_chosen, knn, knc, cpd, thumbnail_path, out_html, umap_plots)
-    skewers.to_csv(os.path.join(out_dir, "skewness.csv"))
+
+    model_name = os.path.basename(embeddings_path_test)
+    skewers.to_csv(os.path.join(out_dir, f"skewness{model_name}.csv"))
 
 if __name__ == "__main__":
     args = parser.parse_args()
