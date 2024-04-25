@@ -240,6 +240,17 @@ def wrap_data(train_data, val_data, test_data, slide_annotations, labels, label_
     assign_labels(val_data, labels, slide_annotations, label_key)
     assign_labels(test_data, labels, slide_annotations, label_key)
 
+    insts_used = defaultdict(int)
+    ds_train_use = []
+    if label_key == "my_inst":
+        for entry in train_data:
+            l = entry['label']
+            if insts_used[l] > 5000:
+                continue
+            insts_used[l] += 1
+            ds_train_use.append(entry)
+        train_data = ds_train_use
+
     ds_train = Dataset(train_data, transformations)
     ds_val = Dataset(val_data, val_transformations)
     ds_test = Dataset(test_data, val_transformations)
@@ -309,10 +320,15 @@ def main():
     slide_annotations["my_inst"] = slide_annotations["File Name"].map(lambda s: s.split("-")[1])
     labels = slide_annotations[args.label_key].unique().tolist()
     labels.sort()
+    if len(labels) == 2:
+        labels.reverse()
     assert len(labels) > 2 or labels[0] == "Solid Tissue Normal" # making 0 the benign class if using 'sample type'
 
     logging.info('Creating dataset')
     train_data, val_data, test_data = build_file_list(args.src_dir, args.file_list_path)
+    # TODO: filter so that there is at most 5000 images per class in train_data
+
+
     if args.debug_mode:
         logging.warning("Debug mode enabled!")
         np.random.shuffle(train_data)
