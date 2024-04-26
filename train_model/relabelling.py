@@ -50,8 +50,8 @@ parser = argparse.ArgumentParser(description='Extract embeddings ')
 
 parser.add_argument('--epochs', default=10, type=int, metavar='N', help='number of total epochs to run')
 parser.add_argument('--feature_extractor',
-                    default='./model_out2b1413ba2b3df0bcd9e2c56bdbea8d2c7f875d1e/MoCo/tiles/model/checkpoint_MoCo_tiles_0200_False_m256_n0_o0_K256.pth.tar',
-                    # default='./model_out2b1413ba2b3df0bcd9e2c56bdbea8d2c7f875d1e/MoCo/tiles/model/checkpoint_MoCo_tiles_0200_True_m256_n0_o4_K256.pth.tar',
+                    #default='./model_out2b1413ba2b3df0bcd9e2c56bdbea8d2c7f875d1e/MoCo/tiles/model/checkpoint_MoCo_tiles_0200_False_m256_n0_o0_K256.pth.tar',
+                    default='./model_out2b1413ba2b3df0bcd9e2c56bdbea8d2c7f875d1e/MoCo/tiles/model/checkpoint_MoCo_tiles_0200_True_m256_n0_o4_K256.pth.tar',
                     type=str, help='path to feature extractor, which will extract features from tiles')
 parser.add_argument('--tcga_annotation_file', default=os.path.join('out', 'annotation', 'recurrence_annotation_tcga.pkl'), type=str, help='path to TCGA annotations')
 parser.add_argument('--profile', default=False, type=bool, action=argparse.BooleanOptionalAction,

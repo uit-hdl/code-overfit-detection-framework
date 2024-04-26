@@ -32,8 +32,8 @@ from sklearn.metrics import accuracy_score
 parser = argparse.ArgumentParser(description='Demographic parities')
 
 
-#parser.add_argument('--feature_extractor', default='out/MoCo/tiles/model/relabelled_checkpoint_MoCo_tiles_0200_True_m256_n0_o4_K256.pth.tar/network_epoch=10.pt', type=str, help='path to feature extractor, which will extract features from tiles')
-parser.add_argument('--feature_extractor', default='out/MoCo/tiles/model/relabelled_checkpoint_MoCo_tiles_0200_False_m256_n0_o0_K256.pth.tar/network_epoch=10.pt', type=str, help='path to feature extractor, which will extract features from tiles')
+parser.add_argument('--feature_extractor', default='out/MoCo/tiles/model/relabelled_checkpoint_MoCo_tiles_0200_True_m256_n0_o4_K256.pth.tar/network_epoch=10.pt', type=str, help='path to feature extractor, which will extract features from tiles')
+#parser.add_argument('--feature_extractor', default='out/MoCo/tiles/model/relabelled_checkpoint_MoCo_tiles_0200_False_m256_n0_o0_K256.pth.tar/network_epoch=10.pt', type=str, help='path to feature extractor, which will extract features from tiles')
 parser.add_argument('--tcga_annotation_file', default='./out/annotation/recurrence_annotation_tcga.pkl', type=str, help='path to TCGA annotations')
 parser.add_argument('--clinical_path', default='./annotations/TCGA/clinical_tcga.tsv', type=str)
 parser.add_argument('--cptac_annotation_file', default='./out/annotation/recurrence_annotation_cptac.pkl', type=str, help='path to CPTAC annotations')

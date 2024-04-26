@@ -29,8 +29,8 @@ import torch.nn.functional as F
 parser = argparse.ArgumentParser(description='Extract embeddings ')
 
 parser.add_argument('--feature_extractor',
-                    default='./out/MoCo/tiles/model/relabelled_checkpoint_MoCo_tiles_0200_False_m256_n0_o0_K256.pth.tar/network_epoch=10.pt',
-                    #default='out/MoCo/tiles/model/relabelled_checkpoint_MoCo_tiles_0200_True_m256_n0_o4_K256.pth.tar/network_epoch=10.pt',
+                    #default='./out/MoCo/tiles/model/relabelled_checkpoint_MoCo_tiles_0200_False_m256_n0_o0_K256.pth.tar/network_epoch=10.pt',
+                    default='out/MoCo/tiles/model/relabelled_checkpoint_MoCo_tiles_0200_True_m256_n0_o4_K256.pth.tar/network_epoch=10.pt',
                     type=str, help='path to feature extractor, which will map tile to sample type')
 parser.add_argument('--src-dir', default=os.path.join('Data', 'CPTAC', 'tiles'), type=str, help='path to preprocessed slide images')
 parser.add_argument('--out-dir', default='./out', type=str, help='path to save extracted embeddings')

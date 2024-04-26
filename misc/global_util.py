@@ -849,6 +849,10 @@ def add_dir(directory):
     all_data = []
     for filename in glob.glob(f"{directory}{os.sep}**{os.sep}*", recursive=True):
         if os.path.isfile(filename):
+            # check if filename contains DX and a number, e.g. DX1, DX2, etc.
+            if re.search(r"DX\d", filename):
+                logging.warning(f"Skipping {filename}")
+                continue
             all_data.append({"q": filename, "k": filename, 'filename': filename})
     return all_data
 

@@ -97,6 +97,8 @@ parser.add_argument('--out-dir', default='./out/models/', type=str,
 parser.add_argument('--file-list-path', default='./out/files.csv', type=str, help='path to list of file splits')
 parser.add_argument('--batch_slide_num', default=4, type=int)
 parser.add_argument('--batch_inst_num', default=0, type=int)
+parser.add_argument('--color-augment', default=True, type=bool, action=argparse.BooleanOptionalAction,
+                    metavar='C', help='whether to use image transformations during training', dest='condition')
 parser.add_argument('--condition', default=False, type=bool, action=argparse.BooleanOptionalAction,
                     metavar='C', help='whether to use conditional sampling or not', dest='condition')
 
@@ -176,7 +178,7 @@ def train(train_loader, model, criterion, optimizer, max_epochs, lr, cos, schedu
                 'optimizer' : optimizer.state_dict(),
             }, model_savename)
 
-def wrap_data(train_data, val_data, batch_size, batch_slide_num, batch_inst_num, workers, is_profiling, is_conditional, is_distributed):
+def wrap_data(train_data, val_data, batch_size, batch_slide_num, batch_inst_num, workers, is_color_augment, is_profiling, is_conditional, is_distributed):
     logging.info('Creating dataset')
     grayer = transforms.Grayscale(num_output_channels=3)
     cropper = transforms.RandomResizedCrop(299, scale=(0.2, 1.), antialias=True)
@@ -185,19 +187,30 @@ def wrap_data(train_data, val_data, batch_size, batch_slide_num, batch_inst_num,
     def range_func(x, y):
         #return y
         return Range(x, methods="__call__")(y) if is_profiling else y
-    transformations = mt.Compose(
-        [
-            range_func("LoadImage", mt.LoadImaged(["q", "k"], image_only=True)),
-            range_func("EnsureChannelFirst", mt.EnsureChannelFirstd(["q", "k"])),
-            range_func("Crop", mt.Lambdad(["q", "k"], cropper)),
-            range_func("ColorJitter", mt.RandLambdad(["q", "k"], jitterer, prob=0.8)),
-            range_func("Grayscale", mt.RandLambdad(["q", "k"], grayer, prob=0.2)),
-            range_func("Flip0", mt.RandFlipd(["q", "k"], prob=0.5, spatial_axis=0)),
-            range_func("Flip1", mt.RandFlipd(["q", "k"], prob=0.5, spatial_axis=1)),
-            range_func("ToTensor", mt.ToTensord(["q", "k"], track_meta=False)),
-            range_func("EnsureType", mt.EnsureTyped(["q", "k"], track_meta=False)),
-        ]
-    )
+    if is_color_augment:
+        transformations = mt.Compose(
+            [
+                range_func("LoadImage", mt.LoadImaged(["q", "k"], image_only=True)),
+                range_func("EnsureChannelFirst", mt.EnsureChannelFirstd(["q", "k"])),
+                range_func("Crop", mt.Lambdad(["q", "k"], cropper)),
+                range_func("ColorJitter", mt.RandLambdad(["q", "k"], jitterer, prob=0.8)),
+                range_func("Grayscale", mt.RandLambdad(["q", "k"], grayer, prob=0.2)),
+                range_func("Flip0", mt.RandFlipd(["q", "k"], prob=0.5, spatial_axis=0)),
+                range_func("Flip1", mt.RandFlipd(["q", "k"], prob=0.5, spatial_axis=1)),
+                range_func("ToTensor", mt.ToTensord(["q", "k"], track_meta=False)),
+                range_func("EnsureType", mt.EnsureTyped(["q", "k"], track_meta=False)),
+            ]
+        )
+    else:
+        transformations = mt.Compose(
+            [
+                range_func("LoadImage", mt.LoadImaged(["q", "k"], image_only=True)),
+                range_func("EnsureChannelFirst", mt.EnsureChannelFirstd(["q", "k"])),
+                range_func("ToTensor", mt.ToTensord(["q", "k"], track_meta=False)),
+                range_func("EnsureType", mt.EnsureTyped(["q", "k"], track_meta=False)),
+            ]
+        )
+
 
     val_transformations = mt.Compose(
         [
@@ -298,7 +311,7 @@ def main():
 
     write_args_tensorboard(args, writer)
 
-    dl_train, dl_val = wrap_data(train_data, val_data, args.batch_size, args.batch_slide_num, args.batch_inst_num, args.workers, args.is_profiling, args.condition, is_distributed)
+    dl_train, dl_val = wrap_data(train_data, val_data, args.batch_size, args.batch_slide_num, args.batch_inst_num, args.workers, args.color_augment, args.is_profiling, args.condition, is_distributed)
     writer.add_scalar("images_in_ds_train", len(dl_train.dataset))
     writer.add_scalar("batches_in_ds_train", len(dl_train))
     dropped_off_tiles = len(dl_train.dataset) - (len(dl_train) * dl_train.batch_sampler.batch_size)

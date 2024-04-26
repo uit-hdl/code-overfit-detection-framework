@@ -18,6 +18,34 @@ def getGradientMagnitude(im):
     mag = cv2.addWeighted(dxabs, 0.5, dyabs, 0.5, 0)
     return mag
 
+def wsi_to_tiles_no_normalization(slide_name, slide_dest, s):
+    count = 0
+    sys.stdout.write('Start task: %s->%s \n' % (slide_name, slide_dest))
+    img = OpenSlide(slide_name)
+    if str(img.properties.values.__self__.get('tiff.ImageDescription')).split("|")[1] == "AppMag = 40":
+        sz = 2048
+        seq = 1536
+    else:
+        sz = 1024
+        seq = 768
+    [w, h] = img.dimensions
+    for x in range(1, w, seq):
+        for y in range(1, h, seq):
+            img_path = os.path.join(slide_dest, str(x) + "_" + str(y) + '.jpg')
+            if os.path.exists(img_path):
+                print ("skipping %s - already done" % img_path)
+                continue
+            print("writing %s" % img_path)
+            img_tmp = img.read_region(location=(x, y), level=0, size=(sz, sz)) \
+                .convert("RGB").resize((299, 299), Image.ANTIALIAS)
+            grad = getGradientMagnitude(np.array(img_tmp))
+            unique, counts = np.unique(grad, return_counts=True)
+            if counts[np.argwhere(unique <= 15)].sum() < 299 * 299 * s:
+                #img_tmp = Image.fromarray(img_tmp)
+                img_tmp.save(img_path, 'JPEG', optimize=True, quality=94)
+                count += 1
+    sys.stdout.write('End task %s->%s with %d tiles\n' % (slide_name,slide_dest,count))
+
 
 def wsi_to_tiles(slide_name, slide_dest, refer_img, s):
     normalizer = staintools.StainNormalizer(method='vahadane')

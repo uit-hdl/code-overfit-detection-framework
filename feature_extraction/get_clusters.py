@@ -32,10 +32,10 @@ parser = argparse.ArgumentParser(description='Get cluster features')
 
 #parser.add_argument('--embeddings-path-test', default='out/inceptionv4/checkpoint_MoCo_tiles_0200_False_m256_n0_o0_K256.pth.tar/test_tiles_embedding.pkl', type=str, help="location of embedding pkl from feature_extraction.py")
 #parser.add_argument('--embeddings-path-test', default='out/inceptionv4/checkpoint_MoCo_tiles_0020_False_m256_n0_o0_K256.pth.tar/test_tiles_embedding.pkl', type=str, help="location of embedding pkl from feature_extraction.py")
-parser.add_argument('--embeddings-path-test', default='out/inceptionv4/checkpoint_MoCo_tiles_0020_True_m256_n0_o4_K256.pth.tar/test_tiles_embedding.pkl', type=str, help="location of embedding pkl from feature_extraction.py")
+# parser.add_argument('--embeddings-path-test', default='out/inceptionv4/checkpoint_MoCo_tiles_0020_True_m256_n0_o4_K256.pth.tar/test_tiles_embedding.pkl', type=str, help="location of embedding pkl from feature_extraction.py")
 parser.add_argument('--embeddings-path-train', default='out/inceptionv4/checkpoint_MoCo_tiles_0200_False_m256_n0_o0_K256.pth.tar/train_tiles_embedding.pkl', type=str, help="location of embedding pkl from feature_extraction.py")
 parser.add_argument('--embeddings-path-val', default='out/inceptionv4/checkpoint_MoCo_tiles_0200_False_m256_n0_o0_K256.pth.tar/val_tiles_embedding.pkl', type=str, help="location of embedding pkl from feature_extraction.py")
-#parser.add_argument('--embeddings-path-test', default='out/inceptionv4/checkpoint_MoCo_tiles_0200_True_m256_n0_o4_K256.pth.tar/test_tiles_embedding.pkl', type=str, help="location of embedding pkl from feature_extraction.py")
+parser.add_argument('--embeddings-path-test', default='out/inceptionv4/checkpoint_MoCo_tiles_0200_True_m256_n0_o4_K256.pth.tar/test_tiles_embedding.pkl', type=str, help="location of embedding pkl from feature_extraction.py")
 #parser.add_argument('--embeddings-path-train', default='out/inceptionv4/checkpoint_MoCo_tiles_0200_True_m256_n0_o4_K256.pth.tar/train_tiles_embedding.pkl', type=str, help="location of embedding pkl from feature_extraction.py")
 #parser.add_argument('--embeddings-path-val', default='out/inceptionv4/checkpoint_MoCo_tiles_0200_True_m256_n0_o4_K256.pth.tar/val_tiles_embedding.pkl', type=str, help="location of embedding pkl from feature_extraction.py")
 parser.add_argument('--number-of-images', default=30, type=int, help="how many images to sample for the UMAP plot")
@@ -402,8 +402,8 @@ def main(clinical_path, embeddings_path_test, embeddings_path_val, embeddings_pa
     features = pickle.load(open(embeddings_path_test, 'rb'))
 
     # TODO: experimental
-    features_val = pickle.load(open(embeddings_path_val, 'rb'))
-    features_train = pickle.load(open(embeddings_path_train, 'rb'))
+    #features_val = pickle.load(open(embeddings_path_val, 'rb'))
+    #features_train = pickle.load(open(embeddings_path_train, 'rb'))
     #features.update(features_val)
     #features.update(features_train)
     #features = pickle.load(open(embeddings_path_train, 'rb'))
@@ -450,12 +450,12 @@ def main(clinical_path, embeddings_path_test, embeddings_path_val, embeddings_pa
             ('slide', "Slide"),
             ('patient', 'Patient'),
             ('institution', "Institution"),
-            #('race', "Race"),
-            #('gender', "Gender"),
-            #('resection', "Resection Site"),
+            ('race', "Race"),
+            ('gender', "Gender"),
+            ('resection', "Resection Site"),
             ('tissue_type', "Tissue Type"),
-            #('path_stage_t', "Pathological Stage T"),
-            #('path_stage_m', "Pathological Stage M")
+            ('path_stage_t', "Pathological Stage T"),
+            ('path_stage_m', "Pathological Stage M")
         ]:
             unique_labels = np.unique(data[key])
             title += (" ({} unique colors)".format(len(unique_labels)))
