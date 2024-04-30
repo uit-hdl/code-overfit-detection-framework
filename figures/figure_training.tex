@@ -11,19 +11,42 @@
 \foreach \x in {1,...,5}
 {
   \node[yslant=0.5, draw] (wsi\x) at (\x,0) 
-  {\includegraphics[width=0.2\textwidth, height=.2\textheight]{./wsi\x.png}};
+  {\includegraphics[width=.2\textwidth, height=.2\textheight]{./wsi\x.png}};
 }
 
 \draw[decorate, decoration={brace, amplitude=10pt, mirror}]
     (-1,-3) -- (7, -3) node [midway, below=10pt] {Training data}
   ;
 
-\foreach \x in {1,...,5}
-{
-  \node[yslant=0.5, draw] (wsi_labeled\x) at (\x,0) 
-  {\includegraphics[width=0.2\textwidth, height=.2\textheight]{./wsi\x.png}};
-}
+    \coordinate (base) at (0,-10);
 
+    \def\numLayers{5}
+    \def\offset{0.2}
+
+    
+    % Draw layers
+    \foreach \n in {1,...,\numLayers}
+    {
+        % Calculate shift for each rectangle
+        \pgfmathsetmacro{\shiftX}{(\numLayers - \n) * \offset}
+        \pgfmathsetmacro{\shiftY}{(\numLayers - \n) * \offset / 2}
+
+        % Draw rectangle
+        \draw[fill=blue!30, opacity=0.9] ([shift={(\shiftX, \shiftY)}]base) rectangle ++(.4,-3);
+    }
+
+    % Label
+    \node at ([shift={(2*\offset, -\numLayers*\offset - 2.5)}]base) {Feature Extraction Layers};
+
+
+% \foreach \x in {1,...,5}
+% {
+%   \node[yslant=0.5, draw] (wsi_labeled\x) at (\x,-10) 
+%   {\includegraphics[width=.2\textwidth, height=.2\textheight]{./wsi\x.png}};
+% }
+% 
+% \draw[->, thick] (3, -4.5) -- (3, -6); % Connects the midpoint below the brace to the position of the first image
+% 
 
 
 \end{tikzpicture}
