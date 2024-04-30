@@ -18,6 +18,12 @@
     (-1,-3) -- (7, -3) node [midway, below=10pt] {Training data}
   ;
 
+\foreach \x in {1,...,5}
+{
+  \node[yslant=0.5, draw] (wsi_labeled\x) at (\x,0) 
+  {\includegraphics[width=0.2\textwidth, height=.2\textheight]{./wsi\x.png}};
+}
+
 
 
 \end{tikzpicture}
