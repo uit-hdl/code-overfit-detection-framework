@@ -10,7 +10,16 @@
 
 \foreach \x in {1,...,5}
 {
-  \node[yslant=0.5, draw] (wsi\x) at (\x,0) 
+  \ifnum\x<3
+    \def\rectColor{green}
+  \else
+    \ifnum\x<5
+    \def\rectColor{blue}
+  \else
+    \def\rectColor{orange}
+  \fi
+    \fi
+  \node[yslant=0.5, fill=\rectColor, opacity=0.8] (wsi\x) at (\x,0) 
   {\includegraphics[width=.2\textwidth, height=.2\textheight]{./wsi\x.png}};
 }
 
@@ -37,19 +46,64 @@
     \def\shiftY{-2};
     \coordinate (csBase) at (7,2);
 
-    \foreach \y in {1,...,2}
+    \foreach \y in {1,...,3}
     {
         \begin{scope}[yshift=\y*\shiftY]
             \foreach \x in {1,...,2}
             {
-              \pgfmathsetmacro\wsiName{int(\x*\y+\x)}
-                \node[yslant=0.5] (wsi\y\x) at ([shift={(\x*\shiftX,-6+\y*\shiftY)}]csBase) 
+              \pgfmathsetmacro\wsiName{int((\x-1)*\y+\x)}
+              \ifnum\y<2
+                \def\rectColor{green}
+              \else
+                \ifnum\y<3
+                \def\rectColor{blue}
+              \else
+                \def\rectColor{orange}
+              \fi
+                \fi
+                \node[yslant=0.5, fill=\rectColor] (cswsi\y\x) at ([shift={(\x*\shiftX,-6+\y*\shiftY)}]csBase) 
                 {
                   {\includegraphics[width=.05\textwidth, height=.05\textheight]{./wsi\wsiName.png}}
             };
+              \ifnum\y<2
+                \pgfmathsetmacro\wsiName{int((\x-1)*\y+\x+1)}
+                \node[yslant=0.5, fill=orange] (cswsi\y3) at ([shift={(\x*\shiftX+1,-6+\y*\shiftY)}]csBase) 
+                {
+                  {\includegraphics[width=.05\textwidth, height=.05\textheight]{./wsi\wsiName.png}}
+            };
+                \pgfmathsetmacro\wsiName{int((\x-1)*\y+\x+2)}
+                \node[yslant=0.5, fill=blue] (cswsi\y4) at ([shift={(\x*\shiftX+2,-6+\y*\shiftY)}]csBase) 
+                {
+                  {\includegraphics[width=.05\textwidth, height=.05\textheight]{./wsi\wsiName.png}}
+            };
+              \else
+                \ifnum\y<3
+                \pgfmathsetmacro\wsiName{int((\x-1)*\y+\x+1)}
+                \node[yslant=0.5, fill=green] (cswsi\y3) at ([shift={(\x*\shiftX+1,-6+\y*\shiftY)}]csBase) 
+                {
+                  {\includegraphics[width=.05\textwidth, height=.05\textheight]{./wsi\wsiName.png}}
+            };
+                \pgfmathsetmacro\wsiName{int((\x-1)*\y+\x+2)}
+                \node[yslant=0.5, fill=orange] (cswsi\y4) at ([shift={(\x*\shiftX+2,-6+\y*\shiftY)}]csBase) 
+                {
+                  {\includegraphics[width=.05\textwidth, height=.05\textheight]{./wsi\wsiName.png}}
+            };
+              \else
+                \pgfmathsetmacro\wsiName{int((\x-1)*\y+\x+1)}
+                \node[yslant=0.5, fill=green] (cswsi\y3) at ([shift={(\x*\shiftX+1,-6+\y*\shiftY)}]csBase) 
+                {
+                  {\includegraphics[width=.05\textwidth, height=.05\textheight]{./wsi\wsiName.png}}
+            };
+                \pgfmathsetmacro\wsiName{int((\x-1)*\y+\x+2)}
+                \node[yslant=0.5, fill=blue] (cswsi\y4) at ([shift={(\x*\shiftX+2,-6+\y*\shiftY)}]csBase) 
+                {
+                  {\includegraphics[width=.05\textwidth, height=.05\textheight]{./wsi\wsiName.png}}
+            };
+              \fi
+              \fi
             }
-            \draw (wsi\y1.south west) rectangle (wsi\y2.north east) ;
-            \node[anchor=north] at ([shift={(-0.8,0)}]wsi\y1.west) {Batch \number\numexpr\y\relax};
+            \draw (cswsi\y1.south west) rectangle (cswsi\y4.north east) ;
+            \node[anchor=north] at ([shift={(-0.8,0.5)}]cswsi\y1.west) {Batch \number\numexpr\y\relax};
         \end{scope}
     }
 
