@@ -18,25 +18,40 @@
     (-1,-3) -- (7, -3) node [midway, below=10pt] {Training data}
   ;
 
+    %% model
     \coordinate (base) at (0,-10);
-
     \def\numLayers{5}
     \def\offset{0.2}
-
-    
-    % Draw layers
     \foreach \n in {1,...,\numLayers}
     {
-        % Calculate shift for each rectangle
         \pgfmathsetmacro{\shiftX}{(\numLayers - \n) * \offset}
         \pgfmathsetmacro{\shiftY}{(\numLayers - \n) * \offset / 2}
 
-        % Draw rectangle
         \draw[fill=blue!30, opacity=0.9] ([shift={(\shiftX, \shiftY)}]base) rectangle ++(.4,-3);
     }
 
-    % Label
     \node at ([shift={(2*\offset, -\numLayers*\offset - 2.5)}]base) {Model / Feature Extraction};
+
+    %% conditional sampling
+    \def\shiftX{1};
+    \def\shiftY{-2};
+    \coordinate (csBase) at (7,2);
+
+    \foreach \y in {1,...,2}
+    {
+        \begin{scope}[yshift=\y*\shiftY]
+            \foreach \x in {1,...,2}
+            {
+              \pgfmathsetmacro\wsiName{int(\x*\y+\x)}
+                \node[yslant=0.5] (wsi\y\x) at ([shift={(\x*\shiftX,-6+\y*\shiftY)}]csBase) 
+                {
+                  {\includegraphics[width=.05\textwidth, height=.05\textheight]{./wsi\wsiName.png}}
+            };
+            }
+            \draw (wsi\y1.south west) rectangle (wsi\y2.north east) ;
+            \node[anchor=north] at ([shift={(-0.8,0)}]wsi\y1.west) {Batch \number\numexpr\y\relax};
+        \end{scope}
+    }
 
 
 % \foreach \x in {1,...,5}
