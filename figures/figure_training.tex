@@ -68,32 +68,32 @@
             }
 
               \ifnum\y<2
-                \node[yslant=0.5, fill=orange] (cswsi\y3) at ([shift={(3*\shiftX+1,-6+\y*\shiftY)}]csBase) 
+                \node[yslant=0.5, fill=orange] (cswsi\y3) at ([shift={(2*\shiftX+0.5,-6+\y*\shiftY)}]csBase) 
                 {
-                  {\includegraphics[width=.05\textwidth, height=.05\textheight]{./wsi\wsiName.png}}
+                  {\includegraphics[width=.05\textwidth, height=.05\textheight]{./wsi5.png}}
             };
-                \node[yslant=0.5, fill=blue] (cswsi\y4) at ([shift={(4*\shiftX+2,-6+\y*\shiftY)}]csBase) 
+                \node[yslant=0.5, fill=blue] (cswsi\y4) at ([shift={(2*\shiftX+1,-6+\y*\shiftY)}]csBase) 
                 {
-                  {\includegraphics[width=.05\textwidth, height=.05\textheight]{./wsi\wsiName.png}}
+                  {\includegraphics[width=.05\textwidth, height=.05\textheight]{./wsi3.png}}
             };
               \else
                 \ifnum\y<3
-                \node[yslant=0.5, fill=green] (cswsi\y3) at ([shift={(2*\shiftX+1,-6+\y*\shiftY)}]csBase) 
+                \node[yslant=0.5, fill=green] (cswsi\y3) at ([shift={(2*\shiftX+0.5,-6+\y*\shiftY)}]csBase) 
                 {
-                  {\includegraphics[width=.05\textwidth, height=.05\textheight]{./wsi\wsiName.png}}
+                  {\includegraphics[width=.05\textwidth, height=.05\textheight]{./wsi2.png}}
             };
-                \node[yslant=0.5, fill=orange] (cswsi\y4) at ([shift={(\2*\shiftX+2,-6+\y*\shiftY)}]csBase) 
+                \node[yslant=0.5, fill=orange] (cswsi\y4) at ([shift={(2*\shiftX+1,-6+\y*\shiftY)}]csBase) 
                 {
-                  {\includegraphics[width=.05\textwidth, height=.05\textheight]{./wsi\wsiName.png}}
+                  {\includegraphics[width=.05\textwidth, height=.05\textheight]{./wsi5.png}}
             };
               \else
-                \node[yslant=0.5, fill=green] (cswsi\y3) at ([shift={(2*\shiftX+1,-6+\y*\shiftY)}]csBase) 
+                \node[yslant=0.5, fill=green] (cswsi\y3) at ([shift={(2*\shiftX+0.5,-6+\y*\shiftY)}]csBase) 
                 {
-                  {\includegraphics[width=.05\textwidth, height=.05\textheight]{./wsi\wsiName.png}}
+                  {\includegraphics[width=.05\textwidth, height=.05\textheight]{./wsi2.png}}
             };
-                \node[yslant=0.5, fill=blue] (cswsi\y4) at ([shift={(2*\shiftX+2,-6+\y*\shiftY)}]csBase) 
+                \node[yslant=0.5, fill=blue] (cswsi\y4) at ([shift={(2*\shiftX+1,-6+\y*\shiftY)}]csBase) 
                 {
-                  {\includegraphics[width=.05\textwidth, height=.05\textheight]{./wsi\wsiName.png}}
+                  {\includegraphics[width=.05\textwidth, height=.05\textheight]{./wsi4.png}}
             };
               \fi
               \fi
@@ -101,6 +101,9 @@
             \node[anchor=north] at ([shift={(-0.8,0.5)}]cswsi\y1.west) {Batch \number\numexpr\y\relax};
         \end{scope}
     }
+
+\node [draw, diamond, aspect=2] {Use conditional sampling?};
+
 
 
 % \foreach \x in {1,...,5}
