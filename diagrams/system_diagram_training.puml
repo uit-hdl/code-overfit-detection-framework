@@ -2,7 +2,7 @@
 left to right direction
 skinparam linetype polyline
 
-node "Model developer" as developer {
+node "Input" as developer {
     node "Training data" as train
     node "Annotations" as anno {
         node Labels as labels
@@ -13,26 +13,24 @@ node "Model developer" as developer {
 /'
 node <img:MONAI-logo-color.png> as monai {
     node "Imageloader" as imageloader
-    node "PyTorch <img:pytorch.png{scale=.2}>" as pytorch
+    node "<img:Pytorch_logo.png{scale=.2}>" as pytorch
     node "Distributed trainer\n\t<img:distributed.png{scale=.10}>"
 }
+'/
+/'
+I should use WSIs as the input, not just "Training data"
 '/
 
 node "Model SSL training" as trainer {
     hexagon "Conditional Sampler" as sampler
+    node "training" as training {
+        label "<img:MONAI-logo-color.png{scale=.3}>" as monai
+        label "<img:Pytorch_logo.png{scale=.2}>" as pytorch
+    }
 }
 
-collections "Models" as models
-
-node "Overfit exploration plugin" as overfit {
-    collections "Metrics" as metrics
-}
-
-map "Analysis output" as analysis {
-    Metric #1 => α, β, γ
-    Metric #2 => α, β, γ
-    Metric #3 => α, β, γ
-
+node "Output" {
+    node "Model" as model
 }
 
 /'
@@ -43,9 +41,8 @@ monai -down[hidden]-> analysis
 monai .d. trainer
 monai .. overfit
 '/
-train --> trainer
+train --> "training"
+sampler --> pytorch
 sens --> sampler
-trainer --> models
-models --> overfit
-overfit --> analysis
+trainer --> model
 ```

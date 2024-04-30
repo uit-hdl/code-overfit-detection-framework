@@ -1,0 +1,42 @@
+```plantuml
+left to right direction
+skinparam linetype polyline
+
+node "Input" as developer {
+    node "Training data" as traindata
+    node "Test data" as testdata
+    node "Annotations" as anno {
+        node Labels as labels
+        node "Sensitive variables" as sens
+    }
+    node "Model" as model
+}
+
+node "Overfit exploration plugin" as overfit {
+    node "UMAP" as umap
+    node "sensitive variable fine-tuning" as finetune
+    node "fairness measuring" as fairness
+}
+
+node "Output" {
+    node "plot" as plot
+    node "plot scores" as plotscores
+    node "fairness score" as score
+    node "fine-tuning accuracy" as accuracy
+}
+
+traindata --> finetune
+testdata --> fairness
+testdata --> umap
+traindata --> umap
+model --> finetune
+model --> umap
+sens --> finetune
+sens --> umap
+sens --> finetune
+sens --> fairness
+fairness --> score
+finetune --> accuracy
+umap --> plot
+umap --> plotscores
+```
