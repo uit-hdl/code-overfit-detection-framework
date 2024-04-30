@@ -6,7 +6,7 @@ node "Input" as developer {
     node "Training data" as train
     node "Annotations" as anno {
         node Labels as labels
-        node "Sensitive variables" as sens
+        node "Sensitive variables\n(such as patient\ngender, age, etc)" as sens
     }
 }
 
@@ -29,7 +29,7 @@ node "Model SSL training" as trainer {
     }
 }
 
-node "Output" {
+node "Output"  as output {
     node "Model" as model
 }
 
@@ -42,7 +42,7 @@ monai .d. trainer
 monai .. overfit
 '/
 train --> "training"
-sampler --> pytorch
+sampler --> training
 sens --> sampler
-trainer --> model
+trainer ---> output
 ```

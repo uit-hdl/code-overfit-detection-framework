@@ -2,20 +2,27 @@
 left to right direction
 skinparam linetype polyline
 
-node "Input" as developer {
+node "Input" as input {
     node "Training data" as traindata
     node "Test data" as testdata
     node "Annotations" as anno {
-        node Labels as labels
-        node "Sensitive variables" as sens
+        node "Sensitive variables\n(e.g. patient gender)" as sens
     }
     node "Model" as model
 }
 
 node "Overfit exploration plugin" as overfit {
     node "UMAP" as umap
-    node "sensitive variable fine-tuning" as finetune
-    node "fairness measuring" as fairness
+    node "sensitive variable fine-tuning" as finetune {
+        label "<img:MONAI-logo-color.png{scale=.3}>" as monai
+        label "<img:Pytorch_logo.png{scale=.2}>" as pytorch
+    }
+    node "fairness measuring" as fairness {
+        /'
+        This node is different from others in the sense
+        that it relies on having a downstream task
+        '/
+    }
 }
 
 node "Output" {
@@ -25,16 +32,7 @@ node "Output" {
     node "fine-tuning accuracy" as accuracy
 }
 
-traindata --> finetune
-testdata --> fairness
-testdata --> umap
-traindata --> umap
-model --> finetune
-model --> umap
-sens --> finetune
-sens --> umap
-sens --> finetune
-sens --> fairness
+input ---> overfit
 fairness --> score
 finetune --> accuracy
 umap --> plot
