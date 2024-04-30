@@ -42,7 +42,7 @@
     \node at ([shift={(2*\offset, -\numLayers*\offset - 2.5)}]base) {Model / Feature Extraction};
 
     %% conditional sampling
-    \def\shiftX{1};
+    \def\shiftX{0.5};
     \def\shiftY{-2};
     \coordinate (csBase) at (7,2);
 
@@ -51,7 +51,6 @@
         \begin{scope}[yshift=\y*\shiftY]
             \foreach \x in {1,...,2}
             {
-              \pgfmathsetmacro\wsiName{int((\x-1)*\y+\x)}
               \ifnum\y<2
                 \def\rectColor{green}
               \else
@@ -61,6 +60,7 @@
                 \def\rectColor{orange}
               \fi
                 \fi
+                \pgfmathsetmacro\wsiName{int((\x-1)*\y+\x)}
                 \node[yslant=0.5, fill=\rectColor] (cswsi\y\x) at ([shift={(\x*\shiftX,-6+\y*\shiftY)}]csBase) 
                 {
                   {\includegraphics[width=.05\textwidth, height=.05\textheight]{./wsi\wsiName.png}}
