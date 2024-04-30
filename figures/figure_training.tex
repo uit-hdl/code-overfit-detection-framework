@@ -8,7 +8,7 @@
 \centering
 \begin{tikzpicture}[node distance=2cm and 2cm, auto]
 
-\foreach \x in {1,...,5}
+\foreach \x in {1,...,6}
 {
   \ifnum\x<3
     \def\rectColor{green}
@@ -65,43 +65,38 @@
                 {
                   {\includegraphics[width=.05\textwidth, height=.05\textheight]{./wsi\wsiName.png}}
             };
+            }
+
               \ifnum\y<2
-                \pgfmathsetmacro\wsiName{int((\x-1)*\y+\x+1)}
-                \node[yslant=0.5, fill=orange] (cswsi\y3) at ([shift={(\x*\shiftX+1,-6+\y*\shiftY)}]csBase) 
+                \node[yslant=0.5, fill=orange] (cswsi\y3) at ([shift={(3*\shiftX+1,-6+\y*\shiftY)}]csBase) 
                 {
                   {\includegraphics[width=.05\textwidth, height=.05\textheight]{./wsi\wsiName.png}}
             };
-                \pgfmathsetmacro\wsiName{int((\x-1)*\y+\x+2)}
-                \node[yslant=0.5, fill=blue] (cswsi\y4) at ([shift={(\x*\shiftX+2,-6+\y*\shiftY)}]csBase) 
+                \node[yslant=0.5, fill=blue] (cswsi\y4) at ([shift={(4*\shiftX+2,-6+\y*\shiftY)}]csBase) 
                 {
                   {\includegraphics[width=.05\textwidth, height=.05\textheight]{./wsi\wsiName.png}}
             };
               \else
                 \ifnum\y<3
-                \pgfmathsetmacro\wsiName{int((\x-1)*\y+\x+1)}
-                \node[yslant=0.5, fill=green] (cswsi\y3) at ([shift={(\x*\shiftX+1,-6+\y*\shiftY)}]csBase) 
+                \node[yslant=0.5, fill=green] (cswsi\y3) at ([shift={(2*\shiftX+1,-6+\y*\shiftY)}]csBase) 
                 {
                   {\includegraphics[width=.05\textwidth, height=.05\textheight]{./wsi\wsiName.png}}
             };
-                \pgfmathsetmacro\wsiName{int((\x-1)*\y+\x+2)}
-                \node[yslant=0.5, fill=orange] (cswsi\y4) at ([shift={(\x*\shiftX+2,-6+\y*\shiftY)}]csBase) 
+                \node[yslant=0.5, fill=orange] (cswsi\y4) at ([shift={(\2*\shiftX+2,-6+\y*\shiftY)}]csBase) 
                 {
                   {\includegraphics[width=.05\textwidth, height=.05\textheight]{./wsi\wsiName.png}}
             };
               \else
-                \pgfmathsetmacro\wsiName{int((\x-1)*\y+\x+1)}
-                \node[yslant=0.5, fill=green] (cswsi\y3) at ([shift={(\x*\shiftX+1,-6+\y*\shiftY)}]csBase) 
+                \node[yslant=0.5, fill=green] (cswsi\y3) at ([shift={(2*\shiftX+1,-6+\y*\shiftY)}]csBase) 
                 {
                   {\includegraphics[width=.05\textwidth, height=.05\textheight]{./wsi\wsiName.png}}
             };
-                \pgfmathsetmacro\wsiName{int((\x-1)*\y+\x+2)}
-                \node[yslant=0.5, fill=blue] (cswsi\y4) at ([shift={(\x*\shiftX+2,-6+\y*\shiftY)}]csBase) 
+                \node[yslant=0.5, fill=blue] (cswsi\y4) at ([shift={(2*\shiftX+2,-6+\y*\shiftY)}]csBase) 
                 {
                   {\includegraphics[width=.05\textwidth, height=.05\textheight]{./wsi\wsiName.png}}
             };
               \fi
               \fi
-            }
             \draw (cswsi\y1.south west) rectangle (cswsi\y4.north east) ;
             \node[anchor=north] at ([shift={(-0.8,0.5)}]cswsi\y1.west) {Batch \number\numexpr\y\relax};
         \end{scope}
