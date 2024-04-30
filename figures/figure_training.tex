@@ -1,0 +1,27 @@
+\documentclass{article}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows, positioning, decorations.pathreplacing}
+
+\begin{document}
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[node distance=2cm and 2cm, auto]
+
+\foreach \x in {1,...,5}
+{
+  \node[yslant=0.5, draw] (wsi\x) at (\x,0) 
+  {\includegraphics[width=0.2\textwidth, height=.2\textheight]{./wsi\x.png}};
+}
+
+\draw[decorate, decoration={brace, amplitude=10pt, mirror}]
+    (-1,-3) -- (7, -3) node [midway, below=10pt] {Training data}
+  ;
+
+
+
+\end{tikzpicture}
+\end{figure}
+
+\end{document}
+
