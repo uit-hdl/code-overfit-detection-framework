@@ -34,8 +34,8 @@ parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
 # parser.add_argument('data', metavar='DIR',
 #                     help='path to dataset')
 
-parser.add_argument('-j', '--workers', default=16, type=int, metavar='N',
-                    help='number of data loading workers (default: 32)')
+parser.add_argument('-j', '--workers', default=6, type=int, metavar='N',
+                    help='number of data loading workers (default: 6)')
 parser.add_argument('--epochs', default=200, type=int, metavar='N',
                     help='number of total epochs to run')
 parser.add_argument('-b', '--batch-size', default=256, type=int,
@@ -98,14 +98,11 @@ parser.add_argument('--file-list-path', default='./out/files.csv', type=str, hel
 parser.add_argument('--batch_slide_num', default=4, type=int)
 parser.add_argument('--batch_inst_num', default=0, type=int)
 parser.add_argument('--color-augment', default=True, type=bool, action=argparse.BooleanOptionalAction,
-                    metavar='C', help='whether to use image transformations during training', dest='condition')
+                    metavar='co', help='whether to use image transformations during training')
 parser.add_argument('--condition', default=False, type=bool, action=argparse.BooleanOptionalAction,
                     metavar='C', help='whether to use conditional sampling or not', dest='condition')
 
 def train(train_loader, model, criterion, optimizer, max_epochs, lr, cos, schedule, out_path, model_filename, writer, is_profiling, is_distributed):
-    epoch_loss_values = []
-    accuracy1_values = []
-    accuracy5_values = []
     writer.add_scalar("vram_available_device_0", torch.cuda.get_device_properties(0).total_memory / (1024*1024))
     set_track_meta(True)
     model_savename = ""
@@ -148,20 +145,18 @@ def train(train_loader, model, criterion, optimizer, max_epochs, lr, cos, schedu
                 epoch_loss += loss.item()
                 acc5_total += acc5
                 acc1_total += acc1
-                writer.add_scalar("iter_loss", loss.item(), global_step=(epoch*step) + step)
-                writer.add_scalar("iter_acc5", acc5, global_step=(epoch*step) + step)
-                writer.add_scalar("iter_acc1", acc1, global_step=(epoch*step) + step)
-                writer.add_scalar("iter_loss", loss.item(), global_step=(epoch*step) + step)
+                iter_step = ((epoch-1)*step) + step
+                writer.add_scalar("iter_loss", loss.item(), global_step=iter_step)
+                writer.add_scalar("iter_acc5", acc5, global_step=iter_step)
+                writer.add_scalar("iter_acc1", acc1, global_step=iter_step)
+                writer.add_scalar("iter_loss", loss.item(), global_step=iter_step)
                 logging.info(f"{step}/{len(train_loader)}, train_loss: {loss.item():.4f} acc1: {acc1:.2f} acc5: {acc5:.2f} step time: {(time.time() - step_start):.4f}")
-                writer.add_scalar("ram_used_mb", psutil.virtual_memory()[3] / 1000000, global_step=(epoch*step) + step)
-                writer.add_scalar("cpu_used", psutil.cpu_percent(), global_step=(epoch * step) + step)
-                writer.add_scalar("vram_used_device_0", torch.cuda.memory_reserved(0), global_step=(epoch * step) + step)
+                writer.add_scalar("ram_used_mb", psutil.virtual_memory()[3] / 1000000, global_step=iter_step)
+                writer.add_scalar("cpu_used", psutil.cpu_percent(), global_step=iter_step)
+                writer.add_scalar("vram_used_device_0", torch.cuda.memory_reserved(0), global_step=iter_step)
         epoch_loss /= step
-        epoch_loss_values.append(epoch_loss)
         acc5_total /= step
-        accuracy5_values.append(acc5_total)
         acc1_total /= step
-        accuracy1_values.append(acc1_total)
         writer.add_scalar("loss", epoch_loss, global_step=epoch)
         writer.add_scalar("accuracy1", acc1, global_step=epoch)
         writer.add_scalar("accuracy5", acc5, global_step=epoch)
@@ -250,12 +245,13 @@ def write_args_tensorboard(args, writer):
     writer.add_scalar("mlp", args.mlp)
     writer.add_scalar("momentum", args.momentum)
     writer.add_scalar("condition", int(args.condition))
+    writer.add_scalar("color_augment", int(args.color_augment))
     writer.add_scalar("lr", args.lr)
     writer.add_scalar("batch_size", args.batch_size)
     writer.add_scalar("is_profiling", int(args.is_profiling))
     writer.add_scalar("cos", int(args.cos))
     for i in args.schedule:
-        writer.add_scalar("schedule", 10, global_step=i)
+        writer.add_scalar("schedule", i, global_step=i)
     writer.add_scalar("weight_decay", args.weight_decay)
     writer.add_scalar("epochs", args.epochs)
     writer.add_scalar("workers", args.workers)
@@ -299,7 +295,7 @@ def main():
 
     writer = SummaryWriter(log_dir=model_filename.replace("_#NUM#", "") + "_runs")
     writer.add_text("git_sha", os.popen('git rev-parse HEAD').read().strip())
-    writer.add_scalar("is_distributed", int(not is_distributed))
+    writer.add_scalar("is_distributed", int(is_distributed))
 
     train_data, val_data, _ = build_file_list(args.data_dir, args.file_list_path)
     if args.debug_mode:

@@ -5,6 +5,7 @@ import random
 from io import TextIOWrapper
 from pathlib import Path
 import logging
+import re
 
 institution_lookup = {
     "01": "International Genomics Consortium",
@@ -851,7 +852,7 @@ def add_dir(directory):
         if os.path.isfile(filename):
             # check if filename contains DX and a number, e.g. DX1, DX2, etc.
             if re.search(r"DX\d", filename):
-                logging.warning(f"Skipping {filename}")
+                #logging.warning(f"Skipping {filename}")
                 continue
             all_data.append({"q": filename, "k": filename, 'filename': filename})
     return all_data
