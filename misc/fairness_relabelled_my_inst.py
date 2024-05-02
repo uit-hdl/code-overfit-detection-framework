@@ -37,6 +37,8 @@ parser.add_argument('--feature_extractor', default='out/MoCo/tiles/model/relabel
 #parser.add_argument('--feature_extractor', default='out/MoCo/tiles/model/relabelled_my_inst_checkpoint_MoCo_tiles_0200_True_m256_n0_o4_K256.pth.tar/network_epoch=10.pt', type=str, help='path to feature extractor, which will extract features from tiles')
 parser.add_argument('--tcga_annotation_file', default='./out/annotation/recurrence_annotation_tcga.pkl', type=str, help='path to TCGA annotations')
 parser.add_argument('--clinical_path', default='./annotations/TCGA/clinical_tcga.tsv', type=str)
+parser.add_argument('--debug-mode', default=False, type=bool, action=argparse.BooleanOptionalAction,
+                    metavar='D', help='turn debugging on or off. Will limit amount of data used. Development only', dest='debug_mode')
 parser.add_argument('--cptac_annotation_file', default='./out/annotation/recurrence_annotation_cptac.pkl', type=str, help='path to CPTAC annotations')
 parser.add_argument('--slide_annotation_file', default='annotations/slide_label/gdc_sample_sheet.2023-08-14.tsv', type=str, help='"Sample sheet" from TCGA, see README.md for instructions on how to get sheet')
 parser.add_argument('--file-list-path', default='./out/files.csv', type=str, help='path to list of file splits')
@@ -79,12 +81,12 @@ def main():
 
     logging.info("Processing annotations")
     train_data, val_data, test_data = build_file_list(args.src_dir, args.file_list_path)
-    # TODO: remove
-    #print("warn: only using subset of data")
-    #import random
-    #random.shuffle(test_data)
-    #test_data = test_data[:100]
-    #for ds in [test_data]:
+    if args.debug_mode:
+        logging.warn("warn: only using subset of data")
+        import random
+        random.shuffle(test_data)
+        test_data = test_data[:100]
+
     for ds in [test_data]:
         for i in range(len(ds)):
             filename = ds[i]['filename']
@@ -155,67 +157,6 @@ def main():
         df = mf.by_group
         df = df.round(3)
         df.to_csv(out_path, index=True)
-
-        demographic_parity = demographic_parity_difference(y_true, y_pred, sensitive_features=group)
-        equalized_odds = equalized_odds_difference(y_true, y_pred, sensitive_features=group)
-        indices_with_gt_positive = []
-        for i in range(len(sf_data)):
-            if y_true[i] == 1:
-                indices_with_gt_positive.append(i)
-        equalized_opportunity = equalized_odds_difference([y_true[i] for i in indices_with_gt_positive], [y_pred[i] for i in indices_with_gt_positive], sensitive_features=[group[i] for i in indices_with_gt_positive])
-
-        data = {"Demographic Parity": [demographic_parity],
-                "Equalized Odds": [equalized_odds],
-                f"Equalized Opportunity {tissue_types[1]}": [equalized_opportunity],
-                }
-        df = pd.DataFrame(data)
-        print(df.to_string())
-
-        # tweak to your needs if there is a singular (or plural) that dominates the scores
-        # indices = []
-        # for i in range(len(sf_data)):
-        #     if sf_data[i] == "90":
-        #         indices.append(i)
-        # indices = dict.fromkeys(indices)
-        # demographic_parity = demographic_parity_difference([y_true[i] for i in range(len(y_true)) if i not in indices], [y_pred[i] for i in range(len(y_true)) if i not in indices],
-        #                                                    sensitive_features=[group[i] for i in range(len(y_true)) if i not in indices])
-        # equalized_odds = equalized_odds_difference([y_true[i] for i in range(len(y_true)) if i not in indices], [y_pred[i] for i in range(len(y_true)) if i not in indices],
-        #                                                    sensitive_features=[group[i] for i in range(len(y_true)) if i not in indices])
-        # equalized_opportunity = equalized_odds_difference([y_true[i] for i in indices_with_gt_positive if i not in indices], [y_pred[i] for i in indices_with_gt_positive if i not in indices],
-        #                                                    sensitive_features=[group[i] for i in indices_with_gt_positive if i not in indices])
-        # metrics_dict = {"accuracy": accuracy_score, "selection_rate": selection_rate, "count": count, "tp_rate": true_positive_rate, "tn_rate": true_negative_rate, "fp_rate": false_positive_rate, "fn_rate": false_negative_rate, "mean_pred": mean_prediction}
-        # mf2 = MetricFrame(metrics=metrics_dict, y_true=y_true, y_pred=y_pred, sensitive_features=group)
-        # out_path = os.path.join(args.out_dir, os.path.basename(os.path.dirname(args.feature_extractor)) + f"_{name}_distributions_fairness.csv")
-        # ensure_dir_exists(out_path)
-        # df = mf2.by_group
-        # df = df.round(3)
-        # df.to_csv(out_path, index=True)
-
-        equalized_opportunity = equalized_odds_difference(y_true, y_pred, sensitive_features=group)
-        demographic_parity = demographic_parity_difference(y_true, y_pred, sensitive_features=group)
-        equalized_odds = equalized_odds_difference(y_true, y_pred, sensitive_features=group)
-        data = {"Demographic Parity": [demographic_parity],
-                "Equalized Odds": [equalized_odds],
-                f"Equalized Opportunity {tissue_types[1]}": [equalized_opportunity],
-                }
-        df = pd.DataFrame(data)
-        out_path = os.path.join(args.out_dir, os.path.basename(os.path.dirname(args.feature_extractor)) + f"_{name}_fairness.csv")
-        ensure_dir_exists(out_path)
-        df = df.round(3)
-        df.to_csv(out_path, index=False)
-        logging.info(f"Results (also written to {out_path}):")
-        pd.set_option('display.width', None)
-        print(df.to_string(index=False))
-
-    overall_data = train_data + val_data + test_data
-    males = list(filter(lambda x: x["gender"] == "male", overall_data))
-    females = list(filter(lambda x: x["gender"] == "female", overall_data))
-    male_distribution = len(list(filter(lambda x: x["gender"] == "male", overall_data))) / (len(overall_data) / 100)
-    print(f"Of {len(overall_data)} patients, {len(males)} ({male_distribution:.2f}%) are male ({100.0-male_distribution}% female)")
-    male_distribution_of_tumor = len(list(filter(lambda x: x[CommonKeys.LABEL] == tissue_types.index("Primary Tumor"), males))) / (len(males) / 100)
-    female_distribution_of_tumor = len(list(filter(lambda x: x[CommonKeys.LABEL] == tissue_types.index("Primary Tumor"), females))) / (len(females) / 100)
-    print(f"For males, {male_distribution_of_tumor}% of slides are primary tumors ({1.0-male_distribution_of_tumor}% are benign)")
-    print(f"For females, {female_distribution_of_tumor}% of slides are primary tumors ({1.0-female_distribution_of_tumor}% are benign)")
 
     print("looking at the test data: ")
     males = list(filter(lambda x: x["gender"] == "male", test_data))

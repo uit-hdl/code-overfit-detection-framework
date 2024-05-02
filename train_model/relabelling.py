@@ -62,7 +62,7 @@ parser.add_argument('--src-dir', default=os.path.join('Data', 'TCGA_LUSC', 'tile
 parser.add_argument('--out-dir', default='./out', type=str, help='path to save extracted embeddings')
 parser.add_argument('--slide_annotation_file', default=os.path.join('annotations', 'slide_label', 'gdc_sample_sheet.2023-08-14.tsv'), type=str,
                     help='"Sample sheet" from TCGA, see README.md for instructions on how to get sheet')
-parser.add_argument('-b', '--batch-size', default=128, type=int,
+parser.add_argument('-b', '--batch-size', default=256, type=int,
                     metavar='N', help=f'batch size, this is the total batch size of all GPUs on the current node when using Data Parallel or Distributed Data Parallel')
 parser.add_argument('--debug-mode', default=False, type=bool, action=argparse.BooleanOptionalAction,
                     metavar='D', help='turn debugging on or off. Will limit amount of data used. Development only', dest='debug_mode')
@@ -208,11 +208,11 @@ def wrap_data(train_data, val_data, test_data, slide_annotations, labels, label_
             [
                 range_func("LoadImage", mt.LoadImaged([CommonKeys.IMAGE], image_only=True)),
                 range_func("EnsureChannelFirst", mt.EnsureChannelFirstd([CommonKeys.IMAGE])),
-                range_func("Crop", mt.Lambdad([CommonKeys.IMAGE], cropper)),
-                range_func("ColorJitter", mt.RandLambdad([CommonKeys.IMAGE], jitterer, prob=0.8)),
-                range_func("Grayscale", mt.RandLambdad([CommonKeys.IMAGE], grayer, prob=0.2)),
-                range_func("Flip0", mt.RandFlipd([CommonKeys.IMAGE], prob=0.5, spatial_axis=0)),
-                range_func("Flip1", mt.RandFlipd([CommonKeys.IMAGE], prob=0.5, spatial_axis=1)),
+                #range_func("Crop", mt.Lambdad([CommonKeys.IMAGE], cropper)),
+                #range_func("ColorJitter", mt.RandLambdad([CommonKeys.IMAGE], jitterer, prob=0.8)),
+                #range_func("Grayscale", mt.RandLambdad([CommonKeys.IMAGE], grayer, prob=0.2)),
+                #range_func("Flip0", mt.RandFlipd([CommonKeys.IMAGE], prob=0.5, spatial_axis=0)),
+                #range_func("Flip1", mt.RandFlipd([CommonKeys.IMAGE], prob=0.5, spatial_axis=1)),
                 range_func("ToTensor", mt.ToTensord([CommonKeys.IMAGE], track_meta=False)),
                 range_func("EnsureType", mt.EnsureTyped([CommonKeys.IMAGE, CommonKeys.LABEL], track_meta=False)),
             ]
@@ -220,9 +220,9 @@ def wrap_data(train_data, val_data, test_data, slide_annotations, labels, label_
     else:
         transformations = mt.Compose(
             [
-                mt.LoadImaged("image", image_only=True),
-                mt.EnsureChannelFirstd("image"),
-                mt.ToTensord("image", track_meta=False),
+                mt.LoadImaged(CommonKeys.IMAGE, image_only=True),
+                mt.EnsureChannelFirstd(CommonKeys.IMAGE),
+                mt.ToTensord(CommonKeys.IMAGE, track_meta=False),
                 # doesnt work?
                 # mt.ToDeviceD(keys="image", device=device),
             ])
@@ -454,7 +454,9 @@ def main():
 
 def plot_results(gts, predictions, labels, title, writer):
     if len(labels) == 2:
-        roc = roc_curve(gts, predictions)
+        _gts = [labels.index(x) for x in gts]
+        _preds = [labels.index(x) for x in gts]
+        roc = roc_curve(_gts, _preds)
         # check if roc[0] or roc[1] contains nan
         if np.isnan(roc[0]).any() or np.isnan(roc[1]).any():
             logging.warning("ROC curve contains nan values - omitting from tensorboard")
@@ -464,7 +466,7 @@ def plot_results(gts, predictions, labels, title, writer):
             plt.ylabel("True Positive Rate")
             plt.plot(roc[0], roc[1])
             writer.add_figure(f"ROC Curve - {title}", plt.gcf(), 0)
-            auc = roc_auc_score(gts, predictions)
+            auc = roc_auc_score(_gts, _preds)
             writer.add_scalar(f"AUC - {title}", auc, 0)
     else:
         logging.info("not plotting ROC curve as there are more than 2 classes")
