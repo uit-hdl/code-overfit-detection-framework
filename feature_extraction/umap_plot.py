@@ -120,9 +120,6 @@ def interactive(
 
     colors = "color"
 
-    if not points.shape[0] <= width * height // 10:
-        raise ValueError("Too many points to plot interactively, use umap's official lib instead")
-
     if hover_data is not None:
         tooltip_dict = {}
         for col_name in hover_data:

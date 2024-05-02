@@ -56,6 +56,8 @@ parser.add_argument('--debug-mode', default=False, type=bool, action=argparse.Bo
                     metavar='D', help='turn debugging on or off. Will limit amount of data used. Development only', dest='debug_mode')
 parser.add_argument('--profile', default=False, type=bool, action=argparse.BooleanOptionalAction,
                     metavar='P', help='whether to profile training or not', dest='is_profiling')
+parser.add_argument('--checkpoint', default=True, type=bool, action=argparse.BooleanOptionalAction,
+                    metavar='X', help='whether to to sequential_checkpoint or not', dest='is_seq_ckpt')
 parser.add_argument('--seed', default=None, type=int,
                     help='seed for initializing training. ')
 parser.add_argument('--world-size', default=-1, type=int,
@@ -246,6 +248,7 @@ def write_args_tensorboard(args, writer):
     writer.add_scalar("momentum", args.momentum)
     writer.add_scalar("condition", int(args.condition))
     writer.add_scalar("color_augment", int(args.color_augment))
+    writer.add_scalar("sequential checkpointing", int(args.is_seq_ckpt))
     writer.add_scalar("lr", args.lr)
     writer.add_scalar("batch_size", args.batch_size)
     writer.add_scalar("is_profiling", int(args.is_profiling))
@@ -327,7 +330,7 @@ def main():
 
     logging.info("=> creating model '{}'".format('x64'))
     model = condssl.builder.MoCo(
-        base_encoder=InceptionV4, dim=args.moco_dim, K=args.moco_k, m=args.moco_m, T=args.moco_t, mlp=args.mlp, condition=args.condition, do_checkpoint=not is_distributed)
+        base_encoder=InceptionV4, dim=args.moco_dim, K=args.moco_k, m=args.moco_m, T=args.moco_t, mlp=args.mlp, condition=args.condition, do_checkpoint=args.is_seq_ckpt)
 
     model = model.cuda()
     if is_distributed:
