@@ -101,7 +101,7 @@ def main():
     model_name = "inceptionv4"
     data_dir_name = list(filter(None, args.src_dir.split(os.sep)))[-1]
 
-    for name, data in list(zip(['train', 'val', 'test'], [train_data, val_data, test_data]))[2:]:
+    for name, data in list(zip(['train', 'val', 'test'], [train_data, val_data, test_data])):
         logging.info(name)
         dl = DataLoader(dataset=Dataset(data, transformations), batch_size=128, num_workers=torch.cuda.device_count(), shuffle=True)
         embedding_dict = get_embeddings_bagging(feature_extractor, dl, device)
