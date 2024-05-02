@@ -29,7 +29,7 @@ test -d "${analysis_dir}" || mkdir -p "${analysis_dir}"
 
 #for model in "${model_out_dir}"/MoCo/tiles/model/*0200*.tar
 #for model in "${model_out_dir}"/MoCo/tiles/model/*0180*False*.tar
-for model in "${model_out_dir}"/MoCo/*/model/*0200*False*.tar
+for model in "${model_out_dir}"/MoCo/*/model/*0020*False*.tar
 do
   m="$(basename "${model}" | command grep -Eo 'm[0-9]+')"
   n="$(basename "${model}" | command grep -Eo "n[0-9]+")"
