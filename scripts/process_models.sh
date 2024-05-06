@@ -29,7 +29,8 @@ test -d "${analysis_dir}" || mkdir -p "${analysis_dir}"
 
 #for model in "${model_out_dir}"/MoCo/tiles/model/*0200*.tar
 #for model in "${model_out_dir}"/MoCo/tiles/model/*0180*False*.tar
-for model in "${model_out_dir}"/MoCo/*/model/*0020*False*.tar
+#for model in "${model_out_dir}"/MoCo/*/model/*0040*False*.tar
+for model in model_out2b1413ba2b3df0bcd9e2c56bdbea8d2c7f875d1e/MoCo/tiles//model/checkpoint_MoCo_tiles_0200_True_m256_n0_o4_K256.pth.tar
 do
   m="$(basename "${model}" | command grep -Eo 'm[0-9]+')"
   n="$(basename "${model}" | command grep -Eo "n[0-9]+")"
@@ -41,7 +42,7 @@ do
   echo "e$e $m $n $c $K $o $out_dir $model"
   set -xe
   test -e "${out_dir}"/inceptionv4/$(basename ${model})/cptac_*_embedding.pkl || \
-	  ipython feature_extraction/extract_embeddings_cptac.py -- --src-dir "${CPATC_SRC_DIR}" --feature-extractor "${model}" --out-dir "${out_dir}"
+	  ipython feature_extraction/extract_embeddings_cptac.py -- --src-dir "${CPTAC_SRC_DIR}" --feature-extractor "${model}" --out-dir "${out_dir}"
   test -e "${out_dir}"/inceptionv4/$(basename ${model})/test_*_embedding.pkl || \
 	  ipython feature_extraction/extract_embeddings.py -- --src-dir "${SRC_DIR}" --feature-extractor "${model}" --out-dir "${out_dir}"
 
@@ -50,13 +51,13 @@ do
 
   test -d "${out_dir}"/MoCo/*/model/relabelled_my_inst*/ || \
 	  ipython train_model/relabelling.py -- --epochs 5 --src-dir "${SRC_DIR}" --out-dir "${out_dir}" --feature_extractor "${model}" --label-key "my_inst"
-  relabelled_model="$(find "${out_dir}"/MoCo/*/model/relabelled_my_inst*/ -name \*5.pt -type f)"
+  relabelled_model="$(find "${out_dir}"/MoCo/*/model/relabelled_my_inst*/ -name \*network_epoch\=5.pt -type f)"
   test -e "${out_dir}"/relabelled_my_inst_*Institution_*fairness.csv || \
 	  ipython ./misc/fairness_relabelled_my_inst.py -- --feature_extractor "${relabelled_model}" --src_dir "${SRC_DIR}" --out_dir "${out_dir}"
 
   test -d "${out_dir}"/MoCo/*/model/relabelled_Sample*/ || \
 	  ipython train_model/relabelling.py -- --epochs 10 --src-dir "${SRC_DIR}" --out-dir "${out_dir}" --feature_extractor "${model}" --label-key "Sample Type"
-  relabelled_model="$(find "${out_dir}"/MoCo/*/model/relabelled_Sample*/ -name \*10.pt -type f)"
+  relabelled_model="$(find "${out_dir}"/MoCo/*/model/relabelled_Sample*/ -name \*network_epoch\=10.pt -type f)"
   test -e "${out_dir}"/relabelled_Sample*Institution_fairness.csv || \
 	  ipython ./misc/fairness.py -- --feature_extractor "${relabelled_model}" --src_dir "${SRC_DIR}" --out_dir "${out_dir}"
   test -e "${out_dir}"/validation* || \
