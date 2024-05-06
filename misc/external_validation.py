@@ -174,6 +174,10 @@ def main():
                 if p != g:
                     wrong_predictions[labels[g]].append((item["filename"][i], g, p))
 
+    writer.add_scalar("size of dataset", len(gts), 0)
+    writer.add_scalar("batch size", args.batch_size, 0)
+    writer.add_text("label_key", args.label_key)
+    writer.flush()
     i = 1
     grid_size = min(10, min(map(lambda l: len(l), wrong_predictions.values())))
     fig, axes = plt.subplots(nrows=len(wrong_predictions), ncols=grid_size, figsize=(16, 16), sharex=True, sharey=True)
