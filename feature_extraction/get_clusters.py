@@ -423,12 +423,15 @@ def main(clinical_path, embeddings_path_test, embeddings_path_val, embeddings_pa
             next_inst = keys_sorted[i].split("-")[1]
         splits.append(i)
 
+    # basename of src (Data) directory
+    bsrc=os.path.basename(os.path.dirname(args.embeddings_path_test)).split("_")[2]
+
     skewers = pd.DataFrame(columns=["slide", "skewness"])
     for i,j  in zip(splits, splits[1:]):
     #for i, j in zip(range(len(keys_sorted)), range(1, len(keys_sorted) + 1)):
         keys_chosen = keys_sorted[i:j]
         number_of_images = j-i
-        out_html = os.path.join(out_dir, "web", f"condssl_out_{i}_{number_of_images}_{histogram_bins}.html")
+        out_html = os.path.join(out_dir, f"web_{bsrc}", f"condssl_out_{i}_{number_of_images}_{histogram_bins}.html")
         ensure_dir_exists(out_html)
         #if os.path.exists(out_html):
             #print(f"not regenerating {out_html}: file exists")
