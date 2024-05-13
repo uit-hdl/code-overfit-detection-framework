@@ -264,31 +264,6 @@ def wrap_data(train_data, val_data, test_data, slide_annotations, labels, label_
     logging.info("Number of batches in train DL: {}".format(len(dl_train)))
     return dl_train, dl_val, dl_test
 
-def plot_train_data(epoch_loss_values, metric_values, mean_val_acc, out_dir):
-    fig = plt.figure(1, (24, 6))
-    fig.subplots_adjust(hspace=0.4, wspace=0.4)
-    ax = fig.add_subplot(2, 2, 1)
-    ax.set_title("Iteration Average Loss")
-    y = epoch_loss_values
-    # set label of x-axis
-    ax.axes.set_xlabel("Iteration")
-    ax.xaxis.set_major_locator(mticker.MaxNLocator(integer=True))
-    ax.plot(range(len(y)), y)
-    ax.xaxis.set_major_locator(mticker.MaxNLocator(integer=True))
-    ax = fig.add_subplot(2, 2, 4)
-    # plot the mean validation accuracy
-    ax.set_title("Val Accuracy")
-    x = len(mean_val_acc)
-    y = mean_val_acc
-    ax.axes.set_ylim(0, 1)
-    ax.axes.set_xlabel("Epoch")
-    ax.plot(y)
-    ax.xaxis.set_major_locator(mticker.MaxNLocator(integer=True))
-    fig.gca().xaxis.set_major_locator(mticker.MaxNLocator(integer=True))
-    # fig.show()
-    plt.savefig(os.path.join(out_dir, 'train_stats.png'))
-
-
 def main():
     args = parser.parse_args()
 
@@ -342,6 +317,7 @@ def main():
 
     model = InceptionV4(num_classes=128)
     load_model(model, args.feature_extractor, device)
+    # TODO: "Since the number of acquisition sites was different among each group, the size of each model’s last layer was adjusted with respect to the number of institutions in each group"
     model = attach_layers(model, [500, 200], len(labels))
     freeze_layers(model, exclude_vars="last_linear")
     model.to(device)
@@ -382,7 +358,6 @@ def main():
         writer.add_scalar("learning rate", args.lr, 0)
         writer.flush()
         logging.info(f"=> Model builder done, wrote model to '{model_path}'")
-        plot_train_data(epoch_loss_values, metric_values, mean_val_acc, args.out_dir)
 
     predictions = []
     gts = []
