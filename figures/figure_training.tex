@@ -8,24 +8,24 @@
 \centering
 \begin{tikzpicture}[node distance=2cm and 2cm, auto]
 
-\foreach \x in {1,...,6}
+\foreach \x in {1,...,9}
 {
-  \ifnum\x<3
+  \ifnum\x<4
     \def\rectColor{green}
   \else
-    \ifnum\x<5
+    \ifnum\x<7
     \def\rectColor{blue}
   \else
     \def\rectColor{orange}
   \fi
     \fi
-  \node[yslant=0.5, fill=\rectColor, opacity=0.8] (wsi\x) at (\x-3,0) 
+  \node[yslant=0.5, fill=\rectColor, opacity=0.8] (wsi\x) at (\x-4,0) 
   {\includegraphics[width=.1\textwidth, height=.1\textheight]{./wsi\x.png}};
 }
 
 
 \draw[decorate, decoration={brace, amplitude=10pt, mirror}]
-    (-3,-1.5) -- (4.0,-1.5) node [midway, below=10pt] (Train) {Training data} ;
+    (-4,-1.5) -- (5.3,-1.5) node [midway, below=10pt] (Train) {Training data} ;
 % ([shift={(-1.5,0.3+\shiftY)}]csBase) 
 
 \node [draw, diamond, aspect=2, below=1cm of Train] (CS) {Use conditional sampling?};
@@ -100,57 +100,53 @@
 \foreach \y in {1,...,3}
 {
     \begin{scope}[yshift=\y*\shiftY]
-        \foreach \x in {1,...,2}
-        {
-
           \ifnum\y<2
-            \def\rectColor{green}
-          \else
-            \ifnum\y<3
-            \def\rectColor{blue}
-          \else
-            \def\rectColor{orange}
-          \fi
-            \fi
-            \pgfmathsetmacro\wsiName{int((\x-1)*\y+\x)}
-            \node[yslant=0.5, fill=\rectColor] (cswsi\y\x) at ([shift={(\x*\shiftX,\y*\shiftY)}]rBase) 
+            \node[yslant=0.5, fill=green] (cswsi\y1) at ([shift={(1*\shiftX+0.5,\y*\shiftY)}]rBase) 
             {
-              {\includegraphics[width=.05\textwidth, height=.05\textheight]{./wsi\wsiName.png}}
-        };
-        }
-
-          \ifnum\y<2
-            \node[yslant=0.5, fill=orange] (cswsi\y3) at ([shift={(2*\shiftX+0.5,\y*\shiftY)}]rBase) 
+              {\includegraphics[width=.05\textwidth, height=.05\textheight]{./wsi1.png}}
+            };
+            \node[yslant=0.5, fill=green] (cswsi\y2) at ([shift={(2*\shiftX+0.5,\y*\shiftY)}]rBase) 
             {
-              {\includegraphics[width=.05\textwidth, height=.05\textheight]{./wsi5.png}}
-        };
-            \node[yslant=0.5, fill=blue] (cswsi\y4) at ([shift={(2*\shiftX+1,\y*\shiftY)}]rBase) 
+              {\includegraphics[width=.05\textwidth, height=.05\textheight]{./wsi2.png}}
+            };
+            \node[yslant=0.5, fill=green] (cswsi\y3) at ([shift={(3*\shiftX+0.5,\y*\shiftY)}]rBase) 
             {
               {\includegraphics[width=.05\textwidth, height=.05\textheight]{./wsi3.png}}
-        };
-          \else
-            \ifnum\y<3
-            \node[yslant=0.5, fill=green] (cswsi\y3) at ([shift={(2*\shiftX+0.5,\y*\shiftY)}]rBase) 
+            };
+            \node[yslant=0.5, fill=orange] (cswsi\y4) at ([shift={(4*\shiftX+0.5,\y*\shiftY)}]rBase) 
             {
-              {\includegraphics[width=.05\textwidth, height=.05\textheight]{./wsi2.png}}
-        };
-            \node[yslant=0.5, fill=orange] (cswsi\y4) at ([shift={(2*\shiftX+1,\y*\shiftY)}]rBase) 
-            {
-              {\includegraphics[width=.05\textwidth, height=.05\textheight]{./wsi5.png}}
-        };
-          \else
-            \node[yslant=0.5, fill=green] (cswsi\y3) at ([shift={(2*\shiftX+0.5,\y*\shiftY)}]rBase) 
-            {
-              {\includegraphics[width=.05\textwidth, height=.05\textheight]{./wsi2.png}}
-        };
-            \node[yslant=0.5, fill=blue] (cswsi\y4) at ([shift={(2*\shiftX+1,\y*\shiftY)}]rBase) 
-            {
-              {\includegraphics[width=.05\textwidth, height=.05\textheight]{./wsi4.png}}
-        };
-          \fi
-          \fi
+              {\includegraphics[width=.05\textwidth, height=.05\textheight]{./wsi7.png}}
+            };
         \draw (cswsi\y1.south west) rectangle (cswsi\y4.north east) ;
         \node[anchor=north] at ([shift={(-0.8,0.5)}]cswsi\y1.west) {Batch \number\numexpr\y\relax};
+        \else
+          \ifnum\y<3
+            \node[yslant=0.5, fill=blue] (cswsi\y1) at ([shift={(1*\shiftX+0.5,\y*\shiftY)}]rBase) 
+            {
+              {\includegraphics[width=.05\textwidth, height=.05\textheight]{./wsi3.png}}
+            };
+            \node[yslant=0.5, fill=orange] (cswsi\y2) at ([shift={(2*\shiftX+0.5,\y*\shiftY)}]rBase) 
+            {
+              {\includegraphics[width=.05\textwidth, height=.05\textheight]{./wsi8.png}}
+            };
+            \node[yslant=0.5, fill=blue] (cswsi\y3) at ([shift={(3*\shiftX+0.5,\y*\shiftY)}]rBase) 
+            {
+              {\includegraphics[width=.05\textwidth, height=.05\textheight]{./wsi5.png}}
+            };
+            \node[yslant=0.5, fill=orange] (cswsi\y4) at ([shift={(4*\shiftX+0.5,\y*\shiftY)}]rBase) 
+            {
+              {\includegraphics[width=.05\textwidth, height=.05\textheight]{./wsi9.png}}
+            };
+            \draw (cswsi\y1.south west) rectangle (cswsi\y4.north east) ;
+            \node[anchor=north] at ([shift={(-0.8,0.5)}]cswsi\y1.west) {Batch \number\numexpr\y\relax};
+        \else
+            \node[anchor=north] at ([shift={(-0.8,-1.5)}]cswsi21.west) {Batch \number\numexpr\y\relax};
+            % ([shift={(-0.2,\y*\shiftY+0.5)}]rBase) 
+              \fill ([shift={(1,\y*\shiftY)}]rBase)  circle (2pt);
+              \fill ([shift={(.2*\shiftX+1.5,\y*\shiftY)}]rBase)  circle (2pt);
+              \fill ([shift={(.3*\shiftX+2.0,\y*\shiftY)}]rBase)  circle (2pt);
+          \fi
+          \fi
     \end{scope}
 }
 
