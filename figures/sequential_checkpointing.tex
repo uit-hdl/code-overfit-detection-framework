@@ -1,0 +1,102 @@
+\documentclass{article}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows, positioning, decorations.pathreplacing, calc, matrix, fit}
+
+
+\begin{document}
+
+\begin{figure}[h!]
+\begin{tikzpicture}[node distance=2cm and 2cm,
+  inner/.style={circle,draw=blue!50,fill=blue!20,thick,inner sep=3pt},
+  outer/.style={draw=green,fill=green!20,thick,inner sep=10pt},
+  mymatrix/.style={matrix of nodes, nodes=typetag, row sep=1em},
+  mycontainer/.style={draw=gray, inner sep=1ex},
+  typetag/.style={draw=gray, inner sep=1ex, anchor=west},
+  title/.style={draw=none, color=gray, inner sep=0pt},
+  ]
+
+\node[] (diagram) {
+\begin{tikzpicture}[
+    node distance=1cm and 1.5cm,
+    every node/.style={circle, draw, minimum size=0.75cm},
+    orange/.style={fill=orange},
+    red/.style={fill=red, star, star points=12},
+    blue/.style={fill=blue},
+    gray/.style={fill=gray},
+    font=\small
+]
+
+% First row
+\node[orange] (n1) {};
+\node[right=of n1] (n2) {};
+\node[right=of n2] (n3) {};
+\node[red, right=of n3] (n4) {};
+\node[right=of n4] (n5) {};
+\node[orange, right=of n5] (n6) {};
+\node[below=0.5cm of n5, draw=none] (t1) {Forward pass};
+\node[below=0.5cm of n6, draw=none, align=center] (t2) {Orange nodes are the ones \\ kept in memory to compute \\ the gradient update for this node};
+
+\draw[->] (n1) -- (n2);
+\draw[->] (n2) -- (n3);
+\draw[->] (n3) -- (n4);
+\draw[->] (n4) -- (n5);
+\draw[->] (n5) -- (n6);
+
+% Second row
+\node[below=2cm of n1] (n7) {};
+\node[below=2cm of n2] (n8) {};
+\node[below=2cm of n3] (n9) {};
+\node[below=2cm of n4] (n10) {};
+\node[gray, below=2cm of n5] (n11) {};
+\node[orange, below=2cm of n6] (n12) {};
+
+\draw[->] (n7) -- (n8);
+\draw[->] (n8) -- (n9);
+\draw[->] (n9) -- (n10);
+\draw[->] (n10) -- (n11);
+\draw[->] (n11) -- (n12);
+
+\node[below=0.5cm of n10, draw=none] (t3) {Backward pass};
+
+% Third row
+\node[below=4.5cm of n1] (n13) {};
+\node[below=4.5cm of n2] (n14) {};
+\node[below=4.5cm of n3] (n15) {};
+\node[below=4.5cm of n4] (n16) {};
+\node[below=4.5cm of n5] (n17) {};
+\node[orange, below=4.5cm of n6] (n18) {};
+\node[below=0.5cm of n17, draw=none, align=center] (t4) {Orange nodes are the ones \\ kept in memory to compute \\ the gradient update for this node};
+
+\draw[->] (n13) -- (n14);
+\draw[->] (n14) -- (n15);
+\draw[->] (n15) -- (n16);
+\draw[->] (n16) -- (n17);
+\draw[->] (n17) -- (n18);
+
+% Fourth row
+\node[below=6.5cm of n1] (n19) {};
+\node[below=6.5cm of n2] (n20) {};
+\node[below=6.5cm of n3] (n21) {};
+\node[below=6.5cm of n4] (n22) {};
+\node[below=6.5cm of n5] (n23) {};
+\node[orange, below=6.5cm of n6] (n24) {};
+\node[blue, below=2cm of n17] (n25) {};
+
+\draw[->] (n19) -- (n20);
+\draw[->] (n20) -- (n21);
+\draw[->] (n21) -- (n22);
+\draw[->] (n22) -- (n23);
+\draw[->] (n23) -- (n24);
+\draw[->] (n23) -- (n25);
+
+\node[below=0.5cm of n22, draw=none] (t5) {Backward pass};
+
+
+\end{tikzpicture}
+};
+
+\end{tikzpicture}
+\end{figure}
+
+\end{document}
+
