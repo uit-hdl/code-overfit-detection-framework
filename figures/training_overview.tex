@@ -1,0 +1,36 @@
+\documentclass[landscape]{article}
+\usepackage{tikz}
+\usetikzlibrary{calc}
+\usetikzlibrary{shapes.geometric, arrows, positioning, decorations.pathreplacing}
+
+\begin{document}
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[node distance=2cm and 2cm, auto]
+
+\foreach \x in {1,...,4}
+{
+  \node[yslant=0.5] (wsi\x) at (\x-0,0) 
+  {\includegraphics[width=.1\textwidth, height=.1\textheight]{./wsi\x.png}};
+}
+
+
+\coordinate [] (Model) {};
+  \def\numLayers{5}
+  \def\offset{0.2}
+  \foreach \n in {1,...,\numLayers}
+  {
+      \pgfmathsetmacro{\shiftX}{(\numLayers - \n) * \offset}
+      \pgfmathsetmacro{\shiftY}{(\numLayers - \n) * \offset / 2}
+
+      \draw[fill=blue!30, opacity=0.9] ([shift={(\shiftX, \shiftY)}]Model) rectangle ++(.4,-2);
+  }
+
+  \node at ([shift={(2*\offset, -\numLayers*\offset - 1.5)}]Model) {Model training};
+
+\end{tikzpicture}
+\end{figure}
+
+\end{document}
+

@@ -13,8 +13,7 @@ package "WSI Data" {
 }
 
 package "Model Architecture" {
-    object "Feature Extractor Network" as FeatureNet {
-    }
+    object "Feature Extractor Network" as FeatureNet
     object "Average Pooling" as Pooling
     object "Two hidden layers" as HiddenLayers {
         footer "1024"
