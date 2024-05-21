@@ -1,6 +1,7 @@
 \documentclass{article}
 \usepackage{tikz}
 \usetikzlibrary{shapes.geometric, arrows, positioning, decorations.pathreplacing, calc, matrix, fit}
+\usepackage[margin=0.5cm]{geometry}
 
 
 \begin{document}
@@ -8,7 +9,8 @@
 \begin{figure}[h!]
 
 \begin{tikzpicture}[node distance=2cm and 2cm,
-  inner/.style={circle,draw=blue!50,fill=blue!20,thick,inner sep=3pt},
+  % every node/.style={inner sep=0,outer sep=0}
+  inner/.style={circle,draw=blue!50,fill=blue!20,thick},
   outer/.style={draw=green,fill=green!20,thick,inner sep=10pt},
   mymatrix/.style={matrix of nodes, nodes=typetag, row sep=1em},
   mycontainer/.style={draw=gray, inner sep=1ex},
@@ -16,12 +18,12 @@
   title/.style={draw=none, color=gray, inner sep=0pt},
   ]
 
-  \node[outer, remember picture] (input) at (-8cm, 0) {
+  \node[outer, remember picture] (input) {
     \begin{tikzpicture}
     \foreach \x in {1,...,4}
     {
-      \node[yslant=0.5] (wsi\x) at (\x*.8-4,0) {
-        \includegraphics[width=.1\textwidth, height=.1\textheight]{./wsi\x.png}
+      \node[yslant=0.5] (wsi\x) at (\x*.4,0) {
+        \includegraphics[width=.05\textwidth, height=.05\textheight]{./wsi\x.png}
       };
     }
   % Calculate the coordinates for the box
@@ -34,7 +36,7 @@
 
   \matrix[mymatrix, below=0.1cm of label, draw] (mx1) {
     |[title]| \\
-    Labels \\
+    % Labels \\
     Sensitive Variables \\
   };
   \node[below=0.0cm of mx1, text width=4.2cm, align=center] (label) {Annotations};
@@ -61,11 +63,11 @@ Annotations
 
 
 \node[below left=-.2cm and .-3cm of ssl] (monai) {
-  \includegraphics[width=.1\textwidth, height=.1\textheight]{./MONAI-logo-color.png}
+  \includegraphics[width=.06\textwidth, height=.06\textheight]{./MONAI-logo-color.png}
 };
 
 \node[below right=0.1cm and .-3cm of ssl] (pytorch) {
-  \includegraphics[width=.1\textwidth, height=.1\textheight]{./Pytorch_logo.png}
+  \includegraphics[width=.06\textwidth, height=.06\textheight]{./Pytorch_logo.png}
 };
 
 \end{tikzpicture}
@@ -75,19 +77,19 @@ Annotations
     \begin{tikzpicture}
 
       \node[yslant=0.5] (wsiMap) {
-        \includegraphics[width=.1\textwidth, height=.1\textheight]{./wsi1.png}
+        \includegraphics[width=.05\textwidth, height=.05\textheight]{./wsi1.png}
       };
 
       \node[right=of wsiMap] (mapper) {
         \begin{tikzpicture}
 \foreach \y in {0,1,...,8}
     {
-        \node[circle, draw=black, fill=green, minimum size=0.01cm, scale=.3] at (0, -\y*0.7) {};
+        \node[circle, draw=black, fill=green, minimum size=0.01cm, scale=.3] at (0, -\y*0.5) {};
     }
           \end{tikzpicture}
         };
 
-      \draw[->] (wsiMap) edge ([shift={(0cm,-.45cm)}]mapper.west);
+      \draw[->] (wsiMap) edge ([shift={(0cm,-.45)}]mapper.west);
 
       \node [below=.0cm of mapper] (ssl) {Feature vector};
 
@@ -96,9 +98,10 @@ Annotations
 
 \node [above=.0cm of input] (inputText) {Input};
 \node [above=.0cm of training] (trainingText) {Training};
-\node [above=.0cm of output] (outputText) {Output model};
+\node [above=.0cm of output] (outputText) {Output (model)};
 
-
+\draw[->] (input) -- (training);
+\draw[->] (training) -- (output);
  
  
 \end{tikzpicture}
