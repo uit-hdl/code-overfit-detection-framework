@@ -1,0 +1,121 @@
+\documentclass{article}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows, positioning, decorations.pathreplacing, calc, matrix, fit}
+\usepackage[margin=0.5cm]{geometry}
+
+
+\begin{document}
+
+\begin{figure}[h!]
+
+\begin{tikzpicture}[node distance=2cm and 2cm,
+  % every node/.style={inner sep=0,outer sep=0}
+  inner/.style={draw=black!80,fill=green!20,thick, inner sep=04pt},
+  outer/.style={draw=green,fill=green!20,thick,inner sep=08pt},
+  mymatrix/.style={matrix of nodes, nodes=typetag, row sep=1em},
+  mycontainer/.style={draw=gray, inner sep=1ex},
+  typetag/.style={draw=gray, inner sep=1ex, anchor=west},
+  title/.style={draw=none, color=gray, inner sep=0pt},
+  ]
+
+  \node[outer, remember picture,outer xsep=02pt] (input) {
+    \begin{tikzpicture}
+    \foreach \x in {1,...,4}
+    {
+      \node[yslant=0.5] (wsi\x) at (\x*.4,0) {
+        \includegraphics[width=.05\textwidth, height=.05\textheight]{./wsi\x.png}
+      };
+    }
+  % Calculate the coordinates for the box
+  \path (wsi1.south west) ++(0,-0.1) coordinate (bottom left);
+  \path (wsi4.north east) ++(0,0.1) coordinate (top right);
+
+  % Draw the box around the images
+  \draw[black, thick] (bottom left) rectangle (top right);
+  \node[below=0.0cm of bottom left, anchor=north west, align=center] (label) {Training Data};
+
+    \foreach \x in {5,...,7}
+    {
+      \node[yslant=0.5] (wsi\x) at (3.5-\x*.4,-4) {
+        \includegraphics[width=.05\textwidth, height=.05\textheight]{./wsi\x.png}
+      };
+    }
+  % Calculate the coordinates for the box
+  \path (wsi5.south west) ++(-.8,-0.1) coordinate (bl2);
+  \path (wsi7.north east) ++(.8,0.1) coordinate (tr2);
+
+  % Draw the box around the images
+  \draw[black, thick] (bl2) rectangle (tr2);
+  \node[below=0.0cm of bl2, anchor=north west, align=center] (label2) {Test Data};
+
+
+  \matrix[mymatrix, below=0.1cm of label2, draw] (mx1) {
+    |[title]| \\
+    % Labels \\
+    Sensitive Variables \\
+  };
+  \node[below=0.0cm of mx1, text width=4.2cm, align=center] (label3) {Annotations};
+
+\coordinate [below left=0.4cm and -1.90cm of label3] (Model) {};
+
+\def\numLayers{5}
+\def\offset{0.2}
+\foreach \n in {1,...,\numLayers}
+{
+    \pgfmathsetmacro{\shiftX}{(\numLayers - \n) * \offset}
+    \pgfmathsetmacro{\shiftY}{(\numLayers - \n) * \offset / 2}
+
+    \draw[fill=blue!30, opacity=0.9] ([shift={(\shiftX, \shiftY)}]Model) rectangle ++(.4,-2);
+}
+
+      \node at ([shift={(2*\offset, -\numLayers*\offset - 1.5)}]Model) (ssl) {SSL Model};
+
+  \end{tikzpicture}
+};
+
+\coordinate [right=4 of input] (Overfit) {};
+  \node[outer, remember picture] (Overfit) at (Overfit) {
+    \begin{tikzpicture}
+
+  \node[inner, remember picture] (finetune) {
+    \begin{tikzpicture}
+  \node[] (monai) {
+    \includegraphics[width=.06\textwidth, height=.06\textheight]{./MONAI-logo-color.png}
+  };
+
+      \node[below=0.0cm of monai]  (pytorch) {
+    \includegraphics[width=.06\textwidth, height=.06\textheight]{./Pytorch_logo.png}
+  };
+\end{tikzpicture} };
+  \node[below=0.0cm of finetune, text width=4.2cm, align=center] (label3) {Finetune};
+
+
+      \node[inner, remember picture, below=0.1cm of label3] (UMAP) { UMAP };
+
+      \node[inner, remember picture, below=0.4cm of UMAP] (fairness) { Fairness measuring };
+
+\end{tikzpicture}
+  };
+
+\node[outer, remember picture, right=1.8 of Overfit] (output) {
+    \begin{tikzpicture}
+
+      \node[inner, remember picture, below=0.1cm of label3] (analysis) { Analysis Results };
+
+      \node[inner, remember picture, below=0.1cm of analysis] (analysis) { Plots };
+    \end{tikzpicture}
+  };
+
+\node [above=.0cm of input] (inputText) {Input};
+\node [above=.0cm of Overfit] (overfitText) {Overfit detection plugin};
+\node [above=.0cm of output] (outputText) {Output};
+
+\draw[->] (input) -- (Overfit);
+\draw[->] (Overfit) -- (output);
+ 
+ 
+\end{tikzpicture}
+\end{figure}
+
+\end{document}
+
