@@ -41,6 +41,8 @@ parser.add_argument('--slide_annotation_file', default='annotations/slide_label/
 parser.add_argument('--file-list-path', default='./out/files.csv', type=str, help='path to list of file splits')
 parser.add_argument('--src_dir', default='/Data/TCGA_LUSC/preprocessed/TCGA/tiles/', type=str, help='path to preprocessed slide images')
 parser.add_argument('--out_dir', default='./out', type=str, help='path to save extracted embeddings')
+parser.add_argument('--debug-mode', default=False, type=bool, action=argparse.BooleanOptionalAction,
+                    metavar='D', help='turn debugging on or off. Will limit amount of data used. Development only', dest='debug_mode')
 
 def load_model(net, model_path, device):
     # original
@@ -75,10 +77,13 @@ def main():
     logging.info("Processing annotations")
     train_data, val_data, test_data = build_file_list(args.src_dir, args.file_list_path)
     # TODO: remove
-    #print("warn: only using subset of data")
-    #import random
-    #random.shuffle(test_data)
-    #test_data = test_data[:100]
+    if args.debug_mode:
+        logging.warning("only using subset of data")
+        import random
+        random.shuffle(test_data)
+        test_data = test_data[:100]
+        train_data = train_data[:100]
+        val_data = val_data[:100]
     #for ds in [test_data]:
     for ds in [train_data, val_data, test_data]:
         for i in range(len(ds)):
@@ -88,6 +93,7 @@ def main():
             clinical_row = clinicalTable.loc[patient_id]
             ann = slide_annotations.loc[slide_id]
             ds[i][CommonKeys.LABEL] = tissue_types.index(ann["Sample Type"])
+            ds[i]["slide"] = slide_id
             ds[i]["gender"] = clinical_row['gender']
     logging.info("Annotations complete")
 
@@ -112,6 +118,7 @@ def main():
     y_true = []
     sf_data = []
     gender_data = []
+    slide_data = []
     model.eval()
     logging.info("Beginning inference")
     with torch.no_grad():
@@ -124,6 +131,7 @@ def main():
                 institutions = os.path.basename(os.path.dirname(item["filename"][0])).split("-")[1]
                 sf_data.append(institutions)
                 gender_data.append(item["gender"])
+                slide_data.append(item["slide"])
             else:
                 am = pred.argmax(dim=1)
                 y_pred += am.tolist()
@@ -131,13 +139,14 @@ def main():
                 institutions = list(map(lambda f: os.path.basename(os.path.dirname(f)).split("-")[1], item["filename"]))
                 sf_data += institutions
                 gender_data += item["gender"]
+                slide_data += item["slide"]
     logging.info("Inference complete")
 
-    for name,group in [("Institution", sf_data), ("Gender", gender_data)]:
+    for name,group in [("Slide", slide_data), ("Institution", sf_data), ("Gender", gender_data)]:
         metrics_dict = {"accuracy": accuracy_score, "selection_rate": selection_rate, "count": count, "tp_rate": true_positive_rate, "tn_rate": true_negative_rate, "fp_rate": false_positive_rate, "fn_rate": false_negative_rate, "mean_pred": mean_prediction}
         mf = MetricFrame(metrics=metrics_dict, y_true=y_true, y_pred=y_pred, sensitive_features=group)
-        print(f"Metrics: {name}:")
-        print(mf.overall)
+        logging.info(f"Metrics: {name}:")
+        logging.info(mf.overall)
         out_path = os.path.join(args.out_dir, os.path.basename(os.path.dirname(args.feature_extractor)) + f"_{name}_distributions_fairness.csv")
         ensure_dir_exists(out_path)
         df = mf.by_group
@@ -157,7 +166,14 @@ def main():
                 f"Equalized Opportunity {tissue_types[1]}": [equalized_opportunity],
                 }
         df = pd.DataFrame(data)
-        print(df.to_string())
+        logging.info(df.to_string())
+        out_path = os.path.join(args.out_dir, os.path.basename(os.path.dirname(args.feature_extractor)) + f"_{name}_fairness.csv")
+        ensure_dir_exists(out_path)
+        df = df.round(3)
+        df.to_csv(out_path, index=False)
+        logging.info(f"Results (also written to {out_path}):")
+        pd.set_option('display.width', None)
+        logging.info(df.to_string(index=False))
 
         # tweak to your needs if there is a singular (or plural) that dominates the scores
         # indices = []
@@ -179,27 +195,12 @@ def main():
         # df = df.round(3)
         # df.to_csv(out_path, index=True)
 
-        equalized_opportunity = equalized_odds_difference(y_true, y_pred, sensitive_features=group)
-        demographic_parity = demographic_parity_difference(y_true, y_pred, sensitive_features=group)
-        equalized_odds = equalized_odds_difference(y_true, y_pred, sensitive_features=group)
-        data = {"Demographic Parity": [demographic_parity],
-                "Equalized Odds": [equalized_odds],
-                f"Equalized Opportunity {tissue_types[1]}": [equalized_opportunity],
-                }
-        df = pd.DataFrame(data)
-        out_path = os.path.join(args.out_dir, os.path.basename(os.path.dirname(args.feature_extractor)) + f"_{name}_fairness.csv")
-        ensure_dir_exists(out_path)
-        df = df.round(3)
-        df.to_csv(out_path, index=False)
-        logging.info(f"Results (also written to {out_path}):")
-        pd.set_option('display.width', None)
-        print(df.to_string(index=False))
 
     overall_data = train_data + val_data + test_data
     males = list(filter(lambda x: x["gender"] == "male", overall_data))
     females = list(filter(lambda x: x["gender"] == "female", overall_data))
     male_distribution = len(list(filter(lambda x: x["gender"] == "male", overall_data))) / (len(overall_data) / 100)
-    print(f"Of {len(overall_data)} patients, {len(males)} ({male_distribution:.2f}%) are male ({100.0-male_distribution}% female)")
+    logging.info(f"Of {len(overall_data)} patients, {len(males)} ({male_distribution:.2f}%) are male ({100.0-male_distribution}% female)")
     male_distribution_of_tumor = len(list(filter(lambda x: x[CommonKeys.LABEL] == tissue_types.index("Primary Tumor"), males))) / (len(males) / 100)
     female_distribution_of_tumor = len(list(filter(lambda x: x[CommonKeys.LABEL] == tissue_types.index("Primary Tumor"), females))) / (len(females) / 100)
     print(f"For males, {male_distribution_of_tumor}% of slides are primary tumors ({1.0-male_distribution_of_tumor}% are benign)")
