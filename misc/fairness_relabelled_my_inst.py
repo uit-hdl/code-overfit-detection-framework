@@ -96,6 +96,7 @@ def main():
             clinical_row = clinicalTable.loc[patient_id]
             ann = slide_annotations.loc[slide_id]
             ds[i][CommonKeys.LABEL] = labels.index(inst_id)
+            ds[i]["slide"] = slide_id
             ds[i]["gender"] = clinical_row['gender']
     logging.info("Annotations complete")
 
@@ -120,6 +121,7 @@ def main():
     y_true = []
     sf_data = []
     gender_data = []
+    slide_data = []
     model.eval()
     logging.info("Beginning inference")
     with torch.no_grad():
@@ -132,6 +134,7 @@ def main():
                 institutions = os.path.basename(os.path.dirname(item["filename"][0])).split("-")[1]
                 sf_data.append(institutions)
                 gender_data.append(item["gender"])
+                slide_data.append(item["slide"])
             else:
                 am = pred.argmax(dim=1)
                 y_pred += am.tolist()
@@ -139,6 +142,7 @@ def main():
                 institutions = list(map(lambda f: os.path.basename(os.path.dirname(f)).split("-")[1], item["filename"]))
                 sf_data += institutions
                 gender_data += item["gender"]
+                slide_data += item["slide"]
     logging.info("Inference complete")
 
     # Using y_true and y_pred, compute accuracy
@@ -146,7 +150,7 @@ def main():
     logging.info(f"Accuracy: {accuracy}")
 
 
-    for name,group in [("Institution", sf_data), ("Gender", gender_data)]:
+    for name, group in [("Slide", slide_data), ("Institution", sf_data), ("Gender", gender_data)]:
         metrics_dict = {"accuracy": accuracy_score, "selection_rate": selection_rate, "count": count, "tp_rate": true_positive_rate, "tn_rate": true_negative_rate, "fp_rate": false_positive_rate, "fn_rate": false_negative_rate, "mean_pred": mean_prediction}
         metrics_dict = {"accuracy": accuracy_score, "count": count, "mean_pred": mean_prediction}
         mf = MetricFrame(metrics=metrics_dict, y_true=y_true, y_pred=y_pred, sensitive_features=group)
