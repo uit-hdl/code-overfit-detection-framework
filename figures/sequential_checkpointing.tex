@@ -1,19 +1,19 @@
-\documentclass{article}
-\usepackage{tikz}
+\documentclass[tikz, margin=5]{standalone}
 \usetikzlibrary{shapes.geometric, arrows, positioning, decorations.pathreplacing, calc, matrix, fit}
 
 
 \begin{document}
 
-\begin{figure}[h!]
 \begin{tikzpicture}[
-  inner/.style={circle,draw=blue!50,fill=blue!20,thick,inner sep=3pt},
-  outer/.style={draw=green,fill=green!20,thick,inner sep=10pt},
+  inner/.style={circle,draw=blue!50,fill=blue!20,thick,inner sep=1pt},
+  outer/.style={draw=green,fill=green!20,thick,inner sep=04pt},
   ]
+\def\ysep{1cm}
+
 
 \node[] (plain) {
 \begin{tikzpicture}[
-    node distance=1cm and 1.5cm,
+    node distance=0.3cm and 1.2cm,
     every node/.style={circle, draw, minimum size=0.75cm},
     orange/.style={fill=orange},
     red/.style={fill=red},
@@ -27,18 +27,18 @@
 \node[orange, right=of n2] (n3) {};
 \node[right=of n3] (n4) {};
 \node[orange, right=of n4] (n5) {};
-\node[above=-0.8cm of n2, draw=none] (t1) {Forward pass $\Rightarrow$};
+\node[above=-0.8cm of n3, draw=none] (t1) {Forward pass $\Rightarrow$};
 
 \draw[->] (n1) -- (n2);
 \draw[->] (n2) -- (n3);
 \draw[->] (n3) -- (n4);
 \draw[->] (n4) -- (n5);
 
-\node[below=2cm of n2] (n6) {};
-\node[below=2cm of n3] (n7) {};
-\node[below=2cm of n4] (n8) {};
-\node[gray, below=2cm of n5] (n9) {};
-\node[orange, right=2cm of n9] (n10) {};
+\node[below=\ysep of n2] (n6) {};
+\node[below=\ysep of n3] (n7) {};
+\node[below=\ysep of n4] (n8) {};
+\node[gray, below=\ysep of n5] (n9) {};
+\node[orange, right=1.2cm of n9] (n10) {};
 
 \draw[->] (n7) -- (n6);
 \draw[->] (n8) -- (n7);
@@ -57,9 +57,11 @@
 \end{tikzpicture}
 };
 
+\node[above left=-1.0cm and -2.5cm of plain, draw=none] (caption) {Regular computations:};
+
 \node[below=0.0cm of plain] (seqckpt) {
 \begin{tikzpicture}[
-    node distance=1cm and 1.5cm,
+    node distance=0.3cm and 1.2cm,
     every node/.style={circle, draw, minimum size=0.75cm},
     orange/.style={fill=orange},
     red/.style={fill=red},
@@ -79,11 +81,11 @@
 \draw[->] (n3) -- (n4);
 \draw[->] (n4) -- (n5);
 
-\node[below=2cm of n2] (n6) {};
-\node[below=2cm of n3] (n7) {};
-\node[below=2cm of n4] (n8) {};
-\node[gray, below=2cm of n5] (n9) {};
-\node[orange, right=2cm of n9] (n10) {};
+\node[below=\ysep of n2] (n6) {};
+\node[below=\ysep of n3] (n7) {};
+\node[below=\ysep of n4] (n8) {};
+\node[gray, below=\ysep of n5] (n9) {};
+\node[orange, right=1.2cm of n9] (n10) {};
 
 \draw[->] (n7) -- (n6);
 \draw[->] (n8) -- (n7);
@@ -95,13 +97,36 @@
 \draw[->] (n4) -- (n8);
 \draw[->] (n5) -- (n9);
 
-% \node[below=0.5cm of n5, draw=none, align=center] (t2) {Orange nodes are the ones \\ kept in memory to compute \\ the gradient update for this node};
+\end{tikzpicture}
+};
+\node[above left=0.5cm and -2.5cm of seqckpt, draw=none, ] (t2) {Sequential Checkpointing};
 
+\def\legendS{0.2cm}
+\def\legendSep{-0.5}
+\node[above right=-3.0cm and 1cm of plain, draw] (legend) {
+  \begin{tikzpicture}
+\normalsize
+\fill[orange] (0,0) circle (\legendS);
+\node[right] at (0.6,0) {Stored in-memory};
+
+\fill[gray] (0,\legendSep) circle (\legendS);
+\node[right] at (0.6,\legendSep) {To be computed};
+
+\draw[thick] (0,2*\legendSep) circle (\legendS);
+\fill[white] (0,2*\legendSep) circle (\legendS);
+\node[right] at (0.6,2*\legendSep) {Activation};
+
+\draw[thick] (0,3*\legendSep) circle (\legendS);
+\fill[red] (0,3*\legendSep) circle (\legendS);
+\node[right] at (0.6,3*\legendSep) {Checkpoint};
+
+\draw[thick] (0,4*\legendSep) circle (\legendS);
+\fill[blue] (0,4*\legendSep) circle (\legendS);
+\node[right] at (0.6,4*\legendSep) {Re-computed};
 \end{tikzpicture}
 };
 
-\end{tikzpicture}
-\end{figure}
 
+\end{tikzpicture}
 \end{document}
 

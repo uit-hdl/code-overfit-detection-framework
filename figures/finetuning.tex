@@ -1,12 +1,10 @@
-\documentclass{article}
+\documentclass[tikz, margin=25mm]{standalone}
 \usepackage{tikz}
 \usetikzlibrary{shapes.geometric, arrows, positioning, decorations.pathreplacing, calc, matrix, fit}
 \usepackage[margin=0.5cm]{geometry}
 
 
 \begin{document}
-
-\begin{figure}[h!]
 
 \begin{tikzpicture}[node distance=2cm and 2cm,
   % every node/.style={inner sep=0,outer sep=0}
@@ -23,7 +21,7 @@
     \foreach \x in {1,...,4}
     {
       \node[yslant=0.5] (wsi\x) at (\x*.4,0) {
-        \includegraphics[width=.05\textwidth, height=.05\textheight]{./wsi\x.png}
+        \includegraphics[width=1.5cm, height=1.5cm]{./wsi\x.png}
       };
     }
   % Calculate the coordinates for the box
@@ -166,7 +164,5 @@
  
  
 \end{tikzpicture}
-\end{figure}
-
 \end{document}
 
