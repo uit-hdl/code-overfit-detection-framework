@@ -1,17 +1,15 @@
-\documentclass{article}
+\documentclass[tikz, margin=5mm]{standalone}
 \usepackage{tikz}
 \usetikzlibrary{shapes.geometric, arrows, positioning, decorations.pathreplacing, calc, matrix, fit}
-\usepackage[margin=0.5cm]{geometry}
+% \usepackage[margin=0.5cm]{geometry}
 
 
 \begin{document}
 
-\begin{figure}[h!]
-
 \begin{tikzpicture}[node distance=2cm and 2cm,
   % every node/.style={inner sep=0,outer sep=0}
   inner/.style={circle,draw=blue!50,fill=blue!20,thick},
-  outer/.style={draw=green,fill=green!20,thick,inner sep=10pt},
+  outer/.style={draw=black,fill=gray!05,thick,inner sep=10pt},
   mymatrix/.style={matrix of nodes, nodes=typetag, row sep=1em},
   mycontainer/.style={draw=gray, inner sep=1ex},
   typetag/.style={draw=gray, inner sep=1ex, anchor=west},
@@ -23,7 +21,7 @@
     \foreach \x in {1,...,4}
     {
       \node[yslant=0.5] (wsi\x) at (\x*.4,0) {
-        \includegraphics[width=.05\textwidth, height=.05\textheight]{./wsi\x.png}
+        \includegraphics[width=1.1cm, height=1.1cm]{./wsi\x.png}
       };
     }
   % Calculate the coordinates for the box
@@ -32,7 +30,7 @@
 
   % Draw the box around the images
   \draw[black, thick] (bottom left) rectangle (top right);
-  \node[below=0.0cm of bottom left, anchor=north west, text width=4.2cm, align=center] (label) {Training Data};
+  \node[below left=0.0cm and 0.9cm of bottom left, anchor=north west, text width=4.2cm, align=center] (label) {Training Data};
 
   \matrix[mymatrix, below=0.1cm of label, draw] (mx1) {
     |[title]| \\
@@ -40,7 +38,6 @@
     Sensitive Variables \\
   };
   \node[below=0.0cm of mx1, text width=4.2cm, align=center] (label) {Annotations};
-Annotations
 
   \end{tikzpicture}
 };
@@ -62,12 +59,12 @@ Annotations
       \node at ([shift={(2*\offset, -\numLayers*\offset - 1.5)}]Model) (ssl) {SSL Model};
 
 
-\node[below left=-.2cm and .-3cm of ssl] (monai) {
-  \includegraphics[width=.06\textwidth, height=.06\textheight]{./MONAI-logo-color.png}
+\node[below left=-.2cm and -1.35cm of ssl] (monai) {
+  \includegraphics[width=1.5cm, height=1.5cm]{./MONAI-logo-color.png}
 };
 
-\node[below right=0.1cm and .-3cm of ssl] (pytorch) {
-  \includegraphics[width=.06\textwidth, height=.06\textheight]{./Pytorch_logo.png}
+\node[below right=0.1cm and -1.35cm of ssl] (pytorch) {
+  \includegraphics[width=1.5cm, height=1.5cm]{./Pytorch_logo.png}
 };
 
 \end{tikzpicture}
@@ -77,7 +74,7 @@ Annotations
     \begin{tikzpicture}
 
       \node[yslant=0.5] (wsiMap) {
-        \includegraphics[width=.05\textwidth, height=.05\textheight]{./wsi1.png}
+        \includegraphics[width=1.1cm, height=1.1cm]{./wsi1.png}
       };
 
       \node[right=of wsiMap] (mapper) {
@@ -105,7 +102,6 @@ Annotations
  
  
 \end{tikzpicture}
-\end{figure}
 
 \end{document}
 

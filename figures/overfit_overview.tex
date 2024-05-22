@@ -1,4 +1,4 @@
-\documentclass{article}
+\documentclass[tikz, margin=30mm]{standalone}
 \usepackage{tikz}
 \usetikzlibrary{shapes.geometric, arrows, positioning, decorations.pathreplacing, calc, matrix, fit}
 \usepackage[margin=0.5cm]{geometry}
@@ -6,12 +6,10 @@
 
 \begin{document}
 
-\begin{figure}[h!]
-
 \begin{tikzpicture}[node distance=2cm and 2cm,
   % every node/.style={inner sep=0,outer sep=0}
-  inner/.style={draw=black!80,fill=green!20,thick, inner sep=04pt},
-  outer/.style={draw=green,fill=green!20,thick,inner sep=08pt},
+  inner/.style={draw=black!80,fill=gray!20,thick, inner sep=04pt},
+  outer/.style={draw=black,fill=gray!10,thick,inner sep=08pt},
   mymatrix/.style={matrix of nodes, nodes=typetag, row sep=1em},
   mycontainer/.style={draw=gray, inner sep=1ex},
   typetag/.style={draw=gray, inner sep=1ex, anchor=west},
@@ -23,7 +21,7 @@
     \foreach \x in {1,...,4}
     {
       \node[yslant=0.5] (wsi\x) at (\x*.4,0) {
-        \includegraphics[width=.05\textwidth, height=.05\textheight]{./wsi\x.png}
+        \includegraphics[width=1.1cm, height=1.1cm]{./wsi\x.png}
       };
     }
   % Calculate the coordinates for the box
@@ -37,7 +35,7 @@
     \foreach \x in {5,...,7}
     {
       \node[yslant=0.5] (wsi\x) at (3.5-\x*.4,-4) {
-        \includegraphics[width=.05\textwidth, height=.05\textheight]{./wsi\x.png}
+        \includegraphics[width=1.1cm, height=1.1cm]{./wsi\x.png}
       };
     }
   % Calculate the coordinates for the box
@@ -80,14 +78,14 @@
   \node[inner, remember picture] (finetune) {
     \begin{tikzpicture}
   \node[] (monai) {
-    \includegraphics[width=.06\textwidth, height=.06\textheight]{./MONAI-logo-color.png}
+    \includegraphics[width=1.5cm, height=1.5cm]{./MONAI-logo-color.png}
   };
 
       \node[below=0.0cm of monai]  (pytorch) {
-    \includegraphics[width=.06\textwidth, height=.06\textheight]{./Pytorch_logo.png}
+    \includegraphics[width=1.5cm, height=1.5cm]{./Pytorch_logo.png}
   };
 \end{tikzpicture} };
-  \node[below=0.0cm of finetune, text width=4.2cm, align=center] (label3) {Finetune};
+  \node[below=0.0cm of finetune, text width=4.2cm, align=center] (label3) {Sensitive variable TL};
 
 
       \node[inner, remember picture, below=0.1cm of label3] (UMAP) { UMAP };
@@ -115,7 +113,6 @@
  
  
 \end{tikzpicture}
-\end{figure}
 
 \end{document}
 
