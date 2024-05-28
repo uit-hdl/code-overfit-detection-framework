@@ -66,7 +66,7 @@
     \draw[fill=blue!30, opacity=0.9] ([shift={(\shiftX, \shiftY)}]Model) rectangle ++(.4,-2);
 }
 
-      \node at ([shift={(2*\offset, -\numLayers*\offset - 1.5)}]Model) (ssl) {SSL Model};
+      \node at ([shift={(2*\offset, -\numLayers*\offset - 1.5)}]Model) (ssl) {Model};
 
   \end{tikzpicture}
 };
@@ -85,15 +85,46 @@
     \includegraphics[width=1.5cm, height=1.5cm]{./Pytorch_logo.png}
   };
 \end{tikzpicture} };
-  \node[below=0.0cm of finetune, text width=4.2cm, align=center] (label3) {Sensitive variable TL};
+  \node[inner, remember picture, below=0.1cm of finetune] (labelFine) { Sensitive Variable TL };
 
+  \node[below=0.0cm of labelFine, text width=4.2cm, align=center] (UMAP) {
+    \begin{tikzpicture}
+      \node[] (umap) {
+        \includegraphics[width=1.5cm, height=1.5cm]{./simpleUmap.png}
+      };
+      \node[inner, remember picture, below=0.1cm of umap] (labelUmap) { UMAP };
+    \end{tikzpicture}
+    };
 
-      \node[inner, remember picture, below=0.1cm of label3] (UMAP) { UMAP };
-
-      \node[inner, remember picture, below=0.4cm of UMAP] (fairness) { Fairness measuring };
-
-\end{tikzpicture}
-  };
+\node[inner, remember picture, below=0.4cm of UMAP] (fairness) { 
+    \begin{tikzpicture}
+  \node[] (fairness) { 
+    \begin{tikzpicture}[line width=1mm, scale=.3]
+        % Draw the base
+        \draw (-3,0) -- (3,0);
+        % Draw the vertical post
+        \draw (0,0) -- (0,4);
+        % Draw the horizontal beam
+        \draw (-2,4) -- (2,4);
+        % Draw the fulcrum
+        \filldraw[black] (0,4) circle (4pt);
+        % Draw the left scale
+        \draw (-2,4) -- (-2.5,2);
+        \draw (-2,4) -- (-1.5,2);
+        \draw (-2.5,2) -- (-1.5,2);
+        \draw (-1.5,2) arc[start angle=0,end angle=-180,radius=0.5];
+        % Draw the right scale
+        \draw (2,4) -- (1.5,2);
+        \draw (2,4) -- (2.5,2);
+        \draw (2.5,2) -- (1.5,2);
+        \draw (2.5,2) arc[start angle=0,end angle=-180,radius=0.5];
+      \end{tikzpicture}
+    };
+      \node[inner, remember picture, below=0.1cm of fairness] (labelFairness) { Fairness Measuring };
+  \end{tikzpicture}
+};
+  \end{tikzpicture}
+      };
 
 \node[outer, remember picture, right=1.8 of Overfit] (output) {
     \begin{tikzpicture}
