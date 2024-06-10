@@ -100,7 +100,6 @@ class MoCo(nn.Module):
         gpu_idx = torch.distributed.get_rank()
         idx_this = idx_shuffle.view(num_gpus, -1)[gpu_idx]
         return x_gather[idx_this], idx_unshuffle
-
     @torch.no_grad()
     def _batch_unshuffle_ddp(self, x, idx_unshuffle):
         """

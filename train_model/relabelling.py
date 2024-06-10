@@ -50,6 +50,8 @@ parser = argparse.ArgumentParser(description='Extract embeddings ')
 
 parser.add_argument('--epochs', default=10, type=int, metavar='N', help='number of total epochs to run')
 parser.add_argument('--feature_extractor',
+                    #default="./out/MoCo/tiles-no-color-normalization/model/checkpoint_MoCo_tiles-no-color-normalization_0040_False_m64_n0_o0_K64.pth.tar",
+                    #default='./model_out2b1413ba2b3df0bcd9e2c56bdbea8d2c7f875d1e/MoCo/tiles/model/checkpoint_MoCo_tiles_0200_False_m256_n0_o0_K256.pth.tar',
                     #default='./model_out2b1413ba2b3df0bcd9e2c56bdbea8d2c7f875d1e/MoCo/tiles/model/checkpoint_MoCo_tiles_0200_False_m256_n0_o0_K256.pth.tar',
                     default='./model_out2b1413ba2b3df0bcd9e2c56bdbea8d2c7f875d1e/MoCo/tiles/model/checkpoint_MoCo_tiles_0200_True_m256_n0_o4_K256.pth.tar',
                     type=str, help='path to feature extractor, which will extract features from tiles')
@@ -62,7 +64,7 @@ parser.add_argument('--src-dir', default=os.path.join('Data', 'TCGA_LUSC', 'tile
 parser.add_argument('--out-dir', default='./out', type=str, help='path to save extracted embeddings')
 parser.add_argument('--slide_annotation_file', default=os.path.join('annotations', 'slide_label', 'gdc_sample_sheet.2023-08-14.tsv'), type=str,
                     help='"Sample sheet" from TCGA, see README.md for instructions on how to get sheet')
-parser.add_argument('-b', '--batch-size', default=256, type=int,
+parser.add_argument('-b', '--batch-size', default=64, type=int,
                     metavar='N', help=f'batch size, this is the total batch size of all GPUs on the current node when using Data Parallel or Distributed Data Parallel')
 parser.add_argument('--debug-mode', default=False, type=bool, action=argparse.BooleanOptionalAction,
                     metavar='D', help='turn debugging on or off. Will limit amount of data used. Development only', dest='debug_mode')
@@ -245,7 +247,7 @@ def wrap_data(train_data, val_data, test_data, slide_annotations, labels, label_
     if label_key == "my_inst":
         for entry in train_data:
             l = entry['label']
-            if insts_used[l] > 5000:
+            if insts_used[l] > 200:
                 continue
             insts_used[l] += 1
             ds_train_use.append(entry)
@@ -319,12 +321,13 @@ def main():
     load_model(model, args.feature_extractor, device)
     # TODO: "Since the number of acquisition sites was different among each group, the size of each model’s last layer was adjusted with respect to the number of institutions in each group"
     model = attach_layers(model, [500, 200], len(labels))
-    freeze_layers(model, exclude_vars="last_linear")
+    # TODO: the model is now not frozen
+    #freeze_layers(model, exclude_vars="last_linear")
     model.to(device)
 
     model_path = os.path.join(out_path, f"network_epoch={args.epochs}.pt")
     writer = SummaryWriter(log_dir=os.path.join(out_path, "runs"))
-    if os.path.exists(model_path):
+    if os.path.exists(model_path) and 1 == 0:
         logging.info(f"=> loading model '{model_path}'")
         model.load_state_dict(torch.load(model_path, map_location=device))
         logging.info('Model builder done')
@@ -334,8 +337,8 @@ def main():
         #model.to(device)
         params = generate_param_groups(network=model, layer_matches=[lambda x: x.last_linear], match_types=["select"],
                                        lr_values=[args.lr])
-        optimizer = torch.optim.Adam(params, args.lr)
-        #optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+        #optimizer = torch.optim.Adam(params, args.lr)
+        optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
         logging.info('Model builder done')
         if args.label_key == 'Sample Type':
             ratio_of_positives = 1 / (len(train_data) / len(list(filter(lambda l: l["label"] == 1, train_data))))

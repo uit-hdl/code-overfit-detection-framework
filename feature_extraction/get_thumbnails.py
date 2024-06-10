@@ -25,6 +25,7 @@ if __name__ == "__main__":
     Path(output_path).mkdir(parents=True, exist_ok=True)
 
     for i, directory in enumerate(glob.glob(f"{slide_path}{os.sep}*")):
+        print(directory)
         for filename in glob.glob(f"{directory}{os.sep}**{os.sep}*.svs", recursive=True):
             if os.path.isfile(filename):
                 get_thumbnail(filename, output_path)

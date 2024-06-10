@@ -30,8 +30,7 @@ from misc.global_util import ensure_dir_exists
 
 parser = argparse.ArgumentParser(description='Get cluster features')
 
-parser.add_argument('--embeddings-path-test-true', default='out/inceptionv4/checkpoint_MoCo_tiles_0200_True_m256_n0_o4_K256.pth.tar/cptac_tiles_embedding.pkl', type=str, help="location of embedding pkl from feature_extraction.py")
-parser.add_argument('--embeddings-path-test-false', default='out/inceptionv4/checkpoint_MoCo_tiles_0200_False_m256_n0_o0_K256.pth.tar/cptac_tiles_embedding.pkl', type=str, help="location of embedding pkl from feature_extraction.py")
+parser.add_argument('--embeddings-path-test', default='out/inceptionv4/checkpoint_MoCo_tiles_0200_True_m256_n0_o4_K256.pth.tar/cptac_tiles_embedding.pkl', type=str, help="location of embedding pkl from feature_extraction.py")
 parser.add_argument('--number-of-images', default=2999, type=int, help="how many images to sample for the UMAP plot")
 parser.add_argument('--histogram-bins', default=20, type=int, help="how many histogram buckets to use in each (x,y) dimension (e.g. 10 means 100 buckets in total)")
 parser.add_argument('--thumbnail-path', default='/Data/TCGA_LUSC/thumbnails', type=str, help="location of directory containing thumbnails")
@@ -344,7 +343,7 @@ def viz_data(mapper, data, names, knn, knc, cpd, thumbnail_path, out_html, umap_
 
     save(gp)
 
-def main(embeddings_path_test_true, embeddings_path_test_false, thumbnail_path, histogram_bins, number_of_images, out_dir):
+def main(embeddings_path_test, thumbnail_path, histogram_bins, number_of_images, out_dir):
     slide_annotations = pd.read_csv(args.slide_annotation_file, sep='\t', header=0)
     slide_annotations = slide_annotations[['slide_submitter_id', 'sample_id']]
 
@@ -354,7 +353,7 @@ def main(embeddings_path_test_true, embeddings_path_test_false, thumbnail_path, 
     df = slide_annotations.merge(sample_annotations, on='sample_id')
     df = df.set_index('slide_submitter_id')
 
-    for label,embeddings_path_test in [("true", embeddings_path_test_true), ("false", embeddings_path_test_false)]:
+    for label,embeddings_path_test in [("cptac", embeddings_path_test)]:
         print(f"Loading embeddings from {embeddings_path_test}")
         features = pickle.load(open(embeddings_path_test, 'rb'))
 
@@ -386,11 +385,11 @@ def main(embeddings_path_test_true, embeddings_path_test_false, thumbnail_path, 
             plot.set_skewness(skewness)
             umap_plots.append(plot)
 
-        out_html = os.path.join(out_dir, "web", "cptac", f"condssl_out_{label}_{number_of_images}_{histogram_bins}.html")
+        out_html = os.path.join(out_dir, "web", "cptac", f"condssl_cptac_out_{label}_{number_of_images}_{histogram_bins}.html")
         ensure_dir_exists(out_html)
 
         viz_data(mapper, data, keys_chosen, knn, knc, cpd, thumbnail_path, out_html, umap_plots)
 
 if __name__ == "__main__":
     args = parser.parse_args()
-    main(args.embeddings_path_test_true, args.embeddings_path_test_false, args.thumbnail_path, args.histogram_bins, args.number_of_images, args.out_dir)
+    main(args.embeddings_path_test, args.thumbnail_path, args.histogram_bins, args.number_of_images, args.out_dir)

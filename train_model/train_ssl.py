@@ -130,6 +130,8 @@ def train(train_loader, model, criterion, optimizer, max_epochs, lr, cos, schedu
                 with Range("Dataload") if is_profiling else no_profiling:
                     batch_data = next(train_loader_iterator)
                     images_q, images_k = batch_data['q'].cuda(), batch_data['k'].cuda()
+                    import ipdb; ipdb.set_trace()
+
                 with Range("forward") if is_profiling else no_profiling:
                     output, target = model(im_q=images_q, im_k=images_k)
                     loss = criterion(output, target)
@@ -333,6 +335,7 @@ def main():
         base_encoder=InceptionV4, dim=args.moco_dim, K=args.moco_k, m=args.moco_m, T=args.moco_t, mlp=args.mlp, condition=args.condition, do_checkpoint=args.is_seq_ckpt)
 
     model = model.cuda()
+    import ipdb; ipdb.set_trace()
     if is_distributed:
         model = torch.nn.parallel.DistributedDataParallel(model)
     optimizer = torch.optim.SGD(model.parameters(), args.lr,
