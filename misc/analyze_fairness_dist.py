@@ -41,7 +41,6 @@ def main():
             # Print number of slides with selection_rate < 0.9 but bigger than 0.0
             print(df[df["selection_rate"] < 1.0][df["selection_rate"] > 0.0].shape[0])
 
-
     #combined_df = pd.concat(dataframes)
     #avg_df = combined_df.groupby("sensitive_feature_0").mean()
     #print(avg_df.to_string())

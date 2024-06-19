@@ -152,7 +152,6 @@ def main():
         df = mf.by_group
         df = df.round(3)
         df.to_csv(out_path, index=True)
-        import ipdb; ipdb.set_trace()
 
         demographic_parity = demographic_parity_difference(y_true, y_pred, sensitive_features=group)
         equalized_odds = equalized_odds_difference(y_true, y_pred, sensitive_features=group)
