@@ -27,6 +27,8 @@ class BasicConv2d(nn.Module):
         return x
 
 if __name__ == "__main__":
+    ## This code verifies that the conditional sampling yields identical results to non-conditional sampling
+
     import random
     import numpy as np
     def reset_seeds():

@@ -7,6 +7,8 @@ from pathlib import Path
 import logging
 import re
 
+from monai.utils import CommonKeys
+
 institution_lookup = {
     "01": "International Genomics Consortium",
     "02": "MD Anderson Cancer Center",
@@ -857,7 +859,34 @@ def add_dir(directory):
             all_data.append({"q": filename, "k": filename, 'filename': filename})
     return all_data
 
-def build_file_list(data_dir, file_list_path):
+def build_splits(labels, splits=None):
+    if not splits:
+        splits = [0.7, 0.1, 0.2]
+    all_data = []
+    for row in labels.iterrows():
+        all_data.append({CommonKeys.IMAGE: row[1]["filename"], CommonKeys.LABEL: row[1][CommonKeys.LABEL]})
+
+    splits = lambda x: [int(x * splits[0]), int(x * splits[1]), int(x * splits[2])]
+    splits = splits(len(labels))
+    #splits = splits(len(all_data))
+    for i, patient in enumerate(patients):
+        d = group_by_patient[patient]
+        if i < splits[0]:
+            train_data += d
+        elif i < splits[0] + splits[1]:
+            val_data += d
+        else:
+            test_data += d
+
+
+def build_file_list(labels, file_list_path, splits=None):
+    if not splits:
+        splits = [0.7, 0.1, 0.2]
+    # assume first column is a link to the image, unless there is a 'filename' column
+    for i, directory in enumerate(glob.glob(f"{data_dir}{os.sep}*")):
+        all_data += add_dir(directory)
+
+
     if not os.path.exists(file_list_path):
         print ("File list not found. Creating file list in {}".format(file_list_path))
         number_of_slides = len(glob.glob(f"{data_dir}{os.sep}*"))
@@ -882,7 +911,7 @@ def build_file_list(data_dir, file_list_path):
         # impose (a more) random ordering
         random.shuffle(patients)
         random.shuffle(institutions)
-        splits = lambda x: [int(x * 0.7), int(x * 0.1), int(x * 0.2)]
+        splits = lambda x: [int(x * splits[0]), int(x * splits[1]), int(x * splits[2])]
         splits = splits(len(patients))
         #splits = splits(len(all_data))
         for i, patient in enumerate(patients):
