@@ -75,6 +75,17 @@ parser.add_argument('--multiprocessing-distributed', action='store_true',
                          'fastest way to use PyTorch for either single node or '
                          'multi node data parallel training')
 parser.add_argument("--local_rank", type=int, default=0)
+parser.add_argument('--data-dir', default='./data/', type=str,
+                    help='path to source directory')
+parser.add_argument('--out-dir', default='./out/models/', type=str,
+                    help='path to output directory')
+parser.add_argument('--file-list-path', default='./out/files.csv', type=str, help='path to list of file splits')
+parser.add_argument('--batch_slide_num', default=4, type=int)
+parser.add_argument('--batch_inst_num', default=0, type=int)
+parser.add_argument('--condition', default=False, type=bool, action=argparse.BooleanOptionalAction,
+                    metavar='C', help='whether to use conditional sampling or not', dest='condition')
+parser.add_argument('--color-augment', default=True, type=bool, action=argparse.BooleanOptionalAction,
+                    metavar='co', help='whether to use image transformations during training')
 
 # moco specific configs:
 parser.add_argument('--moco-dim', default=128, type=int,
@@ -91,17 +102,6 @@ parser.add_argument('--mlp', action='store_true',
 parser.add_argument('--aug-plus', action='store_true',
                     help='use moco v2 data augmentation')
 parser.add_argument('--cos', action='store_true', default=True, help='use cosine lr schedule')
-parser.add_argument('--data-dir', default='./data/', type=str,
-                    help='path to source directory')
-parser.add_argument('--out-dir', default='./out/models/', type=str,
-                    help='path to output directory')
-parser.add_argument('--file-list-path', default='./out/files.csv', type=str, help='path to list of file splits')
-parser.add_argument('--batch_slide_num', default=4, type=int)
-parser.add_argument('--batch_inst_num', default=0, type=int)
-parser.add_argument('--color-augment', default=True, type=bool, action=argparse.BooleanOptionalAction,
-                    metavar='co', help='whether to use image transformations during training')
-parser.add_argument('--condition', default=False, type=bool, action=argparse.BooleanOptionalAction,
-                    metavar='C', help='whether to use conditional sampling or not', dest='condition')
 
 def train(train_loader, model, criterion, optimizer, max_epochs, lr, cos, schedule, out_path, model_filename, writer, is_profiling, is_distributed):
     writer.add_scalar("vram_available_device_0", torch.cuda.get_device_properties(0).total_memory / (1024*1024))
@@ -287,8 +287,8 @@ def main():
     if args.dist_url == "env://" and args.world_size == -1:
         args.world_size = int(os.environ["WORLD_SIZE"])
     is_distributed = args.world_size > 1 or args.multiprocessing_distributed
-    if is_distributed:
-        torch.distributed.init_process_group(args.dist_backend)
+    # if is_distributed:
+    #     torch.distributed.init_process_group(args.dist_backend)
 
     model_name = network.builder.MoCo.__name__
     data_dir_name = list(filter(None, args.data_dir.split(os.sep)))[-1]

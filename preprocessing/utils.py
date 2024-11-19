@@ -42,7 +42,7 @@ def wsi_to_tiles_no_normalization(slide_name, slide_dest, s):
                     continue
                 print("writing %s" % img_path)
                 img_tmp = img.read_region(location=(x, y), level=0, size=(sz, sz)) \
-                    .convert("RGB").resize((299, 299), Image.ANTIALIAS)
+                    .convert("RGB").resize((299, 299), Image.LANCZOS)
                 grad = getGradientMagnitude(np.array(img_tmp))
                 unique, counts = np.unique(grad, return_counts=True)
                 if counts[np.argwhere(unique <= 15)].sum() < 299 * 299 * s:
