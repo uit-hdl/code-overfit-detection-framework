@@ -20,41 +20,6 @@ from monai.utils import CommonKeys
 from misc.global_util import ensure_dir_exists
 
 
-def train(dl_train, dl_val, model, optimizer, loss, max_epochs, out_path, writer, device):
-    evaluator = SupervisedEvaluator(
-        device=device,
-        val_data_loader=dl_val,
-        network=model,
-        val_handlers=[
-            TensorBoardStatsHandler(writer, output_transform=lambda x: x),
-            CheckpointSaver(save_dir=out_path, save_dict={"net": model}, epoch_level=True, save_interval=10, n_saved=20),
-        ],
-        key_val_metric={
-            "val_acc": Accuracy(output_transform=from_engine([CommonKeys.PRED, CommonKeys.LABEL]))
-        },
-        postprocessing=Compose([EnsureTyped(keys=CommonKeys.PRED)]),
-    )
-
-    trainer = SupervisedTrainer(
-        device=device,
-        max_epochs=max_epochs,
-        train_data_loader=dl_train,
-        network=model,
-        optimizer=optimizer,
-        loss_function=loss,
-        inferer=SimpleInferer(),
-        key_train_metric={"train_acc": Accuracy(output_transform=from_engine([CommonKeys.PRED, CommonKeys.LABEL]))},
-        additional_metrics={"train_loss": Loss(output_transform=from_engine([CommonKeys.PRED, CommonKeys.LABEL], first=False), loss_fn=loss)},
-        train_handlers=[StatsHandler(tag_name="train_loss", output_transform=from_engine([CommonKeys.LOSS], first=True)),
-                         TensorBoardStatsHandler(writer, output_transform=lambda x: x),
-                         ValidationHandler(1, evaluator),
-                         ],
-    )
-
-    trainer.run()
-
-    return
-
 def get_username():
     if os.environ.get("USER"):
         return os.environ.get("USER")
@@ -80,16 +45,13 @@ def plot_distributions(data, mode, class_map, writer):
     ax.pie(count_per_label, labels=count_per_label.index, autopct='%1.1f%%')
     writer.add_figure(f"Label Distribution - {mode}", fig)
 
-def divide_data(files, balanced=True):
+def divide_data(files, balanced=True, train_ratio=0.7, val_ratio=0.15, test_ratio=0.15):
     n = len(files)
     if balanced:
-        train_ratio = 0.7
-        val_ratio = 0.15
-        test_ratio = 0.15
         # Group data by labels
         label_to_data = defaultdict(list)
         for item in files:
-            label_to_data[item['label']].append(item)
+            label_to_data[item[CommonKeys.LABEL]].append(item)
 
         min_samples_per_label = min(len(items) for items in label_to_data.values())
 
@@ -110,8 +72,9 @@ def divide_data(files, balanced=True):
             test_data.extend(ff[len(test_data):int(n * test_ratio)])
         return {"train": train_data, "validation": val_data, "test": test_data}
     else:
-        return {"train": files[:int(0.7 * n)], "validation": files[int(0.7 * n):int(0.85 * n)],
-                "test": files[int(0.85 * n):]}
+        return {"train": files[:int(train_ratio * n)],
+                "validation": files[int(train_ratio * n):int(1-val_ratio * n)],
+                "test": files[int(1-test_ratio * n):]}
 
 
 

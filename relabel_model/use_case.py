@@ -11,7 +11,8 @@ from monai.networks.utils import freeze_layers
 
 from misc.monai_boilerplate import init_tb_writer
 from network.inception_v4 import InceptionV4
-from relabel_model import finetune
+from time import time
+from relabel_model.finetune import FinetuneManager
 
 
 def load_model(net, model_path, device):
@@ -37,23 +38,18 @@ def main():
     parser = argparse.ArgumentParser(description='Extract embeddings ')
 
     parser.add_argument('--epochs', default=10, type=int, metavar='N', help='number of total epochs to run')
-    parser.add_argument('-b', '--batch-size', default=128, type=int,
+    parser.add_argument('-b', '--batch-size', default=512, type=int,
                         metavar='N',
                         help=f'batch size, this is the total batch size of all GPUs on the current node when using Data Parallel or Distributed Data Parallel')
     parser.add_argument('--feature-extractor',
                         # default='./model_out2b1413ba2b3df0bcd9e2c56bdbea8d2c7f875d1e/MoCo/tiles/model/checkpoint_MoCo_tiles_0200_False_m256_n0_o0_K256.pth.tar',
                         default=os.path.join('model_dir', 'checkpoint_MoCo_tiles_0200_False_m256_n0_o0_K256.pth.tar'),
                         type=str, help='path to trained model')
-    parser.add_argument('--dist-backend', default='nccl', type=str,
-                        help='distributed backend')
-    parser.add_argument('--is-distributed', action='store_true',
+    parser.add_argument('--distributed', type=bool, default=False, action=argparse.BooleanOptionalAction,
                         help='Use multi-processing distributed training to launch '
                              'N processes per node, which has N GPUs')
-    parser.add_argument('--label-file',
-                        default=os.path.join('annotation', 'TCGA', 'luad-lusc-joined-sample.tsv'), type=str,
-                        help='path to TCGA annotations')
-    parser.add_argument('--label-key', type=str,
-                        help='default key to use for doing fine-tuning. If not set, will use the first column in the label-file')
+    parser.add_argument('--label-file', type=str, help='path to file annotations')
+    parser.add_argument('--label-key', type=str, help='default key to use for doing fine-tuning. If not set, will use the first column in the label-file')
     parser.add_argument('--src-dir', default=os.path.join('Data', 'TCGA_LUSC', 'tiles'), type=str,
                         help='path to preprocessed slide images')
     parser.add_argument('--out-dir', default='./out', type=str, help='path to save extracted embeddings')
@@ -78,7 +74,8 @@ def main():
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     args = parser.parse_args()
 
-    writer = init_tb_writer(os.path.join(args.out_dir, "tb_logs"), args.tensorboard_name,
+    run_name = args.tensorboard_name or str(time())
+    writer = init_tb_writer(os.path.join(args.out_dir, "tb_logs"), run_name,
                             {
                                 "src-dir": args.src_dir,
                                 "epochs": args.epochs,
@@ -108,14 +105,23 @@ def main():
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = model.cuda()
-    if args.is_distributed:
-        torch.distributed.init_process_group(args.dist_backend)
-        model = torch.nn.parallel.DistributedDataParallel(model)
+    if args.distributed:
+        model = torch.nn.parallel.DataParallel(model)
 
-    finetune.assess_model(model, labels[label_key], writer, device, args.epochs,
-                          out_dir=args.out_dir,
-                          lr=args.lr,
-                          batch_size=args.batch_size)
+    finetune = FinetuneManager(model,
+                               labels[label_key],
+                               writer,
+                               device,
+                               args.epochs,
+                               out_dir=os.path.join(args.out_dir, "relabelled", run_name),
+                               lr=args.lr,
+                               batch_size=args.batch_size
+                               )
+    finetune.finetune_model()
+    # TODO: should be a separate function to evaluate a model. Should also be able to evaluate all models for saved checkpoints
+    # finetune.evaluate_models()
+
+    # TODO: create a separate evaluation for dinobloom
 
 if __name__ == "__main__":
     logging.basicConfig(stream=sys.stdout, level=logging.INFO)

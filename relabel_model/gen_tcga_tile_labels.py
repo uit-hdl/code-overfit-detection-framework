@@ -50,6 +50,7 @@ def main():
     logging.debug(all_data.head())
     ensure_dir_exists(args.out_file)
     all_data.to_csv(args.out_file, index=False)
+    logging.info("Wrote data to {}".format(args.out_file))
 #     '''
 #     annotations_files looks like this:
 # id,bcr_patient_barcode,type,age_at_initial_pathologic_diagnosis,gender,race,ajcc_pathologic_tumor_stage,clinical_stage,histological_type,histological_grade,initial_pathologic_dx_year,menopause_status,birth_days_to,vital_status,tumor_status,last_contact_days_to,death_days_to,cause_of_death,new_tumor_event_type,new_tumor_event_site,new_tumor_event_site_other,new_tumor_event_dx_days_to,treatment_outcome_first_course,margin_status,residual_tumor,OS,OS.time,DSS,DSS.time,DFI,DFI.time,PFI,PFI.time,Redaction
