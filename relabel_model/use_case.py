@@ -112,7 +112,7 @@ def main():
         torch.distributed.init_process_group(args.dist_backend)
         model = torch.nn.parallel.DistributedDataParallel(model)
 
-    finetune.assess_model(model, labels[label_key], writer, device,
+    finetune.assess_model(model, labels[label_key], writer, device, args.epochs,
                           out_dir=args.out_dir,
                           lr=args.lr,
                           batch_size=args.batch_size)

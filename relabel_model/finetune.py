@@ -21,7 +21,7 @@ from misc.monai_boilerplate import train, init_tb_writer, plot_distributions
 from relabel_model.evaluate_model import evaluate_model
 
 # TODO: seems like this is mostly data preparation, should be divided into a separate function
-def assess_model(model, labels_series, writer, device, out_dir="out", lr=1e-3, batch_size=64):
+def assess_model(model, labels_series, writer, device, epochs, out_dir="out", lr=1e-3, batch_size=64):
     """
     Assess the model on the given dataset
     """
@@ -55,5 +55,5 @@ def assess_model(model, labels_series, writer, device, out_dir="out", lr=1e-3, b
 
     out_pth = os.path.join(out_dir, "relabelled")
     ensure_dir_exists(out_pth)
-    train(dl_train, dl_val, model, optimizer, loss, 10, out_pth, writer, device)
+    train(dl_train, dl_val, model, optimizer, loss, epochs, out_pth, writer, device)
     evaluate_model(model, dl_test, class_map, writer, device)
