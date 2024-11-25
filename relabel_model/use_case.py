@@ -37,21 +37,26 @@ def main():
     parser = argparse.ArgumentParser(description='Extract embeddings ')
 
     parser.add_argument('--epochs', default=10, type=int, metavar='N', help='number of total epochs to run')
+    parser.add_argument('-b', '--batch-size', default=128, type=int,
+                        metavar='N',
+                        help=f'batch size, this is the total batch size of all GPUs on the current node when using Data Parallel or Distributed Data Parallel')
     parser.add_argument('--feature-extractor',
                         # default='./model_out2b1413ba2b3df0bcd9e2c56bdbea8d2c7f875d1e/MoCo/tiles/model/checkpoint_MoCo_tiles_0200_False_m256_n0_o0_K256.pth.tar',
                         default=os.path.join('model_dir', 'checkpoint_MoCo_tiles_0200_False_m256_n0_o0_K256.pth.tar'),
                         type=str, help='path to trained model')
+    parser.add_argument('--dist-backend', default='nccl', type=str,
+                        help='distributed backend')
+    parser.add_argument('--is-distributed', action='store_true',
+                        help='Use multi-processing distributed training to launch '
+                             'N processes per node, which has N GPUs')
     parser.add_argument('--label-file',
                         default=os.path.join('annotation', 'TCGA', 'luad-lusc-joined-sample.tsv'), type=str,
                         help='path to TCGA annotations')
-    parser.add_argument('--label-key', default='Sample Type', type=str,
-                        help='default key to use for doing fine-tuning. If set to "my_inst", will retrain using institution as label')
+    parser.add_argument('--label-key', type=str,
+                        help='default key to use for doing fine-tuning. If not set, will use the first column in the label-file')
     parser.add_argument('--src-dir', default=os.path.join('Data', 'TCGA_LUSC', 'tiles'), type=str,
                         help='path to preprocessed slide images')
     parser.add_argument('--out-dir', default='./out', type=str, help='path to save extracted embeddings')
-    parser.add_argument('-b', '--batch-size', default=256, type=int,
-                        metavar='N',
-                        help=f'batch size, this is the total batch size of all GPUs on the current node when using Data Parallel or Distributed Data Parallel')
     parser.add_argument('--debug-mode', default=False, type=bool, action=argparse.BooleanOptionalAction,
                         metavar='D', help='turn debugging on or off. Will limit amount of data used. Development only',
                         dest='debug_mode')
@@ -81,13 +86,16 @@ def main():
                                 "debug": str(args.debug_mode),
                             })
 
-
-    labels = pd.read_csv(args.labels_file, sep=",", header=0)
+    labels = pd.read_csv(args.label_file, sep=",", header=0)
     # set index to be the first column
     labels = labels.set_index(labels.columns[0])
 
+    label_key = args.label_key
+    if not args.label_key:
+        label_key = labels.columns[0]
+
     if args.debug_mode:
-        limit = 64
+        limit = 2 * args.batch_size
         args.epochs = min(3, args.epochs)
         labels = labels[:limit]
         logging.warning(f"Debug mode enabled. Only using {limit} samples in train and validation sets")
@@ -98,7 +106,13 @@ def main():
     model = attach_layers(model, [500, 200], len(labels))
     freeze_layers(model, exclude_vars="last_linear")
 
-    finetune.assess_model(model, labels[args.label_key], writer,
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = model.cuda()
+    if args.is_distributed:
+        torch.distributed.init_process_group(args.dist_backend)
+        model = torch.nn.parallel.DistributedDataParallel(model)
+
+    finetune.assess_model(model, labels[label_key], writer, device,
                           out_dir=args.out_dir,
                           lr=args.lr,
                           batch_size=args.batch_size)

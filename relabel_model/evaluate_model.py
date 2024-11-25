@@ -45,30 +45,35 @@ def evaluate_model(model, dl_test, class_map, writer, device):
                     wrong_predictions[class_map_inv[g]].append((item["filename"][i], g, p))
 
     i = 1
-    grid_size = min(10, min(map(lambda l: len(l), wrong_predictions.values())))
-    fig, axes = plt.subplots(nrows=len(wrong_predictions), ncols=grid_size, figsize=(16, 16), sharex=True, sharey=True)
-    plt.setp(axes, xticks=[], yticks=[])
-    fontsize = 6
-    for row,w in enumerate(wrong_predictions):
-        if len(wrong_predictions) == 1 or grid_size == 1:
-            axes[row].set_ylabel(f"GT: {w}", fontsize=fontsize)
-        else:
-            axes[row][0].set_ylabel(f"GT: {w}", fontsize=fontsize)
-        for col in range(grid_size):
-            image_filename, g, p = wrong_predictions[w][col]
+    if wrong_predictions:
+        grid_size = min(10, min(map(lambda l: len(l), wrong_predictions.values())))
+        fig, axes = plt.subplots(nrows=len(wrong_predictions), ncols=grid_size, figsize=(16, 16), sharex=True, sharey=True)
+        plt.setp(axes, xticks=[], yticks=[])
+        fontsize = 6
+        for row,w in enumerate(wrong_predictions):
             if len(wrong_predictions) == 1 or grid_size == 1:
-                axes[col].imshow(plt.imread(image_filename))
-                axes[col].set_title("pred: {}".format(class_map_inv[p]), fontsize=fontsize)
+                axes[row].set_ylabel(f"GT: {w}", fontsize=fontsize)
             else:
-                axes[row][col].imshow(plt.imread(image_filename))
-                axes[row][col].set_title("pred: {}".format(class_map_inv[p]))
-            i += 1
+                axes[row][0].set_ylabel(f"GT: {w}", fontsize=fontsize)
+            for col in range(grid_size):
+                image_filename, g, p = wrong_predictions[w][col]
+                if len(wrong_predictions) == 1 or grid_size == 1:
+                    axes[col].imshow(plt.imread(image_filename))
+                    axes[col].set_title("pred: {}".format(class_map_inv[p]), fontsize=fontsize)
+                else:
+                    axes[row][col].imshow(plt.imread(image_filename))
+                    axes[row][col].set_title("pred: {}".format(class_map_inv[p]))
+                i += 1
+    else:
+        fig, ax = plt.subplots()
+        ax.text(0.5, 0.5, "No wrong predictions", fontsize=12, ha='center')
+
     writer.add_figure("Wrong Predictions", fig, 0)
 
     labels = list(class_map_inv.values())
     plot_results(gts, predictions, labels, "test_acc", writer)
 
-    plot_distributions(dl_test.dataset, "test", class_map_inv, writer)
+    plot_distributions([x[CommonKeys.LABEL] for x in dl_test.dataset.data], "test", class_map_inv, writer)
 
 def plot_results(gts, predictions, labels, title, writer):
     cm = confusion_matrix(gts, predictions, labels=labels)

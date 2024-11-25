@@ -334,8 +334,8 @@ def main():
     model = condssl.builder.MoCo(
         base_encoder=InceptionV4, dim=args.moco_dim, K=args.moco_k, m=args.moco_m, T=args.moco_t, mlp=args.mlp, condition=args.condition, do_checkpoint=args.is_seq_ckpt)
 
+    #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = model.cuda()
-    import ipdb; ipdb.set_trace()
     if is_distributed:
         model = torch.nn.parallel.DistributedDataParallel(model)
     optimizer = torch.optim.SGD(model.parameters(), args.lr,
