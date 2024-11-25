@@ -1,6 +1,18 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+"""
+note to self:
+
+Interpreting these results is more difficult than intended, since DP and EO looks mostly at binary differences. I'm looking at institutions, where there's usually around 30 classes. And I think each institution in some cases have too few samples to give meaningful DP and EO ratios (measuring overall fairness/bias of the model)
+
+also, WSI datasets are "supposed" to have some bad data, with pen markers and dubious tissue. So DP and EO doesnt make that much sense unless I apply it to broad categories, like gender or race. Although that being said, it's nice to look at those numbers
+
+the much more simple "accuracy" work for identifying bad slides: when the accuracy is zero, it's bad.
+
+another idea might to look at "selection_rate" and measure overall how many slides that have non-1.0 and 0.0 values
+"""
+
 # orig paper: adds two new layers for classification and re-trains
 # https://github.com/TahDeh/TCGA_Acquisition_site_project/blob/main/tss-feature-extraction.ipynb
 # guide
