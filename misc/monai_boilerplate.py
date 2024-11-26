@@ -4,7 +4,7 @@ import os
 import sys
 import tempfile
 from collections import defaultdict
-from random import random
+import random
 from time import time
 
 import pandas as pd
@@ -43,9 +43,11 @@ def plot_distributions(data, mode, class_map, writer):
 
     fig, ax = plt.subplots()
     ax.pie(count_per_label, labels=count_per_label.index, autopct='%1.1f%%')
-    writer.add_figure(f"Label Distribution - {mode}", fig)
 
-def divide_data(files, balanced=True, train_ratio=0.7, val_ratio=0.15, test_ratio=0.15):
+    if writer:
+        writer.add_figure(f"Label Distribution - {mode}", fig)
+
+def divide_data(files, balanced=True, balanced_roundup=None, separate=False, train_ratio=0.7, val_ratio=0.15, test_ratio=0.15):
     n = len(files)
     if balanced:
         # Group data by labels
@@ -54,22 +56,46 @@ def divide_data(files, balanced=True, train_ratio=0.7, val_ratio=0.15, test_rati
             label_to_data[item[CommonKeys.LABEL]].append(item)
 
         min_samples_per_label = min(len(items) for items in label_to_data.values())
-
-        num_train = int(min_samples_per_label * train_ratio)
-        num_val = int(min_samples_per_label * val_ratio)
-        num_test = int(n * test_ratio)
+        if balanced_roundup:
+            min_samples_per_label = max(balanced_roundup, min_samples_per_label)
 
         train_data, val_data, test_data = [], [], []
 
-        for items in label_to_data.values():
-            random.shuffle(items)
-            train_data.extend(items[:num_train])
-            val_data.extend(items[num_train:num_train + num_val])
-            test_data.extend(items[num_train + num_val:num_train + num_val + num_test])
-        if len(test_data) < n * test_ratio:
-            ff = files.copy()
-            random.shuffle(ff)
-            test_data.extend(ff[len(test_data):int(n * test_ratio)])
+        # if we do not want to sample from the same class into the train, val, and test sets
+        # e.g. if we are training with tiles from the same slide, we (may) want tiles from the same slide to only be in one set
+        # if separate = False, e.g. if we are working with broader classes like cancer types, we want to sample from the same class into different sets
+        if separate:
+            added_items = 0
+            _n = min_samples_per_label * len(label_to_data)
+            num_train = int(_n * train_ratio)
+            num_val = int(_n * val_ratio)
+            num_test = int(_n * test_ratio)
+
+            for items in label_to_data.values():
+                random.shuffle(items)
+                to_add = items[:min_samples_per_label]
+                if added_items < num_train:
+                    train_data.extend(to_add)
+                elif added_items < num_train + num_val:
+                    val_data.extend(to_add)
+                else:
+                    test_data.extend(to_add)
+                added_items += len(to_add)
+        else:
+            for items in label_to_data.values():
+                random.shuffle(items)
+                _n = len(items)
+                num_train = int(_n * train_ratio)
+                num_val = int(_n * val_ratio)
+                num_test = int(n * test_ratio)
+
+                train_data.extend(items[:num_train])
+                val_data.extend(items[num_train:num_train + num_val])
+                test_data.extend(items[num_train + num_val:num_train + num_val + num_test])
+
+        number_of_samples = len(train_data) - len(val_data) - len(test_data)
+        pruned_entries = n - number_of_samples
+        logging.info(f"Balanced data with {min_samples_per_label} samples per label - this prunes away {pruned_entries} of {number_of_samples} entries for {len(label_to_data)} labels")
         return {"train": train_data, "validation": val_data, "test": test_data}
     else:
         return {"train": files[:int(train_ratio * n)],

@@ -33,6 +33,7 @@ class FinetuneManager:
                  out_dir="out",
                  lr=1e-3,
                  balanced=True,
+                 balanced_roundup=None,
                  train_ratio=0.7,
                  val_ratio=0.15,
                  test_ratio=0.15,
@@ -45,33 +46,18 @@ class FinetuneManager:
         self.out_dir = out_dir
         self.batch_size = batch_size
         self.lr = lr
-        filenames = labels_series.index.tolist()
-        self.class_map = {c: i for i, c in enumerate(labels_series.unique())}
+        self.class_map, self.dl_train, self.dl_val, self.dl_test = \
+            construct_datasets(labels_series, self.batch_size, balanced, balanced_roundup, train_ratio, val_ratio, test_ratio)
 
-        labels = [self.class_map[l] for l in labels_series.tolist()]
-        all_data = [{CommonKeys.IMAGE: f, CommonKeys.LABEL: l, "filename": f} for f,l in zip(filenames, labels)]
-        splits = divide_data(all_data, balanced=False, train_ratio=train_ratio, val_ratio=val_ratio, test_ratio=test_ratio)
-        train_data, val_data, test_data = splits['train'], splits['validation'], splits['test']
         if self.writer:
             self.writer.add_text("Train ratio", str(train_ratio), 0)
             self.writer.add_text("Val ratio", str(val_ratio), 0)
             self.writer.add_text("Test ratio", str(test_ratio), 0)
 
-        transformations = mt.Compose(
-            [
-                mt.LoadImaged([CommonKeys.IMAGE], image_only=True),
-                mt.EnsureChannelFirstd([CommonKeys.IMAGE]),
-                mt.ToTensord([CommonKeys.IMAGE], track_meta=False),
-                mt.EnsureTyped([CommonKeys.IMAGE, CommonKeys.LABEL], track_meta=False),
-            ])
-
-        ds_train = Dataset(train_data, transformations)
-        ds_val = Dataset(val_data, transformations)
-        ds_test = Dataset(test_data, transformations)
-
-        self.dl_train = DataLoader(ds_train, batch_size=batch_size, drop_last=True, shuffle=True)
-        self.dl_val = DataLoader(ds_val, batch_size=batch_size, shuffle=True)
-        self.dl_test = DataLoader(ds_test, batch_size=batch_size, shuffle=True)
+            class_map_inv = {v: k for k, v in self.class_map.items()}
+            plot_distributions([x[CommonKeys.LABEL] for x in self.dl_train.dataset.data], "train", class_map_inv, writer)
+            plot_distributions([x[CommonKeys.LABEL] for x in self.dl_val.dataset.data], "validation", class_map_inv, writer)
+            plot_distributions([x[CommonKeys.LABEL] for x in self.dl_test.dataset.data], "test", class_map_inv, writer)
 
     def finetune_model(self):
         if self.writer:
@@ -124,71 +110,101 @@ class FinetuneManager:
         trainer.run()
 
         return
-
     def evaluate_model(self):
-        predictions = []
-        gts = []
-        logging.info('Evaluating model')
-        wrong_predictions = defaultdict(list)
-        class_map_inv = {v: k for k, v in self.class_map.items()}
-        with eval_mode(self.model):
-            for item in tqdm(self.dl_test):
-                y = self.model(item["image"].to(self.device))
-                prob = F.softmax(y).detach().to("cpu")
-                pred = torch.argmax(prob, dim=1).numpy()
+        evaluate_model(self.model, self.dl_test, self.class_map, writer=self.writer, device=self.device)
 
-                predictions += list(class_map_inv[x] for x in pred)
+def construct_datasets(labels_series, batch_size, balanced = False, balanced_roundup= None, train_ratio = 0.7, val_ratio = 0.15, test_ratio = 0.15):
+    class_map = {c: i for i, c in enumerate(labels_series.unique())}
+    filenames = labels_series.index.tolist()
+    labels = [class_map[l] for l in labels_series.tolist()]
+    all_data = [{CommonKeys.IMAGE: f, CommonKeys.LABEL: l, "filename": f} for f,l in zip(filenames, labels)]
 
-                gt = item[CommonKeys.LABEL].detach().cpu().numpy()
-                gts += list(class_map_inv[x] for x in gt)
-                for i,(p,g) in enumerate(zip(pred, gt)):
-                    if p != g:
-                        wrong_predictions[class_map_inv[g]].append((item["filename"][i], g, p))
+    splits = divide_data(all_data, balanced=balanced, balanced_roundup=balanced_roundup,
+                         separate=True,
+                         train_ratio=train_ratio, val_ratio=val_ratio, test_ratio=test_ratio)
+    train_data, val_data, test_data = splits['train'], splits['validation'], splits['test']
 
-        i = 1
-        if wrong_predictions:
-            grid_size = min(10, min(map(lambda l: len(l), wrong_predictions.values())))
-            fig, axes = plt.subplots(nrows=len(wrong_predictions), ncols=grid_size, figsize=(16, 16), sharex=True, sharey=True)
-            plt.setp(axes, xticks=[], yticks=[])
-            fontsize = 6
-            for row,w in enumerate(wrong_predictions):
+    transformations = mt.Compose(
+        [
+            mt.LoadImaged([CommonKeys.IMAGE], image_only=True),
+            mt.EnsureChannelFirstd([CommonKeys.IMAGE]),
+            mt.ToTensord([CommonKeys.IMAGE], track_meta=False),
+            mt.EnsureTyped([CommonKeys.IMAGE, CommonKeys.LABEL], track_meta=False),
+        ])
+
+    ds_train = Dataset(train_data, transformations)
+    ds_val = Dataset(val_data, transformations)
+    ds_test = Dataset(test_data, transformations)
+
+    dl_train = DataLoader(ds_train, batch_size=batch_size, drop_last=True, shuffle=True)
+    dl_val = DataLoader(ds_val, batch_size=batch_size, shuffle=True)
+    dl_test = DataLoader(ds_test, batch_size=batch_size, shuffle=True)
+
+    return class_map, dl_train, dl_val, dl_test
+
+def evaluate_model(model, dl_test, class_map, device="cpu", writer=None):
+    predictions = []
+    gts = []
+    logging.info('Evaluating model')
+    wrong_predictions = defaultdict(list)
+    class_map_inv = {v: k for k, v in class_map.items()}
+    with eval_mode(model):
+        for item in tqdm(dl_test):
+            y = model(item["image"].to(device))
+            prob = F.softmax(y).detach().to("cpu")
+            pred = torch.argmax(prob, dim=1).numpy()
+
+            predictions += list(class_map_inv[x] for x in pred)
+
+            gt = item[CommonKeys.LABEL].detach().cpu().numpy()
+            gts += list(class_map_inv[x] for x in gt)
+            for i,(p,g) in enumerate(zip(pred, gt)):
+                if p != g:
+                    wrong_predictions[class_map_inv[g]].append((item["filename"][i], g, p))
+
+    i = 1
+    if wrong_predictions:
+        grid_size = min(10, min(map(lambda l: len(l), wrong_predictions.values())))
+        fig, axes = plt.subplots(nrows=len(wrong_predictions), ncols=grid_size, figsize=(16, 16), sharex=True, sharey=True)
+        plt.setp(axes, xticks=[], yticks=[])
+        fontsize = 6
+        for row,w in enumerate(wrong_predictions):
+            if len(wrong_predictions) == 1 or grid_size == 1:
+                axes[row].set_ylabel(f"GT: {w}", fontsize=fontsize)
+            else:
+                axes[row][0].set_ylabel(f"GT: {w}", fontsize=fontsize)
+            for col in range(grid_size):
+                image_filename, g, p = wrong_predictions[w][col]
                 if len(wrong_predictions) == 1 or grid_size == 1:
-                    axes[row].set_ylabel(f"GT: {w}", fontsize=fontsize)
+                    axes[col].imshow(plt.imread(image_filename))
+                    axes[col].set_title("pred: {}".format(class_map_inv[p]), fontsize=fontsize)
                 else:
-                    axes[row][0].set_ylabel(f"GT: {w}", fontsize=fontsize)
-                for col in range(grid_size):
-                    image_filename, g, p = wrong_predictions[w][col]
-                    if len(wrong_predictions) == 1 or grid_size == 1:
-                        axes[col].imshow(plt.imread(image_filename))
-                        axes[col].set_title("pred: {}".format(class_map_inv[p]), fontsize=fontsize)
-                    else:
-                        axes[row][col].imshow(plt.imread(image_filename))
-                        axes[row][col].set_title("pred: {}".format(class_map_inv[p]))
-                    i += 1
-        else:
-            fig, ax = plt.subplots()
-            ax.text(0.5, 0.5, "No wrong predictions", fontsize=12, ha='center')
+                    axes[row][col].imshow(plt.imread(image_filename))
+                    axes[row][col].set_title("pred: {}".format(class_map_inv[p]))
+                i += 1
+    else:
+        fig, ax = plt.subplots()
+        ax.text(0.5, 0.5, "No wrong predictions", fontsize=12, ha='center')
 
-        if self.writer:
-            self.writer.add_figure("Wrong Predictions", fig, 0)
+    if writer:
+        writer.add_figure("Wrong Predictions", fig, 0)
 
-        labels = list(class_map_inv.values())
-        self._plot_results(gts, predictions, labels, "test_acc")
+    labels = list(class_map_inv.values())
+    plot_results(gts, predictions, labels, "test_acc")
 
-        plot_distributions([x[CommonKeys.LABEL] for x in self.dl_test.dataset.data], "test", class_map_inv, self.writer)
+    plot_distributions([x[CommonKeys.LABEL] for x in dl_test.dataset.data], "test", class_map_inv, writer)
 
-    def _plot_results(self, gts, predictions, labels, title):
-        cm = confusion_matrix(gts, predictions, labels=labels)
-        correct_classifications = sum([cm[i][i] for i in range(len(labels))])
-        wrong_classifications = len(gts) - correct_classifications
-        total = correct_classifications + wrong_classifications
-        disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=labels)
-        cmd = disp.plot(ax=plt.subplots(1, 1, facecolor="white")[1])
-        fig = cmd.ax_.get_figure()
-        fig.set_figwidth(20)
-        fig.set_figheight(20)
+def plot_results(gts, predictions, labels, title, writer=None):
+    cm = confusion_matrix(gts, predictions, labels=labels)
+    correct_classifications = sum([cm[i][i] for i in range(len(labels))])
+    wrong_classifications = len(gts) - correct_classifications
+    total = correct_classifications + wrong_classifications
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=labels)
+    cmd = disp.plot(ax=plt.subplots(1, 1, facecolor="white")[1])
+    fig = cmd.ax_.get_figure()
+    fig.set_figwidth(20)
+    fig.set_figheight(20)
 
-        if self.writer:
-            self.writer.add_scalar(title, correct_classifications / total, 0)
-            self.writer.add_figure(f"Confusion Matrix - {title}", cmd.figure_)
-
+    if writer:
+        writer.add_scalar(title, correct_classifications / total, 0)
+        writer.add_figure(f"Confusion Matrix - {title}", cmd.figure_)
