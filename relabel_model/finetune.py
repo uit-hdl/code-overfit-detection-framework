@@ -120,7 +120,7 @@ def construct_datasets(labels_series, batch_size, balanced = False, balanced_rou
     all_data = [{CommonKeys.IMAGE: f, CommonKeys.LABEL: l, "filename": f} for f,l in zip(filenames, labels)]
 
     splits = divide_data(all_data, balanced=balanced, balanced_roundup=balanced_roundup,
-                         separate=True,
+                         separate=False,
                          train_ratio=train_ratio, val_ratio=val_ratio, test_ratio=test_ratio)
     train_data, val_data, test_data = splits['train'], splits['validation'], splits['test']
 

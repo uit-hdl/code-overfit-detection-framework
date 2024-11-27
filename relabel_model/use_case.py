@@ -107,6 +107,7 @@ def main(args):
     load_model(model, args.feature_extractor, device)
 
     model = attach_layers(model, [500, 200], len(labels.unique()))
+    # do I freeze my last two layers, leaving one linear layer? LOL
     freeze_layers(model, exclude_vars="last_linear")
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
