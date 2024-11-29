@@ -48,6 +48,9 @@ def plot_distributions(data, mode, class_map, writer):
         writer.add_figure(f"Label Distribution - {mode}", fig)
 
 def divide_data(files, balanced=True, balanced_roundup=None, separate=False, train_ratio=0.7, val_ratio=0.15, test_ratio=0.15):
+    if not files:
+        return {"train": [], "validation": [], "test": []}
+
     n = len(files)
     if balanced:
         # Group data by labels

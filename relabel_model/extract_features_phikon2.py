@@ -5,6 +5,7 @@
 # and save the reduced embeddings to a file
 
 import argparse
+from transformers import AutoImageProcessor, AutoModel
 import glob
 import logging
 import os
@@ -29,12 +30,6 @@ from misc.monai_boilerplate import build_file_list
 from network.inception_v4 import InceptionV4
 
 
-def load_model(net, model_path, device):
-    checkpoint = torch.load(model_path, map_location=device)
-    model_state_dict = {k.replace("encoder_q.", ""): v for k, v in checkpoint['state_dict'].items() if
-                        "encoder_q" in k}
-    net.load_state_dict(model_state_dict)
-
 def main():
     parser = argparse.ArgumentParser(description='Extract embeddings ')
 
@@ -48,8 +43,8 @@ def main():
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    model = InceptionV4(num_classes=128)
-    load_model(model, args.feature_extractor, device)
+    processor = AutoImageProcessor.from_pretrained("owkin/phikon-v2")
+    model = AutoModel.from_pretrained("owkin/phikon-v2")
 
     transformations = mt.Compose(
         [
@@ -57,7 +52,6 @@ def main():
             mt.EnsureChannelFirstd(CommonKeys.IMAGE),
             mt.EnsureTyped(CommonKeys.IMAGE),
             mt.ToTensord(CommonKeys.IMAGE, track_meta=False),
-            mt.ToDeviceD(keys="image", device=device),
         ])
 
     data = []
@@ -70,7 +64,7 @@ def main():
         logging.warning(f"Debug mode - limiting data to {limit} samples")
         data = data[:limit]
 
-    embedding_dest_path = os.path.join(args.out_dir, f"inception_{args.src_dir}_embedding.zarr")
+    embedding_dest_path = os.path.join(args.out_dir, f"phikon_{args.src_dir}_embedding.zarr")
     ensure_dir_exists(embedding_dest_path)
     if os.path.exists(embedding_dest_path):
         logging.error(f"Zarr file {os.path.join(os.getcwd(), embedding_dest_path)} exists - please remove it first")
@@ -79,15 +73,17 @@ def main():
     dl = DataLoader(dataset=Dataset(data, transformations), batch_size=256, num_workers=torch.cuda.device_count(), shuffle=False)
     embedding_dict = {}
     logging.info(f"Processing {args.src_dir}")
-    model = model.eval()
+    model = model.to(device).eval()
 
-    for d in tqdm(dl, position=0, leave=True, desc="processing batch"):
-        img_batch = d[CommonKeys.IMAGE]
-        feat = model(img_batch.to(device))
-        for i, (filename, label, f) in enumerate(zip(d["filename"], feat)):
-            embedding_dict[filename] = {
-                CommonKeys.IMAGE: f.cpu().numpy(),
-            }
+    with torch.no_grad():
+        for d in tqdm(dl, position=0, leave=True, desc="processing batch"):
+            img_batch = d[CommonKeys.IMAGE]
+            inputs = processor(images=img_batch, return_tensors="pt")['pixel_values'].to(device)
+            feat = model(inputs).last_hidden_state[:, 0, :]
+            for i, (filename, f) in enumerate(zip(d["filename"], feat)):
+                embedding_dict[filename] = {
+                    CommonKeys.IMAGE: f.cpu().detach().numpy(),
+                }
 
     root = zarr.group()
     for key, value in embedding_dict.items():
