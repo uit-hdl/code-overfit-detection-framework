@@ -4,9 +4,11 @@
 """
 note to self:
 
-Interpreting these results is more difficult than intended, since DP and EO looks mostly at binary differences. I'm looking at institutions, where there's usually around 30 classes. And I think each institution in some cases have too few samples to give meaningful DP and EO ratios (measuring overall fairness/bias of the model)
+Interpreting these results is more difficult than intended, since DP and EO looks mostly at binary differences. I'm looking at institutions, where there's usually around 30 classes.
+And I think each institution in some cases have too few samples to give meaningful DP and EO ratios (measuring overall fairness/bias of the model)
 
-also, WSI datasets are "supposed" to have some bad data, with pen markers and dubious tissue. So DP and EO doesnt make that much sense unless I apply it to broad categories, like gender or race. Although that being said, it's nice to look at those numbers
+also, WSI datasets are "supposed" to have some bad data, with pen markers and dubious tissue.
+So DP and EO doesnt make that much sense unless I apply it to broad categories, like gender or race. Although that being said, it's nice to look at those numbers
 
 the much more simple "accuracy" work for identifying bad slides: when the accuracy is zero, it's bad.
 
@@ -155,7 +157,8 @@ def main():
     logging.info("Inference complete")
 
     for name,group in [("Slide", slide_data), ("Institution", sf_data), ("Gender", gender_data)]:
-        metrics_dict = {"accuracy": accuracy_score, "selection_rate": selection_rate, "count": count, "tp_rate": true_positive_rate, "tn_rate": true_negative_rate, "fp_rate": false_positive_rate, "fn_rate": false_negative_rate, "mean_pred": mean_prediction}
+        metrics_dict = {"accuracy": accuracy_score, "selection_rate": selection_rate, "count": count,
+                        "tp_rate": true_positive_rate, "tn_rate": true_negative_rate, "fp_rate": false_positive_rate, "fn_rate": false_negative_rate, "mean_pred": mean_prediction}
         mf = MetricFrame(metrics=metrics_dict, y_true=y_true, y_pred=y_pred, sensitive_features=group)
         logging.info(f"Metrics: {name}:")
         logging.info(mf.overall)

@@ -46,32 +46,41 @@ from sklearn.metrics import roc_curve, confusion_matrix, ConfusionMatrixDisplay,
 from ignite.metrics import Accuracy, Loss
 import torch.nn.functional as F
 
-parser = argparse.ArgumentParser(description='Extract embeddings ')
+def parse_args():
+    parser = argparse.ArgumentParser(description='Extract embeddings ')
 
-parser.add_argument('--epochs', default=10, type=int, metavar='N', help='number of total epochs to run')
-parser.add_argument('--feature_extractor',
-                    #default="./out/MoCo/tiles-no-color-normalization/model/checkpoint_MoCo_tiles-no-color-normalization_0040_False_m64_n0_o0_K64.pth.tar",
-                    #default='./model_out2b1413ba2b3df0bcd9e2c56bdbea8d2c7f875d1e/MoCo/tiles/model/checkpoint_MoCo_tiles_0200_False_m256_n0_o0_K256.pth.tar',
-                    #default='./model_out2b1413ba2b3df0bcd9e2c56bdbea8d2c7f875d1e/MoCo/tiles/model/checkpoint_MoCo_tiles_0200_False_m256_n0_o0_K256.pth.tar',
-                    default='./model_out2b1413ba2b3df0bcd9e2c56bdbea8d2c7f875d1e/MoCo/tiles/model/checkpoint_MoCo_tiles_0200_True_m256_n0_o4_K256.pth.tar',
-                    type=str, help='path to feature extractor, which will extract features from tiles')
-parser.add_argument('--tcga_annotation_file', default=os.path.join('out', 'annotation', 'recurrence_annotation_tcga.pkl'), type=str, help='path to TCGA annotations')
-parser.add_argument('--profile', default=False, type=bool, action=argparse.BooleanOptionalAction,
-                    metavar='P', help='whether to profile training or not', dest='is_profiling')
-parser.add_argument('--file-list-path', default=os.path.join('out', 'files.csv'), type=str, help='path to list of file splits')
-parser.add_argument('--label-key', default='Sample Type', type=str, help='default key to use for doing fine-tuning. If set to "my_inst", will retrain using institution as label')
-parser.add_argument('--src-dir', default=os.path.join('Data', 'TCGA_LUSC', 'tiles'), type=str, help='path to preprocessed slide images')
-parser.add_argument('--out-dir', default='./out', type=str, help='path to save extracted embeddings')
-parser.add_argument('--slide_annotation_file', default=os.path.join('annotations', 'slide_label', 'gdc_sample_sheet.2023-08-14.tsv'), type=str,
-                    help='"Sample sheet" from TCGA, see README.md for instructions on how to get sheet')
-parser.add_argument('-b', '--batch-size', default=64, type=int,
-                    metavar='N', help=f'batch size, this is the total batch size of all GPUs on the current node when using Data Parallel or Distributed Data Parallel')
-parser.add_argument('--debug-mode', default=False, type=bool, action=argparse.BooleanOptionalAction,
-                    metavar='D', help='turn debugging on or off. Will limit amount of data used. Development only', dest='debug_mode')
-parser.add_argument('-j', '--workers', default=0, type=int, metavar='N',
-                    help='number of data loading workers')
-parser.add_argument('--lr', '--learning-rate', default=1e-05, type=float,
-                    metavar='LR', help='initial learning rate', dest='lr')
+    parser.add_argument('--epochs', default=10, type=int, metavar='N', help='number of total epochs to run')
+    parser.add_argument('--feature_extractor',
+                        default='./model_out2b1413ba2b3df0bcd9e2c56bdbea8d2c7f875d1e/MoCo/tiles/model/checkpoint_MoCo_tiles_0200_True_m256_n0_o4_K256.pth.tar',
+                        type=str, help='path to feature extractor, which will extract features from tiles')
+    parser.add_argument('--tcga_annotation_file', default=os.path.join('out', 'annotation', 'recurrence_annotation_tcga.pkl'), type=str, help='path to TCGA annotations')
+    parser.add_argument('--profile', default=False, type=bool, action=argparse.BooleanOptionalAction,
+                        metavar='P', help='whether to profile training or not', dest='is_profiling')
+    parser.add_argument('--file-list-path', default=os.path.join('out', 'files.csv'), type=str, help='path to list of file splits')
+    parser.add_argument('--label-key', default='Sample Type', type=str, help='default key to use for doing fine-tuning. If set to "my_inst", will retrain using institution as label')
+    parser.add_argument('--src-dir', default=os.path.join('Data', 'TCGA_LUSC', 'tiles'), type=str, help='path to preprocessed tile images')
+    parser.add_argument('--out-dir', default='./out', type=str, help='path to save extracted embeddings')
+    parser.add_argument('--slide_annotation_file', default=os.path.join('annotations', 'slide_label', 'gdc_sample_sheet.2023-08-14.tsv'), type=str,
+                        help='"Sample sheet" from TCGA, see README.md for instructions on how to get sheet')
+    parser.add_argument('-b', '--batch-size', default=64, type=int,
+                        metavar='N', help=f'batch size, this is the total batch size of all GPUs on the current node')
+    parser.add_argument('--debug-mode', default=False, type=bool, action=argparse.BooleanOptionalAction,
+                        metavar='D', help='turn debugging on or off. Will limit amount of data used. Development only', dest='debug_mode')
+    parser.add_argument('-j', '--workers', default=0, type=int, metavar='N',
+                        help='number of data loading workers')
+    parser.add_argument('--lr', '--learning-rate', default=1e-05, type=float,
+                        metavar='LR', help='initial learning rate', dest='lr')
+    return parser.parse_args()
+
+def load_inception(feature_pth, device, num_classes):
+    model = InceptionV4(num_classes=128)
+    load_model(model, feature_pth, device)
+    model = attach_layers(model, [500, 200], num_classes)
+    # TODO: the model is now not frozen
+    # freeze_layers(model, exclude_vars="last_linear")
+    model.to(device)
+    return model
+
 
 def from_engine_custom(keys, device):
     """
@@ -205,29 +214,19 @@ def wrap_data(train_data, val_data, test_data, slide_annotations, labels, label_
     def range_func(x, y):
         return Range(x, methods="__call__")(y) if is_profiling else y
 
-    if label_key.lower() == "my_inst":
-        transformations = mt.Compose(
-            [
-                range_func("LoadImage", mt.LoadImaged([CommonKeys.IMAGE], image_only=True)),
-                range_func("EnsureChannelFirst", mt.EnsureChannelFirstd([CommonKeys.IMAGE])),
-                #range_func("Crop", mt.Lambdad([CommonKeys.IMAGE], cropper)),
-                #range_func("ColorJitter", mt.RandLambdad([CommonKeys.IMAGE], jitterer, prob=0.8)),
-                #range_func("Grayscale", mt.RandLambdad([CommonKeys.IMAGE], grayer, prob=0.2)),
-                #range_func("Flip0", mt.RandFlipd([CommonKeys.IMAGE], prob=0.5, spatial_axis=0)),
-                #range_func("Flip1", mt.RandFlipd([CommonKeys.IMAGE], prob=0.5, spatial_axis=1)),
-                range_func("ToTensor", mt.ToTensord([CommonKeys.IMAGE], track_meta=False)),
-                range_func("EnsureType", mt.EnsureTyped([CommonKeys.IMAGE, CommonKeys.LABEL], track_meta=False)),
-            ]
-        )
-    else:
-        transformations = mt.Compose(
-            [
-                mt.LoadImaged(CommonKeys.IMAGE, image_only=True),
-                mt.EnsureChannelFirstd(CommonKeys.IMAGE),
-                mt.ToTensord(CommonKeys.IMAGE, track_meta=False),
-                # doesnt work?
-                # mt.ToDeviceD(keys="image", device=device),
-            ])
+    transformations = mt.Compose(
+        [
+            range_func("LoadImage", mt.LoadImaged([CommonKeys.IMAGE], image_only=True)),
+            range_func("EnsureChannelFirst", mt.EnsureChannelFirstd([CommonKeys.IMAGE])),
+            range_func("Crop", mt.Lambdad([CommonKeys.IMAGE], cropper)),
+            range_func("ColorJitter", mt.RandLambdad([CommonKeys.IMAGE], jitterer, prob=0.8)),
+            range_func("Grayscale", mt.RandLambdad([CommonKeys.IMAGE], grayer, prob=0.2)),
+            range_func("Flip0", mt.RandFlipd([CommonKeys.IMAGE], prob=0.5, spatial_axis=0)),
+            range_func("Flip1", mt.RandFlipd([CommonKeys.IMAGE], prob=0.5, spatial_axis=1)),
+            range_func("ToTensor", mt.ToTensord([CommonKeys.IMAGE], track_meta=False)),
+            range_func("EnsureType", mt.EnsureTyped([CommonKeys.IMAGE, CommonKeys.LABEL], track_meta=False)),
+        ]
+    )
 
     val_transformations = mt.Compose(
         [
@@ -243,16 +242,6 @@ def wrap_data(train_data, val_data, test_data, slide_annotations, labels, label_
     assign_labels(test_data, labels, slide_annotations, label_key)
 
     insts_used = defaultdict(int)
-    ds_train_use = []
-    if label_key == "my_inst":
-        for entry in train_data:
-            l = entry['label']
-            if insts_used[l] > 200:
-                continue
-            insts_used[l] += 1
-            ds_train_use.append(entry)
-        train_data = ds_train_use
-
     ds_train = Dataset(train_data, transformations)
     ds_val = Dataset(val_data, val_transformations)
     ds_test = Dataset(test_data, val_transformations)
@@ -267,7 +256,7 @@ def wrap_data(train_data, val_data, test_data, slide_annotations, labels, label_
     return dl_train, dl_val, dl_test
 
 def main():
-    args = parser.parse_args()
+    args = parse_args()
 
     data_dir_name = list(filter(None, args.src_dir.split(os.sep)))[-1]
     out_path = os.path.join(args.out_dir, condssl.builder.MoCo.__name__, data_dir_name, 'model', 'relabelled_{}_{}'.format(args.label_key, os.path.basename(args.feature_extractor)))
@@ -282,7 +271,7 @@ def main():
         ]
     )
     if not torch.cuda.is_available():
-        print('No GPU device available')
+        logging.error('No GPU device available')
         sys.exit(1)
     if not os.path.exists(args.slide_annotation_file):
         logging.error("TCGA annotation file not found: {}".format(args.slide_annotation_file))
@@ -303,8 +292,6 @@ def main():
 
     logging.info('Creating dataset')
     train_data, val_data, test_data = build_file_list(args.src_dir, args.file_list_path)
-    # TODO: filter so that there is at most 5000 images per class in train_data
-
 
     if args.debug_mode:
         logging.warning("Debug mode enabled!")
@@ -317,13 +304,7 @@ def main():
 
     dl_train, dl_val, dl_test = wrap_data(train_data, val_data, test_data, slide_annotations, labels, args.label_key, args.batch_size, args.workers, args.is_profiling)
 
-    model = InceptionV4(num_classes=128)
-    load_model(model, args.feature_extractor, device)
-    # TODO: "Since the number of acquisition sites was different among each group, the size of each model’s last layer was adjusted with respect to the number of institutions in each group"
-    model = attach_layers(model, [500, 200], len(labels))
-    # TODO: the model is now not frozen
-    #freeze_layers(model, exclude_vars="last_linear")
-    model.to(device)
+    model = load_inception(args.feature_extractor, device, len(labels))
 
     model_path = os.path.join(out_path, f"network_epoch={args.epochs}.pt")
     writer = SummaryWriter(log_dir=os.path.join(out_path, "runs"))
@@ -333,15 +314,12 @@ def main():
         logging.info('Model builder done')
     else:
         logging.info("=> creating model '{}'".format('x64'))
-        #model = densenet121(spatial_dims=2, in_channels=3, out_channels=len(labels), pretrained=True)
-        #model.to(device)
-        params = generate_param_groups(network=model, layer_matches=[lambda x: x.last_linear], match_types=["select"],
-                                       lr_values=[args.lr])
-        #optimizer = torch.optim.Adam(params, args.lr)
         optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
         logging.info('Model builder done')
         if args.label_key == 'Sample Type':
             ratio_of_positives = 1 / (len(train_data) / len(list(filter(lambda l: l["label"] == 1, train_data))))
+            # TODO: lets just use 50%...
+            ratio_of_positives = 0.5
             if not args.debug_mode and (ratio_of_positives > 0.9 or ratio_of_positives < 0.1):
                 logging.error(f"Ratio of positives ({ratio_of_positives}) is very high/low, consider adjusting the dataset. Exiting in case this was a mistake :)")
                 sys.exit(1)
@@ -462,4 +440,5 @@ def plot_results(gts, predictions, labels, title, writer):
     writer.add_figure(f"Confusion Matrix - {title}", cmd.figure_)
 
 if __name__ == '__main__':
+    logging.basicConfig(stream=sys.stdout, level=logging.INFO)
     main()
