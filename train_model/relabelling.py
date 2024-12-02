@@ -321,6 +321,7 @@ def main():
     wrong_predictions = defaultdict(list)
     predictions_per_slide = defaultdict(lambda: np.array([], dtype=np.int32))
     gt_for_slide = {}
+    class_map = {i: c for i, c in enumerate(np.unique(labels))}
     with eval_mode(model):
         for item in tqdm(dl_test):
             y = model(item["image"].to(device))
@@ -330,10 +331,10 @@ def main():
             pred = torch.argmax(prob, dim=1).numpy()
 
             pred_positive = prob[:, 1].numpy() # only extract "positive", i.e. probability of being malignant
-            predictions += list(labels[x] for x in pred)
+            predictions += pred
 
             gt = item[CommonKeys.LABEL].detach().cpu().numpy()
-            gts += list(labels[x] for x in gt)
+            gts += gt
             for i,(p,g) in enumerate(zip(pred, gt)):
                 slide_name = os.path.basename(os.path.dirname(item["filename"][i]))
                 gt_for_slide[slide_name] = g
@@ -358,10 +359,10 @@ def main():
             image_filename, g, p = wrong_predictions[w][col]
             if len(wrong_predictions) == 1 or grid_size == 1:
                 axes[col].imshow(plt.imread(image_filename))
-                axes[col].set_title("pred: {}".format(labels[p]), fontsize=fontsize)
+                axes[col].set_title("pred: {}".format(class_map[labels[p]]), fontsize=fontsize)
             else:
                 axes[row][col].imshow(plt.imread(image_filename))
-                axes[row][col].set_title("pred: {}".format(labels[p]))
+                axes[row][col].set_title("pred: {}".format(class_map[labels[p]]))
             i += 1
     writer.add_figure("Wrong Predictions", fig, 0)
 
@@ -387,9 +388,7 @@ def main():
 
 def plot_results(gts, predictions, labels, title, writer):
     if len(labels) == 2:
-        _gts = [labels.index(x) for x in gts]
-        _preds = [labels.index(x) for x in gts]
-        roc = roc_curve(_gts, _preds)
+        roc = roc_curve(gts, predictions)
         # check if roc[0] or roc[1] contains nan
         if np.isnan(roc[0]).any() or np.isnan(roc[1]).any():
             logging.warning("ROC curve contains nan values - omitting from tensorboard")
@@ -399,7 +398,7 @@ def plot_results(gts, predictions, labels, title, writer):
             plt.ylabel("True Positive Rate")
             plt.plot(roc[0], roc[1])
             writer.add_figure(f"ROC Curve - {title}", plt.gcf(), 0)
-            auc = roc_auc_score(_gts, _preds)
+            auc = roc_auc_score(gts, predictions)
             writer.add_scalar(f"AUC - {title}", auc, 0)
     else:
         logging.info("not plotting ROC curve as there are more than 2 classes")
