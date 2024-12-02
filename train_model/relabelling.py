@@ -19,6 +19,7 @@ from matplotlib import pyplot as plt
 from monai.data import DataLoader, Dataset
 from monai.networks import eval_mode
 from monai.networks.utils import freeze_layers
+from transformers import AutoImageProcessor, AutoModel
 
 sys.path.append('./')
 from misc.global_util import build_file_list, ensure_dir_exists
@@ -50,17 +51,16 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Extract embeddings ')
 
     parser.add_argument('--epochs', default=10, type=int, metavar='N', help='number of total epochs to run')
-    parser.add_argument('--feature_extractor',
+    parser.add_argument('--feature-extractor',
                         default='./model_out2b1413ba2b3df0bcd9e2c56bdbea8d2c7f875d1e/MoCo/tiles/model/checkpoint_MoCo_tiles_0200_True_m256_n0_o4_K256.pth.tar',
-                        type=str, help='path to feature extractor, which will extract features from tiles')
-    parser.add_argument('--tcga_annotation_file', default=os.path.join('out', 'annotation', 'recurrence_annotation_tcga.pkl'), type=str, help='path to TCGA annotations')
+                        type=str, help='path to feature extractor, which will extract features from tiles. Can also just type "phikon" to use phikon from HF')
     parser.add_argument('--profile', default=False, type=bool, action=argparse.BooleanOptionalAction,
                         metavar='P', help='whether to profile training or not', dest='is_profiling')
     parser.add_argument('--file-list-path', default=os.path.join('out', 'files.csv'), type=str, help='path to list of file splits')
     parser.add_argument('--label-key', default='Sample Type', type=str, help='default key to use for doing fine-tuning. If set to "my_inst", will retrain using institution as label')
-    parser.add_argument('--src-dir', default=os.path.join('Data', 'TCGA_LUSC', 'tiles'), type=str, help='path to preprocessed tile images')
+    parser.add_argument('--src-dir', default=os.path.join('/data', 'TCGA_LUSC', 'tiles'), type=str, help='path to preprocessed tile images')
     parser.add_argument('--out-dir', default='./out', type=str, help='path to save extracted embeddings')
-    parser.add_argument('--slide_annotation_file', default=os.path.join('annotations', 'slide_label', 'gdc_sample_sheet.2023-08-14.tsv'), type=str,
+    parser.add_argument('--slide-annotation-file', default=os.path.join('annotations', 'slide_label', 'gdc_sample_sheet.2023-08-14.tsv'), type=str,
                         help='"Sample sheet" from TCGA, see README.md for instructions on how to get sheet')
     parser.add_argument('-b', '--batch-size', default=64, type=int,
                         metavar='N', help=f'batch size, this is the total batch size of all GPUs on the current node')
@@ -121,15 +121,20 @@ def assign_labels(ds, labels, annotations, label_key):
         del entry['k']
         #del entry['filename']
 
-def train(dl_train, dl_val, model, optimizer, max_epochs, ratio_of_positives, out_path, writer, device):
+def train(dl_train, dl_val, model, optimizer, max_epochs, out_path, writer, device, processor):
     val_postprocessing = Compose([EnsureTyped(keys=CommonKeys.PRED),
                                   # AsDiscreted(keys=CommonKeys.PRED, argmax=True),
                                   ])
+
+    def from_phikon(data):
+        data[CommonKeys.PRED] = data[CommonKeys.PRED]['pooler_output']
+        return data
 
     evaluator = SupervisedEvaluator(
         device=device,
         val_data_loader=dl_val,
         network=model,
+        postprocessing=from_phikon,
         val_handlers=[
             StatsHandler(tag_name="train_log", output_transform=lambda x: None),
             TensorBoardStatsHandler(writer, output_transform=lambda x: x),
@@ -138,14 +143,21 @@ def train(dl_train, dl_val, model, optimizer, max_epochs, ratio_of_positives, ou
         key_val_metric={
             "val_acc": Accuracy(output_transform=from_engine([CommonKeys.PRED, CommonKeys.LABEL]))
         },
-        postprocessing=val_postprocessing,
+        #postprocessing=val_postprocessing,
     )
 
-    if ratio_of_positives:
-        w = torch.Tensor([1 - ratio_of_positives, ratio_of_positives])
+    loss_fn = nn.CrossEntropyLoss().cuda()
+    if processor is not None:
+        def loss(data, target):
+            #return loss_fn(from_phikon(data), target)
+            return loss_fn(data.last_hidden_state[:, 0, :], target)
+
+        def prepare_batch_fn(batch, device, non_blocking):
+            return processor(images=batch[CommonKeys.IMAGE], return_tensors="pt")['pixel_values'].squeeze().to(device), batch[CommonKeys.LABEL].to(device)
     else:
-        w = None
-    loss = nn.CrossEntropyLoss(w).cuda()
+        loss = loss_fn
+        def prepare_batch_fn(batch, device, non_blocking):
+            return batch
 
     trainer = SupervisedTrainer(
         device=device,
@@ -153,10 +165,12 @@ def train(dl_train, dl_val, model, optimizer, max_epochs, ratio_of_positives, ou
         train_data_loader=dl_train,
         network=model,
         optimizer=optimizer,
+        prepare_batch=prepare_batch_fn,
         loss_function=loss,
         inferer=SimpleInferer(),
+        postprocessing=from_phikon,
         key_train_metric={"train_acc": Accuracy(output_transform=from_engine([CommonKeys.PRED, CommonKeys.LABEL]))},
-        additional_metrics={"train_loss": Loss(output_transform=from_engine([CommonKeys.PRED, CommonKeys.LABEL], first=False), loss_fn=loss)},
+        #additional_metrics={"train_loss": Loss(output_transform=from_engine([CommonKeys.PRED, CommonKeys.LABEL], first=False))},
         train_handlers=[StatsHandler(tag_name="train_loss", output_transform=from_engine([CommonKeys.LOSS], first=True)),
                         TensorBoardStatsHandler(writer, output_transform=lambda x: x),
                         ValidationHandler(1, evaluator),
@@ -164,45 +178,9 @@ def train(dl_train, dl_val, model, optimizer, max_epochs, ratio_of_positives, ou
                         ],
     )
 
-    iterLosses = []
-    batchSizes = []
-    epoch_loss_values = []
-    metric_values = []
-    mean_val_acc = []
-
-    @evaluator.on(Events.EPOCH_COMPLETED)
-    def log_validation(engine):
-        mean_val_acc.append(engine.state.metrics["val_acc"])
-
-    @trainer.on(Events.ITERATION_COMPLETED)
-    def log_training(engine):
-        loss = np.average([o["loss"] for o in engine.state.output])
-        batch_len = len(engine.state.batch[0])
-
-        iterLosses.append(loss)
-        batchSizes.append(batch_len)
-
-    @trainer.on(Events.EPOCH_COMPLETED)
-    def run_validation(engine):
-        # the overall average loss must be weighted by batch size
-        overallAverageLoss = np.average(iterLosses, weights=batchSizes)
-        epoch_loss_values.append(overallAverageLoss)
-        train_acc = engine.state.metrics['train_acc']
-        metric_values.append(train_acc)
-
-        # clear the contents of iter_losses and batch_sizes for the next epoch
-        del iterLosses[:]
-        del batchSizes[:]
-
-        # reset iteration for next epoch
-        engine.state.iteration = 0
-
-        # fetch and report the validation metrics
-        logging.info(f"evaluation for epoch {engine.state.epoch}: averageLoss: {overallAverageLoss}, epoch_loss_values: {epoch_loss_values}, training accuracy: {train_acc}")
-
     trainer.run()
 
-    return epoch_loss_values, metric_values, mean_val_acc
+    return
 
 def wrap_data(train_data, val_data, test_data, slide_annotations, labels, label_key, batch_size, workers, is_profiling):
     logging.info('Creating dataset')
@@ -214,19 +192,17 @@ def wrap_data(train_data, val_data, test_data, slide_annotations, labels, label_
     def range_func(x, y):
         return Range(x, methods="__call__")(y) if is_profiling else y
 
-    transformations = mt.Compose(
-        [
+    transformations = [
             range_func("LoadImage", mt.LoadImaged([CommonKeys.IMAGE], image_only=True)),
             range_func("EnsureChannelFirst", mt.EnsureChannelFirstd([CommonKeys.IMAGE])),
-            range_func("Crop", mt.Lambdad([CommonKeys.IMAGE], cropper)),
-            range_func("ColorJitter", mt.RandLambdad([CommonKeys.IMAGE], jitterer, prob=0.8)),
-            range_func("Grayscale", mt.RandLambdad([CommonKeys.IMAGE], grayer, prob=0.2)),
-            range_func("Flip0", mt.RandFlipd([CommonKeys.IMAGE], prob=0.5, spatial_axis=0)),
-            range_func("Flip1", mt.RandFlipd([CommonKeys.IMAGE], prob=0.5, spatial_axis=1)),
+            # range_func("Crop", mt.Lambdad([CommonKeys.IMAGE], cropper)),
+            # range_func("ColorJitter", mt.RandLambdad([CommonKeys.IMAGE], jitterer, prob=0.8)),
+            # range_func("Grayscale", mt.RandLambdad([CommonKeys.IMAGE], grayer, prob=0.2)),
+            # range_func("Flip0", mt.RandFlipd([CommonKeys.IMAGE], prob=0.5, spatial_axis=0)),
+            # range_func("Flip1", mt.RandFlipd([CommonKeys.IMAGE], prob=0.5, spatial_axis=1)),
             range_func("ToTensor", mt.ToTensord([CommonKeys.IMAGE], track_meta=False)),
             range_func("EnsureType", mt.EnsureTyped([CommonKeys.IMAGE, CommonKeys.LABEL], track_meta=False)),
-        ]
-    )
+    ]
 
     val_transformations = mt.Compose(
         [
@@ -242,7 +218,7 @@ def wrap_data(train_data, val_data, test_data, slide_annotations, labels, label_
     assign_labels(test_data, labels, slide_annotations, label_key)
 
     insts_used = defaultdict(int)
-    ds_train = Dataset(train_data, transformations)
+    ds_train = Dataset(train_data, mt.Compose(transformations))
     ds_val = Dataset(val_data, val_transformations)
     ds_test = Dataset(test_data, val_transformations)
 
@@ -293,6 +269,7 @@ def main():
     logging.info('Creating dataset')
     train_data, val_data, test_data = build_file_list(args.src_dir, args.file_list_path)
 
+    epochs = args.epochs
     if args.debug_mode:
         logging.warning("Debug mode enabled!")
         np.random.shuffle(train_data)
@@ -301,10 +278,19 @@ def main():
         train_data = train_data[:args.batch_size * 4]
         val_data = val_data[:args.batch_size * 4]
         test_data = test_data[:args.batch_size * 4]
+        epochs = min(2, epochs)
+
+    use_phikon = "phikon" in args.feature_extractor
+    if use_phikon:
+        processor = AutoImageProcessor.from_pretrained("owkin/phikon-v2")
+        model = AutoModel.from_pretrained("owkin/phikon-v2")
+        model = attach_layers(model, [500, 200], len(labels)).to(device)
+    else:
+        model = load_inception(args.feature_extractor, device, len(labels))
+        processor = None
+
 
     dl_train, dl_val, dl_test = wrap_data(train_data, val_data, test_data, slide_annotations, labels, args.label_key, args.batch_size, args.workers, args.is_profiling)
-
-    model = load_inception(args.feature_extractor, device, len(labels))
 
     model_path = os.path.join(out_path, f"network_epoch={args.epochs}.pt")
     writer = SummaryWriter(log_dir=os.path.join(out_path, "runs"))
@@ -316,20 +302,9 @@ def main():
         logging.info("=> creating model '{}'".format('x64'))
         optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
         logging.info('Model builder done')
-        if args.label_key == 'Sample Type':
-            ratio_of_positives = 1 / (len(train_data) / len(list(filter(lambda l: l["label"] == 1, train_data))))
-            # TODO: lets just use 50%...
-            ratio_of_positives = 0.5
-            if not args.debug_mode and (ratio_of_positives > 0.9 or ratio_of_positives < 0.1):
-                logging.error(f"Ratio of positives ({ratio_of_positives}) is very high/low, consider adjusting the dataset. Exiting in case this was a mistake :)")
-                sys.exit(1)
-            elif args.debug_mode:
-                ratio_of_positives = 0.5
-                logging.warning("Debug mode enabled, setting ratio_of_positives to 0.5")
-            writer.add_scalar("ratio_of_positives_train", ratio_of_positives, 0)
-        else:
-            ratio_of_positives = None
-        epoch_loss_values, metric_values, mean_val_acc = train(dl_train, dl_val, model, optimizer, args.epochs, ratio_of_positives, out_path, writer, device)
+
+        train(dl_train, dl_val, model, optimizer, epochs, out_path, writer, device, processor)
+
         writer.add_scalar("size of dataset", len(train_data), 0)
         writer.add_scalar("batch size", args.batch_size, 0)
         writer.add_text("model name", "inception")
@@ -349,6 +324,8 @@ def main():
     with eval_mode(model):
         for item in tqdm(dl_test):
             y = model(item["image"].to(device))
+            if use_phikon:
+                y = y.last_hidden_state[:, 0, :]
             prob = F.softmax(y).detach().to("cpu")
             pred = torch.argmax(prob, dim=1).numpy()
 
