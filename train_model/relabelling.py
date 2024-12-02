@@ -315,8 +315,8 @@ def main():
         writer.flush()
         logging.info(f"=> Model builder done, wrote model to '{model_path}'")
 
-    predictions = []
-    gts = []
+    predictions = np.array([])
+    gts = np.array([])
     logging.info('Evaluating model')
     wrong_predictions = defaultdict(list)
     predictions_per_slide = defaultdict(lambda: np.array([], dtype=np.int32))
@@ -331,10 +331,10 @@ def main():
             pred = torch.argmax(prob, dim=1).numpy()
 
             pred_positive = prob[:, 1].numpy() # only extract "positive", i.e. probability of being malignant
-            predictions += pred
+            predictions = np.concatenate((predictions, pred), axis=0)
 
             gt = item[CommonKeys.LABEL].detach().cpu().numpy()
-            gts += gt
+            gts = np.concatenate((gts, gt), axis=0)
             for i,(p,g) in enumerate(zip(pred, gt)):
                 slide_name = os.path.basename(os.path.dirname(item["filename"][i]))
                 gt_for_slide[slide_name] = g
