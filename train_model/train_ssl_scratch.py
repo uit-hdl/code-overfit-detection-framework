@@ -111,6 +111,7 @@ def train(train_loader, model, criterion, optimizer, max_epochs, lr, cos, schedu
                 images_q, images_k = batch_data['q'].to(device), batch_data['k'].to(device)
 
                 output, target = model(im_q=images_q, im_k=images_k)
+                target = target.to(device)
                 loss = criterion(output, target)
 
                 acc1, acc5 = accuracy(output, target, topk=(1, 5))
