@@ -80,7 +80,7 @@ parser.add_argument("--local_rank", type=int, default=0)
 # moco specific configs:
 parser.add_argument('--moco-dim', default=128, type=int,
                     help='feature dimension (default: 128)')
-parser.add_argument('--moco-k', default=256, type=int,
+parser.add_argument('--moco-k', default=65536, type=int,
                     help='queue size; number of negative keys (default moco: 65536, here: 256)')
 parser.add_argument('--moco-m', default=0.999, type=float,
                     help='moco momentum of updating key encoder (default: 0.999)')
@@ -130,7 +130,6 @@ def train(train_loader, model, criterion, optimizer, max_epochs, lr, cos, schedu
                 with Range("Dataload") if is_profiling else no_profiling:
                     batch_data = next(train_loader_iterator)
                     images_q, images_k = batch_data['q'].cuda(), batch_data['k'].cuda()
-                    import ipdb; ipdb.set_trace()
 
                 with Range("forward") if is_profiling else no_profiling:
                     output, target = model(im_q=images_q, im_k=images_k)
