@@ -146,10 +146,11 @@ class MoCo(nn.Module):
             #k = self._batch_unshuffle_ddp(k, idx_unshuffle)
 
 
-        if self.condition:
-            logits = torch.mm(q, k.T) / self.T
-            labels = torch.arange(logits.shape[0], dtype=torch.long).cuda()
-            return logits, labels
+# this skips the queue update?!
+        # if self.condition:
+        #     logits = torch.mm(q, k.T) / self.T
+        #     labels = torch.arange(logits.shape[0], dtype=torch.long).cuda()
+        #     return logits, labels
 
         #else:
             # compute logits
