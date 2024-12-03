@@ -881,8 +881,8 @@ def build_file_list(data_dir, file_list_path, splits=None):
         patients = list(group_by_patient.keys())
         # impose (a more) random ordering
         random.shuffle(patients)
-        splits = lambda x: [int(x * splits[0]), int(x * splits[1]), int(x * splits[2])]
-        splits = splits(len(patients))
+        split_borders = lambda x: [int(x * splits[0]), int(x * splits[1]), int(x * splits[2])]
+        splits = split_borders(len(patients))
         #splits = splits(len(all_data))
         for i, patient in enumerate(patients):
             d = group_by_patient[patient]
