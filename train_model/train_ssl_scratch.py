@@ -37,7 +37,7 @@ def parse_args():
                         help='number of data loading workers (default: 6)')
     parser.add_argument('--epochs', default=200, type=int, metavar='N',
                         help='number of total epochs to run')
-    parser.add_argument('-b', '--batch-size', default=256, type=int,
+    parser.add_argument('-b', '--batch-size', default=128, type=int,
                         metavar='N',
                         help='mini-batch size (default: 128), this is the total '
                              'batch size of all GPUs on the current node when '
@@ -193,23 +193,23 @@ def wrap_data(train_data, val_data, batch_size, batch_slide_num, batch_inst_num,
     return dl_train, dl_val
 
 def write_args_tensorboard(args, writer):
-    writer.add_text("moco_dim", args.moco_dim)
-    writer.add_text("moco_k", args.moco_k)
-    writer.add_text("moco_m", args.moco_m)
-    writer.add_text("moco_t", args.moco_t)
-    writer.add_text("mlp", args.mlp)
-    writer.add_text("momentum", args.momentum)
-    writer.add_text("condition", int(args.condition))
-    writer.add_text("lr", args.lr)
-    writer.add_text("batch_size", args.batch_size)
-    writer.add_text("cos", int(args.cos))
+    writer.add_text("moco_dim", str(args.moco_dim))
+    writer.add_text("moco_k", str(args.moco_k))
+    writer.add_text("moco_m", str(args.moco_m))
+    writer.add_text("moco_t", str(args.moco_t))
+    writer.add_text("mlp", str(args.mlp))
+    writer.add_text("momentum", str(args.momentum))
+    writer.add_text("condition", str(int(args.condition)))
+    writer.add_text("lr", str(args.lr))
+    writer.add_text("batch_size", str(args.batch_size))
+    writer.add_text("cos", str(int(args.cos)))
     for i in args.schedule:
-        writer.add_text("schedule", i, global_step=i)
-    writer.add_text("weight_decay", args.weight_decay)
-    writer.add_text("epochs", args.epochs)
-    writer.add_text("workers", args.workers)
-    writer.add_text("batch_slide_num", args.batch_slide_num)
-    writer.add_text("batch_inst_num", args.batch_inst_num)
+        writer.add_text("schedule", str(i), global_step=i)
+    writer.add_text("weight_decay", str(args.weight_decay))
+    writer.add_text("epochs", str(args.epochs))
+    writer.add_text("workers", str(args.workers))
+    writer.add_text("batch_slide_num", str(args.batch_slide_num))
+    writer.add_text("batch_inst_num", str(args.batch_inst_num))
 
 
 def main():
