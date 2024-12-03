@@ -87,7 +87,7 @@ def parse_args():
                         metavar='C', help='whether to use conditional sampling or not', dest='condition')
     return parser.parse_args()
 
-def train(train_loader, model, criterion, optimizer, max_epochs, lr, cos, schedule, out_path, model_filename, writer, gpu_id=0):
+def train(train_loader, model, criterion, optimizer, max_epochs, lr, cos, schedule, out_path, model_filename, writer, device, gpu_id=0):
     writer.add_scalar(f"vram_available_device_{gpu_id}", torch.cuda.get_device_properties(gpu_id).total_memory / (1024*1024))
     set_track_meta(True)
     model_savename = ""
@@ -108,7 +108,7 @@ def train(train_loader, model, criterion, optimizer, max_epochs, lr, cos, schedu
                 # profiling: train dataload
                 # Download https://developer.nvidia.com/gameworksdownload#?dn=nsight-systems-2023-3 to visualize
                 batch_data = next(train_loader_iterator)
-                images_q, images_k = batch_data['q'].cuda(), batch_data['k'].cuda()
+                images_q, images_k = batch_data['q'].to(device), batch_data['k'].to(device)
 
                 output, target = model(im_q=images_q, im_k=images_k)
                 loss = criterion(output, target)
@@ -289,7 +289,7 @@ def main():
 
     criterion = nn.CrossEntropyLoss().to(device)
     writer.add_text("criterion", criterion.__str__())
-    train(dl_train, model, criterion, optimizer, args.epochs, args.lr, args.cos, args.schedule, out_path, model_filename, writer, gpu_id=args.gpu_id)
+    train(dl_train, model, criterion, optimizer, args.epochs, args.lr, args.cos, args.schedule, out_path, model_filename, writer, device, gpu_id=args.gpu_id)
 
 if __name__ == '__main__':
     logging.basicConfig(stream=sys.stdout, level=logging.INFO)
