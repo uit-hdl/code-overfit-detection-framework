@@ -19,7 +19,7 @@ from matplotlib import pyplot as plt
 from monai.data import DataLoader, Dataset
 from monai.networks import eval_mode
 from monai.networks.utils import freeze_layers
-from transformers import AutoImageProcessor, AutoModel
+from transformers import AutoImageProcessor, AutoModel, AutoModelForImageClassification
 
 sys.path.append('./')
 from misc.global_util import build_file_list, ensure_dir_exists
@@ -122,12 +122,8 @@ def assign_labels(ds, labels, annotations, label_key):
         #del entry['filename']
 
 def train(dl_train, dl_val, model, optimizer, max_epochs, out_path, writer, device, processor):
-    val_postprocessing = Compose([EnsureTyped(keys=CommonKeys.PRED),
-                                  # AsDiscreted(keys=CommonKeys.PRED, argmax=True),
-                                  ])
-
     def from_phikon(data):
-        data[CommonKeys.PRED] = data[CommonKeys.PRED]['pooler_output']
+        data[CommonKeys.PRED] = data[CommonKeys.PRED]['logits']
         return data
 
     evaluator = SupervisedEvaluator(
@@ -143,14 +139,13 @@ def train(dl_train, dl_val, model, optimizer, max_epochs, out_path, writer, devi
         key_val_metric={
             "val_acc": Accuracy(output_transform=from_engine([CommonKeys.PRED, CommonKeys.LABEL]))
         },
-        #postprocessing=val_postprocessing,
     )
 
     loss_fn = nn.CrossEntropyLoss().cuda()
     if processor is not None:
         def loss(data, target):
-            #return loss_fn(from_phikon(data), target)
-            return loss_fn(data.last_hidden_state[:, 0, :], target)
+            #return loss_fn(data.last_hidden_state[:, 0, :], target)
+            return loss_fn(data.logits, target)
 
         def prepare_batch_fn(batch, device, non_blocking):
             return processor(images=batch[CommonKeys.IMAGE], return_tensors="pt")['pixel_values'].squeeze().to(device), batch[CommonKeys.LABEL].to(device)
@@ -280,10 +275,16 @@ def main():
         test_data = test_data[:args.batch_size * 4]
         epochs = min(2, epochs)
 
+    class_map = {i: c for i, c in enumerate(np.unique(labels))}
     use_phikon = "phikon" in args.feature_extractor
     if use_phikon:
         processor = AutoImageProcessor.from_pretrained("owkin/phikon-v2")
-        model = AutoModel.from_pretrained("owkin/phikon-v2")
+        model = AutoModelForImageClassification.from_pretrained("owkin/phikon-v2",
+                                                                label2id={c: i for i, c in enumerate(np.unique(labels))},
+                                                                id2label=class_map)
+        for name, param in model.named_parameters():
+            if not name.startswith("classifier."):
+                param.requires_grad = False
         model = attach_layers(model, [500, 200], len(labels)).to(device)
     else:
         model = load_inception(args.feature_extractor, device, len(labels))
@@ -321,12 +322,12 @@ def main():
     wrong_predictions = defaultdict(list)
     predictions_per_slide = defaultdict(lambda: np.array([], dtype=np.int32))
     gt_for_slide = {}
-    class_map = {i: c for i, c in enumerate(np.unique(labels))}
     with eval_mode(model):
         for item in tqdm(dl_test):
             y = model(item["image"].to(device))
             if use_phikon:
-                y = y.last_hidden_state[:, 0, :]
+                #y = y.last_hidden_state[:, 0, :]
+                y = y['logits']
             prob = F.softmax(y).detach().to("cpu")
             pred = torch.argmax(prob, dim=1).numpy()
 
@@ -359,10 +360,10 @@ def main():
             image_filename, g, p = wrong_predictions[w][col]
             if len(wrong_predictions) == 1 or grid_size == 1:
                 axes[col].imshow(plt.imread(image_filename))
-                axes[col].set_title("pred: {}".format(class_map[labels[p]]), fontsize=fontsize)
+                axes[col].set_title("pred: {}".format(labels[p]), fontsize=fontsize)
             else:
                 axes[row][col].imshow(plt.imread(image_filename))
-                axes[row][col].set_title("pred: {}".format(class_map[labels[p]]))
+                axes[row][col].set_title("pred: {}".format(labels[p]))
             i += 1
     writer.add_figure("Wrong Predictions", fig, 0)
 
@@ -379,9 +380,9 @@ def main():
 
     a = np.array([[l,gt_for_slide[s]] for s,l in predictions_per_slide.items()])
     predictions = a[:,0].astype(np.int32)
-    predictions = list(labels[x] for x in predictions)
+    #predictions = list(labels[x] for x in predictions)
     gts = a[:,1].astype(np.int32)
-    gts = list(labels[x] for x in gts)
+    #gts = list(labels[x] for x in gts)
 
     plot_results(gts, predictions, labels, "Test data - Slide level", writer)
     #plt.show()
@@ -403,7 +404,8 @@ def plot_results(gts, predictions, labels, title, writer):
     else:
         logging.info("not plotting ROC curve as there are more than 2 classes")
 
-    cm = confusion_matrix(gts, predictions, labels=labels)
+    #cm = confusion_matrix(gts, predictions, labels=labels)
+    cm = confusion_matrix([labels[int(x)] for x in gts], [labels[int(x)] for x in predictions], labels=labels)
     correct_classifications = sum([cm[i][i] for i in range(len(labels))])
     wrong_classifications = len(gts) - correct_classifications
     total = correct_classifications + wrong_classifications
