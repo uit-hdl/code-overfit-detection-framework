@@ -55,7 +55,7 @@ def parse_args():
                         metavar='D', help='turn debugging on or off. Will limit amount of data used. Development only', dest='debug_mode')
     parser.add_argument('--seed', default=None, type=int,
                         help='seed for initializing training. ')
-    parser.add_argument('--gpu', default=None, type=int,
+    parser.add_argument('--gpu-id', default=0, type=int,
                         help='GPU id to use.')
     parser.add_argument('--multiprocessing-distributed', action='store_true',
                         help='Use multi-processing distributed training to launch '
