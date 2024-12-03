@@ -87,8 +87,8 @@ def parse_args():
                         metavar='C', help='whether to use conditional sampling or not', dest='condition')
     return parser.parse_args()
 
-def train(train_loader, model, criterion, optimizer, max_epochs, lr, cos, schedule, out_path, model_filename, writer):
-    writer.add_scalar("vram_available_device_0", torch.cuda.get_device_properties(0).total_memory / (1024*1024))
+def train(train_loader, model, criterion, optimizer, max_epochs, lr, cos, schedule, out_path, model_filename, writer, gpu_id=0):
+    writer.add_scalar(f"vram_available_device_{gpu_id}", torch.cuda.get_device_properties(gpu_id).total_memory / (1024*1024))
     set_track_meta(True)
     model_savename = ""
     step = 0
@@ -131,7 +131,7 @@ def train(train_loader, model, criterion, optimizer, max_epochs, lr, cos, schedu
                 logging.info(f"{step}/{len(train_loader)}, train_loss: {loss.item():.4f} acc1: {acc1:.2f} acc5: {acc5:.2f} step time: {(time.time() - step_start):.4f}")
                 writer.add_scalar("ram_used_mb", psutil.virtual_memory()[3] / 1000000, global_step=iter_step)
                 writer.add_scalar("cpu_used", psutil.cpu_percent(), global_step=iter_step)
-                writer.add_scalar("vram_used_device_0", torch.cuda.memory_reserved(0), global_step=iter_step)
+                writer.add_scalar(f"vram_used_device_{gpu_id}", torch.cuda.memory_reserved(gpu_id), global_step=iter_step)
         epoch_loss /= step
         acc5_total /= step
         acc1_total /= step
@@ -233,6 +233,7 @@ def main():
         logging.error('No GPU device available')
         sys.exit(1)
 
+    device = torch.device(f"cuda:{args.gpu_id}" if torch.cuda.is_available() else "cpu")
     logging.info('Create dataset')
 
     model_name = condssl.builder.MoCo.__name__
@@ -278,7 +279,7 @@ def main():
         base_encoder=InceptionV4, dim=args.moco_dim, K=args.moco_k, m=args.moco_m, T=args.moco_t, mlp=args.mlp, condition=args.condition)
 
     #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = model.cuda()
+    model = model.to(device)
     optimizer = torch.optim.SGD(model.parameters(), args.lr,
                                 momentum=args.momentum,
                                 weight_decay=args.weight_decay)
@@ -286,9 +287,9 @@ def main():
     writer.add_text("model", str(model.__class__))
     logging.info('Model builder done, placed on cuda()')
 
-    criterion = nn.CrossEntropyLoss().cuda()
+    criterion = nn.CrossEntropyLoss().to(device)
     writer.add_text("criterion", criterion.__str__())
-    train(dl_train, model, criterion, optimizer, args.epochs, args.lr, args.cos, args.schedule, out_path, model_filename, writer)
+    train(dl_train, model, criterion, optimizer, args.epochs, args.lr, args.cos, args.schedule, out_path, model_filename, writer, gpu_id=args.gpu_id)
 
 if __name__ == '__main__':
     logging.basicConfig(stream=sys.stdout, level=logging.INFO)
