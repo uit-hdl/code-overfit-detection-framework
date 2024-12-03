@@ -859,33 +859,9 @@ def add_dir(directory):
             all_data.append({"q": filename, "k": filename, 'filename': filename})
     return all_data
 
-def build_splits(labels, splits=None):
+def build_file_list(data_dir, file_list_path, splits=None):
     if not splits:
         splits = [0.7, 0.1, 0.2]
-    all_data = []
-    for row in labels.iterrows():
-        all_data.append({CommonKeys.IMAGE: row[1]["filename"], CommonKeys.LABEL: row[1][CommonKeys.LABEL]})
-
-    splits = lambda x: [int(x * splits[0]), int(x * splits[1]), int(x * splits[2])]
-    splits = splits(len(labels))
-    #splits = splits(len(all_data))
-    for i, patient in enumerate(patients):
-        d = group_by_patient[patient]
-        if i < splits[0]:
-            train_data += d
-        elif i < splits[0] + splits[1]:
-            val_data += d
-        else:
-            test_data += d
-
-
-def build_file_list(labels, file_list_path, splits=None):
-    if not splits:
-        splits = [0.7, 0.1, 0.2]
-    # assume first column is a link to the image, unless there is a 'filename' column
-    for i, directory in enumerate(glob.glob(f"{data_dir}{os.sep}*")):
-        all_data += add_dir(directory)
-
 
     if not os.path.exists(file_list_path):
         print ("File list not found. Creating file list in {}".format(file_list_path))
@@ -897,20 +873,14 @@ def build_file_list(labels, file_list_path, splits=None):
             all_data += add_dir(directory)
         for d in all_data:
             patient = '-'.join(d['filename'].split(os.sep)[-2].split('-')[1:3])
-            inst = d['filename'].split(os.sep)[-2].split('-')[1]
             if patient not in group_by_patient:
                 group_by_patient[patient] = []
-            if patient not in group_by_inst:
-                group_by_inst[inst] = []
             group_by_patient[patient].append(d)
-            group_by_inst[inst].append(d)
 
         train_data, val_data, test_data = [], [], []
         patients = list(group_by_patient.keys())
-        institutions = list(group_by_inst.keys())
         # impose (a more) random ordering
         random.shuffle(patients)
-        random.shuffle(institutions)
         splits = lambda x: [int(x * splits[0]), int(x * splits[1]), int(x * splits[2])]
         splits = splits(len(patients))
         #splits = splits(len(all_data))
@@ -922,15 +892,6 @@ def build_file_list(labels, file_list_path, splits=None):
                 val_data += d
             else:
                 test_data += d
-        # for inst in institutions:
-        #     d = group_by_inst[inst]
-        #     if i < splits[0]:
-        #         train_data += d
-        #     elif i < splits[0] + splits[1]:
-        #         val_data += d
-        #     else:
-        #         test_data += d
-        #     i += len(d)
 
         if not train_data:
             raise RuntimeError(f"Found no data in {data_dir}")
