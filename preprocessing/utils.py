@@ -1,11 +1,15 @@
-import cv2
-import sys
+# this code is heavily inspired/copied from https://github.com/NYUMedML/conditional_ssl_hist/blob/main/preprocessing/utils.py
+# They did not licence this code as of Dec 10th 2024
+
 import os
-from openslide import OpenSlide
+import sys
 from pathlib import Path
-from PIL import Image
+
+import cv2
 import numpy as np
 import staintools
+from PIL import Image
+from openslide import OpenSlide
 
 
 def getGradientMagnitude(im):
@@ -88,4 +92,3 @@ def ensure_dir_exists(path):
     if not os.path.exists(dest_dir):
         Path(dest_dir).mkdir(parents=True, exist_ok=True)
         print(f"mkdir: '{dest_dir}'")
-

@@ -29,19 +29,22 @@ from misc.global_util import ensure_dir_exists
 from misc.monai_boilerplate import build_file_list
 from network.inception_v4 import InceptionV4
 
+# ipython extract_features_phikon2.py -- --src-dir TCGA-LUSC-testfiles --out-dir out --gpu-id 2
 
 def main():
     parser = argparse.ArgumentParser(description='Extract embeddings ')
 
     parser.add_argument('--src-dir', default=os.path.join('assets', 'krd-wbc', 'Dataset', 'image'), type=str,
                         help='path to dataset, folder of images')
+    parser.add_argument('--gpu-id', default=2, type=int,
+                        help='GPU id to use.')
     parser.add_argument('--out-dir', default='out', type=str, help='path to save extracted embeddings')
     parser.add_argument('--debug-mode', default=False, type=bool, action=argparse.BooleanOptionalAction,
                         metavar='D', help='turn debugging on or off. Will limit amount of data used. Development only',
                         dest='debug_mode')
     args = parser.parse_args()
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device(f"cuda:{args.gpu_id}" if torch.cuda.is_available() else "cpu")
 
     processor = AutoImageProcessor.from_pretrained("owkin/phikon-v2")
     model = AutoModel.from_pretrained("owkin/phikon-v2")

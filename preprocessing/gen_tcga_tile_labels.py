@@ -12,6 +12,7 @@ import os
 import sys
 import glob
 
+import openslide
 import pandas as pd
 
 from misc.global_util import ensure_dir_exists
@@ -20,8 +21,8 @@ from misc.global_util import ensure_dir_exists
 def main():
     parser = argparse.ArgumentParser(description='Generate a csv file for each tile with patient-level labels')
 
-    parser.add_argument('--annotation-file', nargs='+', type=str, help='path to annotation file')
-    parser.add_argument('--data-dir', nargs='+', type=str, help='path to tiles. Should be a directories that have structure "<root_dir>/TCGA-XX-XXXX-XXA-XX-XX/<tile>.png"')
+    parser.add_argument('--clinical-annotation-file', type=str, help='path to annotation file')
+    parser.add_argument('--data-dir', type=str, help='path to tiles. Should be a directories that have structure "<root_dir>/TCGA-XX-XXXX-XXA-XX-XX/<tile>.png"')
     parser.add_argument('--out-file', default=os.path.join('out', 'tcga-tile-annotations.csv'), type=str, help='path to output file')
 
     args = parser.parse_args()
@@ -32,12 +33,15 @@ def main():
             if filename.endswith(".png") or filename.endswith(".jpg"):
                 tcga_label = os.path.basename(os.path.dirname(filename))
                 patient_id = '-'.join(tcga_label.split("-")[0:3])
+                disease_label = tcga_label.split('-')[3]
+                disease = "Primary Tumor" if disease_label == "01" else "Solid Tissue Normal"
                 institution = tcga_label.split('-')[1]
                 slide_id = tcga_label
                 all_data.append({"filename": filename,
                                  "bcr_patient_barcode": patient_id,
                                  "institution": institution,
                                  "slide_id": slide_id,
+                                 "disease": disease,
                                  })
     #logging.debug(all_data[:10])
     # convert all_data to a pandas dataframe

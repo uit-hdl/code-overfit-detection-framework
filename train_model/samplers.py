@@ -1,20 +1,18 @@
+import contextlib
 import random
 from collections import defaultdict
 
-from torch.utils.data import Sampler, DistributedSampler
+from monai.utils import Range
+from torch.utils.data import Sampler
 
 from train_util import *
-from monai.utils import Range
-import contextlib
+
 no_profiling = contextlib.nullcontext()
 
 class MySampler(Sampler):
     """
-    Conditional sampler that will generate batches made out of `batch_size` with at least `batch_slide_num` tiles from each slide
+    Conditional sampler that will generate batches made out of `batch_size` with at least `batch_slide_num` tiles or `batch_inst_num` from each slide/institution (aka TSS)
     E.g. if `batch_slide_num` is 4 and `batch_size is 32, there will be 8 slides with 4 tiles each in one batch
-
-    Note: Don't pass in a MONAI dataset object here: the default iterator performs transformations right away
-    this is very slow, and we only need the filenames to generate the indices
     """
 
     def __init__(self, data_source, batch_size, batch_slide_num, batch_inst_num, is_profiling=False):
@@ -60,7 +58,7 @@ class MySampler(Sampler):
                 inst2tiles[institution_id].append(i)
 
             if self.batch_inst_num and self.batch_slide_num:
-                raise NotImplementedError("Not implemented, too complicated?")
+                raise NotImplementedError("Batch-sampling from both institution and slides not implemented, too complicated?")
 
             if self.batch_inst_num:
                 tile_chunks = self._sample_batch_from_group(inst2tiles, self.batch_inst_num)
@@ -92,4 +90,3 @@ class MySampler(Sampler):
 
     def __len__(self):
         return len(list(self.__iter__()))
-

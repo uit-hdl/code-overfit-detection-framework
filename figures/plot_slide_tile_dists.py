@@ -1,8 +1,11 @@
+# -*- coding: utf-8 -*-
+'''
+This code will re-create figure X and Y in the paper "Open-source framework for detecting bias and overfitting for large pathology images
+'''
 import numpy as np
-import pandas as pd
-from bokeh.models import FuncTickFormatter, CustomJSTickFormatter
-from bokeh.plotting import save, figure, show, output_file
 from bokeh.layouts import layout
+from bokeh.models import CustomJSTickFormatter
+from bokeh.plotting import save, figure, output_file
 
 data = """156 66
 100 60

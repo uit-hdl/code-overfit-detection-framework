@@ -1,25 +1,27 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+'''
+Train a MoCo V1 model using self-supervised learning. Stats are logged to tensorboard.
+'''
+
 import argparse
-import csv
+import logging
 import os.path
 import random
 import sys
-import psutil
-import tempfile
 import time
-import warnings
-import logging
 
 import monai.transforms as mt
+import psutil
 import torch.backends.cudnn as cudnn
 import torch.nn as nn
 import torchvision.transforms as transforms
 from monai.data import DataLoader, Dataset, set_track_meta
 from monai.handlers.tensorboard_handlers import SummaryWriter
-from torch.utils.data import Sampler
 
 sys.path.append('./')
-import condssl.builder
-import condssl.loader
+import network.moco
 import samplers
 
 from misc.global_util import build_file_list, ensure_dir_exists
@@ -31,9 +33,6 @@ import contextlib
 no_profiling = contextlib.nullcontext()
 
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
-# parser.add_argument('data', metavar='DIR',
-#                     help='path to dataset')
-
 parser.add_argument('-j', '--workers', default=6, type=int, metavar='N',
                     help='number of data loading workers (default: 6)')
 parser.add_argument('--epochs', default=200, type=int, metavar='N',
@@ -291,7 +290,7 @@ def main():
     if is_distributed:
         torch.distributed.init_process_group(args.dist_backend)
 
-    model_name = condssl.builder.MoCo.__name__
+    model_name = network.builder.MoCo.__name__
     data_dir_name = list(filter(None, args.data_dir.split(os.sep)))[-1]
     out_path = os.path.join(args.out_dir, model_name, data_dir_name)
     model_filename = os.path.join(out_path, 'model', 'checkpoint_{}_{}_#NUM#_{}_m{}_n{}_o{}_K{}.pth.tar'.format(model_name, data_dir_name, args.condition, args.batch_size, args.batch_slide_num, args.batch_inst_num, args.moco_k))
@@ -330,7 +329,7 @@ def main():
                       'from checkpoints.')
 
     logging.info("=> creating model '{}'".format('x64'))
-    model = condssl.builder.MoCo(
+    model = network.builder.MoCo(
         base_encoder=InceptionV4, dim=args.moco_dim, K=args.moco_k, m=args.moco_m, T=args.moco_t, mlp=args.mlp, condition=args.condition, do_checkpoint=args.is_seq_ckpt)
 
     #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

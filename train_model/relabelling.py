@@ -1,12 +1,10 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# orig paper: adds two new layers for classification and re-trains
-# https://github.com/TahDeh/TCGA_Acquisition_site_project/blob/main/tss-feature-extraction.ipynb
-# guide
-#https://snappishproductions.com/blog/2020/05/25/image-self-supervised-training-with-pytorch-lightning.html.html
-# other guide:
-#https://github.com/Project-MONAI/tutorials/blob/main/modules/layer_wise_learning_rate.ipynb
+'''
+Fine-tune either MoCo v1 or phikon on tile-based data, presumably from TCGA or CPTAC.
+`--label-key` decides the label to use for fine-tuning. If set to "my_inst", will retrain using institution as label
+'''
 
 
 import logging
@@ -18,17 +16,15 @@ import numpy as np
 from matplotlib import pyplot as plt
 from monai.data import DataLoader, Dataset
 from monai.networks import eval_mode
-from monai.networks.utils import freeze_layers
-from transformers import AutoImageProcessor, AutoModel, AutoModelForImageClassification
+from transformers import AutoImageProcessor, AutoModelForImageClassification
 
 sys.path.append('./')
 from misc.global_util import build_file_list, ensure_dir_exists
 
 
 import pandas as pd
-import condssl.builder
+import network.moco
 import argparse
-import matplotlib.ticker as mticker
 from monai.utils import Range, CommonKeys
 import torchvision.transforms as transforms
 import torch
@@ -38,13 +34,10 @@ from network.inception_v4 import InceptionV4
 import monai.transforms as mt
 from monai.engines import SupervisedTrainer, SupervisedEvaluator
 from monai.inferers import SimpleInferer
-from monai.optimizers import generate_param_groups
-from ignite.engine import Events
-from monai.transforms import Compose, EnsureTyped
 from monai.handlers import StatsHandler, from_engine, ValidationHandler, CheckpointSaver, TensorBoardStatsHandler
 from monai.handlers.tensorboard_handlers import SummaryWriter
 from sklearn.metrics import roc_curve, confusion_matrix, ConfusionMatrixDisplay, roc_auc_score
-from ignite.metrics import Accuracy, Loss
+from ignite.metrics import Accuracy
 import torch.nn.functional as F
 
 def parse_args():
@@ -230,7 +223,7 @@ def main():
     args = parse_args()
 
     data_dir_name = list(filter(None, args.src_dir.split(os.sep)))[-1]
-    out_path = os.path.join(args.out_dir, condssl.builder.MoCo.__name__, data_dir_name, 'model', 'relabelled_{}_{}'.format(args.label_key, os.path.basename(args.feature_extractor)))
+    out_path = os.path.join(args.out_dir, network.builder.MoCo.__name__, data_dir_name, 'model', 'relabelled_{}_{}'.format(args.label_key, os.path.basename(args.feature_extractor)))
 
     logfile_path = os.path.join(out_path, "output.log")
     ensure_dir_exists(logfile_path)

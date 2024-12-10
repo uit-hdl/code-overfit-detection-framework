@@ -39,8 +39,8 @@ for slide_id in ds:
 
     if not os.path.exists(tile_path):
         Path(tile_path).mkdir(parents=True, exist_ok=True)
-        #wsi_to_tiles(slide_id['filename'], tile_path, args.refer_img, args.s)
-        wsi_to_tiles_no_normalization(slide_id['filename'], tile_path, args.s)
+        wsi_to_tiles(slide_id['filename'], tile_path, args.refer_img, args.s)
+        #wsi_to_tiles_no_normalization(slide_id['filename'], tile_path, args.s)
 
 followUpTable = pd.read_csv(args.follow_up_path, sep='\t')
 followUpTable = followUpTable.loc[followUpTable['new_tumor_event_dx_indicator'].isin({'YES', 'NO'})]
