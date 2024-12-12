@@ -20,8 +20,33 @@ Otherwise, a lot of the information is in the filename itself.
 
 # Installation
 ```bash
-pip install -e .
+pip install -r requirements.txt
 ```
+
+# Recreating the paper
+Assuming you have the raw dataset from the TCGA portal in "/data/TCGA-LUSC". We use ipython since it has a better/easier way of including paths (otherwise you might get "module not found")
+```bash
+# create tiles and annotations
+# the current default color normalization is Vahadane, but you can change this in the script
+# according to many other papers, normalization has little impact on TSS bias, so you could consider changing color normalization to speed it up
+ipython preprocessing/process_tcga.py -- --wsi-path /data/TCGA-LUSC --out-dir /data/TCGA-LUSC-tiles
+ipython preprocessing/gen_tcga_tile_labels.py -- --data-dir /data/TCGA-LUSC-tiles --out-dir out
+# create a dataset that only has the top 5 institutions
+
+
+# train the model. For our computer this took about 3 days per model
+# you can also skip this and just use PhikonV2 (next steps) to avoid training
+ipython train_model/train_ssl.py -- --condition --batch-slide-num 4 --src-dir /data/TCGA-LUSC-tiles --epochs 300 --moco-k 128
+ipython train_model/train_ssl.py -- --no-condition --src-dir /data/TCGA-LUSC-tiles --epochs 300 --moco-k 128
+ipython train_model/train_ssl.py -- --no-condition --src-dir /data/TCGA-LUSC-tiles --epochs 300 --moco-k 65536
+
+ipython feature_extraction/extract_features_phikon2.py -- --src-dir /data/TCGA-LUSC-tiles --out-dir out
+ipython feature_extraction/extract_features_inceptionv4.py -- --src-dir /data/TCGA-LUSC-tiles \
+  --out-dir out --model-pth out/ --model-pth 'out/models/MoCo/TCGA_LUSC/model/checkpoint_MoCo_TCGA_LUSC_0200_False_m128_n0_o0_K128.pth.tar'
+# ..repeat for other models..
+```
+After running the above, you'll have embeddings saved in './out/*.zarr'. These can then be used by our `feature_inspect` package.
+To view model stats for InceptionV4, you can use tensorboard: `tensorboard --logdir=out/models/MoCo/TCGA_LUSC/model/`
 
 # License
 This code is under the Apache 2.0 license. See [LICENSE](LICENSE).

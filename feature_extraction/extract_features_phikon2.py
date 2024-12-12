@@ -34,10 +34,8 @@ from network.inception_v4 import InceptionV4
 def main():
     parser = argparse.ArgumentParser(description='Extract embeddings ')
 
-    parser.add_argument('--src-dir', default=os.path.join('assets', 'krd-wbc', 'Dataset', 'image'), type=str,
-                        help='path to dataset, folder of images')
-    parser.add_argument('--gpu-id', default=2, type=int,
-                        help='GPU id to use.')
+    parser.add_argument('--src-dir', default=os.path.join('/data', 'TCGA_LUSC-tiles'), type=str, help='path to dataset, folder of images')
+    parser.add_argument('--gpu-id', default=0, type=int, help='GPU id to use.')
     parser.add_argument('--out-dir', default='out', type=str, help='path to save extracted embeddings')
     parser.add_argument('--debug-mode', default=False, type=bool, action=argparse.BooleanOptionalAction,
                         metavar='D', help='turn debugging on or off. Will limit amount of data used. Development only',
@@ -67,7 +65,7 @@ def main():
         logging.warning(f"Debug mode - limiting data to {limit} samples")
         data = data[:limit]
 
-    embedding_dest_path = os.path.join(args.out_dir, f"phikon_{args.src_dir}_embedding.zarr")
+    embedding_dest_path = os.path.join(args.out_dir, f"phikon_{os.path.basename(args.src_dir)}_embedding.zarr")
     ensure_dir_exists(embedding_dest_path)
     if os.path.exists(embedding_dest_path):
         logging.error(f"Zarr file {os.path.join(os.getcwd(), embedding_dest_path)} exists - please remove it first")
