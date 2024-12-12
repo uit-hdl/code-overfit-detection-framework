@@ -31,7 +31,7 @@ def main():
                 tcga_label = os.path.basename(os.path.dirname(filename))
                 patient_id = '-'.join(tcga_label.split("-")[0:3])
                 disease_label = tcga_label.split('-')[3]
-                disease = "Primary Tumor" if disease_label == "01" else "Solid Tissue Normal"
+                disease = "Primary Tumor" if "01" in disease_label else "Solid Tissue Normal"
                 institution = tcga_label.split('-')[1]
                 slide_id = tcga_label
                 all_data.append({"filename": filename,
@@ -50,6 +50,8 @@ def main():
     ensure_dir_exists(args.out_file)
     all_data.to_csv(args.out_file, index=False)
     logging.info("Wrote data to {}".format(args.out_file))
+    # to get top 5:#
+    # awk -F',' 'NR>1{count[$3]++} END{for (i in count) print count[i],i}' out/tcga-tile-annotations.csv | sort -nr | head -5 | awk '{print $2}' | xargs -I{} awk -F',' 'NR==1 || $3 == "{}"' out/tcga-tile-annotations.csv > out/top5TSSfiles.csv
 
 if __name__ == '__main__':
     logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
