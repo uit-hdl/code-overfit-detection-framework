@@ -40,6 +40,8 @@ def main():
     parser = argparse.ArgumentParser(description='Extract embeddings ')
 
     parser.add_argument('--src-dir', default=os.path.join('/data', 'TCGA_LUSC-tiles'), type=str, help='path to dataset, folder of images')
+    #parser.add_argument('--model-pth', default=os.path.join('out', 'models', 'MoCo', 'TCGA_LUSC', 'model', 'checkpoint_MoCo_TCGA_LUSC_0200_False_m128_n0_o0_K128.pth.tar'), type=str, help='path to dataset, folder of images')
+    #parser.add_argument('--model-pth', default=os.path.join('out', 'models', 'MoCo', 'TCGA_LUSC', 'model', 'checkpoint_MoCo_TCGA_LUSC_0200_False_m128_n0_o0_K128.pth.tar'), type=str, help='path to dataset, folder of images')
     parser.add_argument('--model-pth', default=os.path.join('out', 'models', 'MoCo', 'TCGA_LUSC', 'model', 'checkpoint_MoCo_TCGA_LUSC_0200_False_m128_n0_o0_K128.pth.tar'), type=str, help='path to dataset, folder of images')
     parser.add_argument('--gpu-id', default=1, type=int, help='GPU id to use.')
     parser.add_argument('--out-dir', default='out', type=str, help='path to save extracted embeddings')
