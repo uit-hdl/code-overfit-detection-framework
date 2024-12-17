@@ -865,10 +865,8 @@ def build_file_list(data_dir, file_list_path, splits=None):
 
     if not os.path.exists(file_list_path):
         print ("File list not found. Creating file list in {}".format(file_list_path))
-        number_of_slides = len(glob.glob(f"{data_dir}{os.sep}*"))
         all_data = []
         group_by_patient = {}
-        group_by_inst = {}
         for i, directory in enumerate(glob.glob(f"{data_dir}{os.sep}*")):
             all_data += add_dir(directory)
         for d in all_data:
@@ -914,9 +912,9 @@ def build_file_list(data_dir, file_list_path, splits=None):
         next(csvreader)
         train_data, val_data, test_data = [], [], []
         for row in csvreader:
-            if row[3] == "train":
+            if row[-1] == "train":
                 train_data.append({"q": row[0], "k": row[1], "image": row[0], 'filename': row[2]})
-            elif row[3] == "validation":
+            elif row[-1] == "validation":
                 val_data.append({"q": row[0], "k": row[1], "image": row[0], 'filename': row[2]})
             else:
                 test_data.append({"q": row[0], "k": row[1], "image": row[0], 'filename': row[2]})

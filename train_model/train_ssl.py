@@ -89,6 +89,7 @@ def parse_args():
     parser.add_argument('--file-list-path', default='./out/files.csv', type=str, help='path to list of file splits')
     parser.add_argument('--batch-slide-num', default=4, type=int)
     parser.add_argument('--batch-inst-num', default=0, type=int)
+    parser.add_argument('--gpu-id', default=1, type=int, help='GPU id to use.')
     parser.add_argument('--condition', default=False, type=bool, action=argparse.BooleanOptionalAction,
                         metavar='C', help='whether to use conditional sampling or not', dest='condition')
     return parser.parse_args()
@@ -193,7 +194,10 @@ def wrap_data(train_data, val_data, batch_size, batch_slide_num, batch_inst_num,
     else:
         dl_train = DataLoader(ds_train, batch_size=batch_size, drop_last=True, shuffle=True, num_workers=workers)
 
-    dl_val = DataLoader(ds_val, batch_size=batch_size, num_workers=workers, shuffle=True)
+    if len(ds_val) > 0:
+        dl_val = DataLoader(ds_val, batch_size=batch_size, num_workers=workers, shuffle=True)
+    else:
+        dl_val = None
 
     logging.info("Dataset Created ...")
     return dl_train, dl_val
@@ -221,10 +225,10 @@ def write_args_tensorboard(args, writer):
 def main():
     args = parse_args()
 
-    if args.batch_slide_num > args.batch_size or args.batch_inst_num > args.batch_size:
-        logging.error("Looks like you mistook m or n for n: batch_slide_num and batch_inst_num has to be less than batch_size")
-        sys.exit(1)
-    if args.batch_slide_num and args.batch_inst_num:
+    # if args.batch_slide_num > args.batch_size or args.batch_inst_num > args.batch_size:
+    #     logging.error("Looks like you mistook m or n for n: batch_slide_num and batch_inst_num has to be less than batch_size")
+    #     sys.exit(1)
+    if args.condition and args.batch_slide_num and args.batch_inst_num:
         logging.error("Haven't implemented support for both batch_slide_num and batch_inst_num")
         sys.exit(1)
     largest_batch_sampler = max(args.batch_slide_num, args.batch_inst_num)
@@ -242,8 +246,8 @@ def main():
     device = torch.device(f"cuda:{args.gpu_id}" if torch.cuda.is_available() else "cpu")
     logging.info('Create dataset')
 
-    model_name = network.builder.MoCo.__name__
-    data_dir_name = list(filter(None, args.data_dir.split(os.sep)))[-1]
+    model_name = "moco"
+    data_dir_name = list(filter(None, args.src_dir.split(os.sep)))[-1]
     out_path = os.path.join(args.out_dir, model_name, data_dir_name)
     model_filename = os.path.join(out_path, 'model',
                                   f'checkpoint_{model_name}_{data_dir_name}_#NUM#_{args.condition}_m{args.batch_size}_n{args.batch_slide_num}_o{args.batch_inst_num}_K{args.moco_k}.pth.tar')
@@ -281,8 +285,9 @@ def main():
                       'from checkpoints.')
 
     logging.info("=> creating model '{}'".format('x64'))
-    model = network.builder.MoCo(
-        base_encoder=InceptionV4, dim=args.moco_dim, K=args.moco_k, m=args.moco_m, T=args.moco_t, mlp=args.mlp, condition=args.condition, do_checkpoint=args.is_seq_ckpt)
+    # TODO: re-enable seq.ckpt
+    model = network.moco.MoCo(
+        base_encoder=InceptionV4, dim=args.moco_dim, K=args.moco_k, m=args.moco_m, T=args.moco_t, mlp=args.mlp, condition=args.condition)
 
     #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = model.to(device)

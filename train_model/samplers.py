@@ -25,7 +25,7 @@ class MySampler(Sampler):
 
     def _sample_batch_from_group(self, confound2tiles, batch_size):
         # Generate chunks of indices. If one slide has indices slide2tiles['slide'] = [1 .. 10] the result can be like
-        # tile_chunks = [[1 .. 4], [ 1 .. 8 ]]
+        # tile_chunks = [[1 .. 4], [ 5 .. 8 ]]
         # cut_off_indices = [ 9, 10 ]
         tile_chunks = defaultdict(list)
         for confounder, tiles in confound2tiles.items():
