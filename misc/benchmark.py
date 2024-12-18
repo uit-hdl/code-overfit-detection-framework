@@ -46,11 +46,11 @@ def monitor_gpu(stop_event, interval, action, writer, gpu_index=0):
             gpu_util = utilization.gpu  # GPU utilization percentage
 
             # Log metrics
-            writer.add_scalar(f"{action}_gpu_mem_used_mb", gpu_mem_used, global_step=i)
+            writer.add_scalar(f"{action}_gpu_{gpu_index}_mem_used_mb", gpu_mem_used, global_step=i)
             writer.add_scalar(
-                f"{action}_gpu_mem_total_mb", gpu_mem_total, global_step=i
+                f"{action}_gpu_mem_{gpu_index}_total_mb", gpu_mem_total, global_step=i
             )
-            writer.add_scalar(f"{action}_gpu_util_percent", gpu_util, global_step=i)
+            writer.add_scalar(f"{action}_gpu_{gpu_index}_util_percent", gpu_util, global_step=i)
             i += 1
 
             time.sleep(interval)
@@ -70,7 +70,7 @@ def monitor_memory(stop_event, interval, action, writer):
         time.sleep(interval)
 
 
-def track_method(func, action_name, writer, i=0):
+def track_method(func, action_name, writer, gpu_id, step=0):
     @wraps(func)
     def wrapper(*args, **kwargs):
         start = time.time()
@@ -81,26 +81,30 @@ def track_method(func, action_name, writer, i=0):
             args=(stop_event, 0.5, action_name, writer),
             daemon=True,
         )
-        gpu_monitor = threading.Thread(
-            target=monitor_gpu, args=(stop_event, 0.5, action_name, writer), daemon=True
-        )
+        gpu_monitors = []
+        for i,g in enumerate(gpu_id):
+            gpu_monitor = threading.Thread(
+                target=monitor_gpu, args=(stop_event, 0.5, action_name, writer, i), daemon=True
+            )
+            gpu_monitor.start()
+            gpu_monitors.append(gpu_monitor)
 
         memory_tracker.start()
-        gpu_monitor.start()
         result = func(*args, **kwargs)
 
         end = time.time() - start
-        writer.add_scalar(f"{action_name}_sec", end, i)
+        writer.add_scalar(f"{action_name}_sec", end, step)
 
         elapsed_time = timedelta(seconds=end)
         days = elapsed_time.days
         hours, remainder = divmod(elapsed_time.seconds, 3600)
         minutes, seconds = divmod(remainder, 60)
         formatted_time = f"{days}d {hours:02}h {minutes:02}m {seconds:02}s"
-        writer.add_text(f"{action_name}_sec_str", formatted_time, i)
+        writer.add_text(f"{action_name}_sec_str", formatted_time, step)
         stop_event.set()
         memory_tracker.join()
-        gpu_monitor.join()
+        for g in gpu_monitors:
+            g.join()
         logging.info("Action done: %s", action_name)
 
         return result

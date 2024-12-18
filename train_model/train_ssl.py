@@ -314,7 +314,7 @@ def main():
 
     criterion = nn.CrossEntropyLoss().to(device)
     writer.add_text("criterion", criterion.__str__())
-    track_method(train, "train", writer, 0)(dl_train, model, criterion, optimizer, args.epochs, args.lr, args.cos, args.schedule, out_path, model_filename, writer, device, gpu_id=args.gpu_id)
+    track_method(train, "train", writer, gpu_id=args.gpu_id)(dl_train, model, criterion, optimizer, args.epochs, args.lr, args.cos, args.schedule, out_path, model_filename, writer, device, gpu_id=args.gpu_id)
 
 if __name__ == '__main__':
     logging.basicConfig(stream=sys.stdout, level=logging.INFO)
