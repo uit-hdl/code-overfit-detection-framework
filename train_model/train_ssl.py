@@ -14,6 +14,8 @@ import time
 
 import psutil
 
+from misc.benchmark import track_method
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description='PyTorch Moco With InceptionV4 Training')
@@ -96,7 +98,7 @@ from network.inception_v4 import InceptionV4
 from train_util import *
 
 
-def train(train_loader, model, criterion, optimizer, max_epochs, lr, cos, schedule, out_path, model_filename, writer, device, is_distributed, gpu_id=None):
+def train(train_loader, model, criterion, optimizer, max_epochs, lr, cos, schedule, out_path, model_filename, writer, device, gpu_id=None):
     if not gpu_id:
         gpu_id = [0]
     # even if you map device id 5,6 it will be seen as 0,1 in torch
@@ -143,10 +145,6 @@ def train(train_loader, model, criterion, optimizer, max_epochs, lr, cos, schedu
                 writer.add_scalar("iter_acc1", acc1, global_step=iter_step)
                 writer.add_scalar("iter_loss", loss.item(), global_step=iter_step)
                 logging.info(f"{step}/{len(train_loader)}, train_loss: {loss.item():.4f} acc1: {acc1:.2f} acc5: {acc5:.2f} step time: {(time.time() - step_start):.4f}")
-                writer.add_scalar("ram_used_mb", psutil.virtual_memory()[3] / 1000000, global_step=iter_step)
-                writer.add_scalar("cpu_used", psutil.cpu_percent(), global_step=iter_step)
-                for i,g in enumerate(gpu_id):
-                    writer.add_scalar(f"vram_used_device_{i}", torch.cuda.memory_reserved(i), global_step=iter_step)
         epoch_loss /= step
         acc5_total /= step
         acc1_total /= step
@@ -315,7 +313,7 @@ def main():
 
     criterion = nn.CrossEntropyLoss().to(device)
     writer.add_text("criterion", criterion.__str__())
-    train(dl_train, model, criterion, optimizer, args.epochs, args.lr, args.cos, args.schedule, out_path, model_filename, writer, device, is_distributed, gpu_id=args.gpu_id)
+    track_method(train, "train", writer, 0)(dl_train, model, criterion, optimizer, args.epochs, args.lr, args.cos, args.schedule, out_path, model_filename, writer, device, gpu_id=args.gpu_id)
 
 if __name__ == '__main__':
     logging.basicConfig(stream=sys.stdout, level=logging.INFO)
