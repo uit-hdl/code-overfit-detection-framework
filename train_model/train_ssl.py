@@ -299,7 +299,8 @@ def main():
         device = torch.device(f"cuda" if torch.cuda.is_available() else "cpu")
         model = torch.nn.parallel.DataParallel(model)
     else:
-        device = torch.device(f"cuda:{args.gpu_id[0]}" if torch.cuda.is_available() else "cpu")
+        # since we set CUDA_VISIBLE_DEVICES, 0 will always be the one we want
+        device = torch.device(f"cuda:0" if torch.cuda.is_available() else "cpu")
 
     model = model.to(device)
 
