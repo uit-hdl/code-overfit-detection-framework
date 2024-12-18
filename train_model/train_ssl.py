@@ -6,35 +6,14 @@ Train a MoCo V1 model using self-supervised learning. Stats are logged to tensor
 '''
 
 import argparse
-import csv
+import logging
 import os.path
 import random
 import sys
-import psutil
-import tempfile
 import time
-import warnings
-import logging
 
-import monai.transforms as mt
-import torch.backends.cudnn as cudnn
-import torch.nn as nn
-import torchvision.transforms as transforms
-from monai.data import DataLoader, Dataset, set_track_meta
-from monai.handlers.tensorboard_handlers import SummaryWriter
-from monai.utils import CommonKeys
-from torch.utils.data import Sampler
+import psutil
 
-from misc.monai_boilerplate import plot_distributions
-
-sys.path.append('./')
-import network.moco
-import samplers
-
-from misc.global_util import build_file_list, ensure_dir_exists
-
-from network.inception_v4 import InceptionV4
-from train_util import *
 
 def parse_args():
     parser = argparse.ArgumentParser(description='PyTorch Moco With InceptionV4 Training')
@@ -89,13 +68,40 @@ def parse_args():
     parser.add_argument('--file-list-path', default='./out/files.csv', type=str, help='path to list of file splits')
     parser.add_argument('--batch-slide-num', default=4, type=int)
     parser.add_argument('--batch-inst-num', default=0, type=int)
-    parser.add_argument('--gpu-id', default=1, type=int, help='GPU id to use.')
+    parser.add_argument('--gpu-id', nargs='+', default=[5,6], type=int, help='GPU id(s) to use.')
     parser.add_argument('--condition', default=False, type=bool, action=argparse.BooleanOptionalAction,
                         metavar='C', help='whether to use conditional sampling or not', dest='condition')
+    parser.add_argument('--checkpoint', default=True, type=bool, action=argparse.BooleanOptionalAction,
+                        metavar='X', help='whether to to sequential_checkpoint or not', dest='is_seq_ckpt')
     return parser.parse_args()
 
-def train(train_loader, model, criterion, optimizer, max_epochs, lr, cos, schedule, out_path, model_filename, writer, gpu_id=0):
-    writer.add_scalar(f"vram_available_device_{gpu_id}", torch.cuda.get_device_properties(gpu_id).total_memory / (1024*1024))
+__args = parse_args()
+# have to be set before importing any torch dependencies
+os.environ["CUDA_VISIBLE_DEVICES"] = ','.join(map(str, __args.gpu_id))
+
+import monai.transforms as mt
+import torch.backends.cudnn as cudnn
+import torch.nn as nn
+import torchvision.transforms as transforms
+from monai.data import DataLoader, Dataset, set_track_meta
+from monai.handlers.tensorboard_handlers import SummaryWriter
+
+sys.path.append('./')
+import network.moco
+import samplers
+
+from misc.global_util import build_file_list, ensure_dir_exists
+
+from network.inception_v4 import InceptionV4
+from train_util import *
+
+
+def train(train_loader, model, criterion, optimizer, max_epochs, lr, cos, schedule, out_path, model_filename, writer, device, is_distributed, gpu_id=None):
+    if not gpu_id:
+        gpu_id = [0]
+    # even if you map device id 5,6 it will be seen as 0,1 in torch
+    for i,g in enumerate(gpu_id):
+        writer.add_scalar(f"vram_available_device_{i}", torch.cuda.get_device_properties(i).total_memory / (1024*1024))
     set_track_meta(True)
     model_savename = ""
     step = 0
@@ -115,9 +121,10 @@ def train(train_loader, model, criterion, optimizer, max_epochs, lr, cos, schedu
                 # profiling: train dataload
                 # Download https://developer.nvidia.com/gameworksdownload#?dn=nsight-systems-2023-3 to visualize
                 batch_data = next(train_loader_iterator)
-                images_q, images_k = batch_data['q'].cuda(), batch_data['k'].cuda()
+                images_q, images_k = batch_data['q'].to(device), batch_data['k'].to(device)
 
                 output, target = model(im_q=images_q, im_k=images_k)
+                target = target.to(device)
                 loss = criterion(output, target)
 
                 acc1, acc5 = accuracy(output, target, topk=(1, 5))
@@ -138,7 +145,8 @@ def train(train_loader, model, criterion, optimizer, max_epochs, lr, cos, schedu
                 logging.info(f"{step}/{len(train_loader)}, train_loss: {loss.item():.4f} acc1: {acc1:.2f} acc5: {acc5:.2f} step time: {(time.time() - step_start):.4f}")
                 writer.add_scalar("ram_used_mb", psutil.virtual_memory()[3] / 1000000, global_step=iter_step)
                 writer.add_scalar("cpu_used", psutil.cpu_percent(), global_step=iter_step)
-                writer.add_scalar(f"vram_used_device_{gpu_id}", torch.cuda.memory_reserved(gpu_id), global_step=iter_step)
+                for i,g in enumerate(gpu_id):
+                    writer.add_scalar(f"vram_used_device_{i}", torch.cuda.memory_reserved(i), global_step=iter_step)
         epoch_loss /= step
         acc5_total /= step
         acc1_total /= step
@@ -243,7 +251,6 @@ def main():
         logging.error('No GPU device available')
         sys.exit(1)
 
-    device = torch.device(f"cuda:{args.gpu_id}" if torch.cuda.is_available() else "cpu")
     logging.info('Create dataset')
 
     model_name = "moco"
@@ -287,20 +294,28 @@ def main():
     logging.info("=> creating model '{}'".format('x64'))
     # TODO: re-enable seq.ckpt
     model = network.moco.MoCo(
-        base_encoder=InceptionV4, dim=args.moco_dim, K=args.moco_k, m=args.moco_m, T=args.moco_t, mlp=args.mlp, condition=args.condition)
+        base_encoder=InceptionV4, dim=args.moco_dim, K=args.moco_k, m=args.moco_m, T=args.moco_t, mlp=args.mlp, condition=args.condition, do_checkpoint=args.is_seq_ckpt)
 
-    #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    is_distributed = len(args.gpu_id) > 1
+    if is_distributed:
+        device = torch.device(f"cuda" if torch.cuda.is_available() else "cpu")
+        model = torch.nn.parallel.DataParallel(model)
+    else:
+        device = torch.device(f"cuda:{args.gpu_id[0]}" if torch.cuda.is_available() else "cpu")
+
     model = model.to(device)
+
     optimizer = torch.optim.SGD(model.parameters(), args.lr,
                                 momentum=args.momentum,
                                 weight_decay=args.weight_decay)
     writer.add_text("optimizer", optimizer.__str__())
     writer.add_text("model", str(model.__class__))
+    writer.add_text("sequential_checkpointing", str(args.is_seq_ckpt))
     logging.info('Model builder done, placed on cuda()')
 
     criterion = nn.CrossEntropyLoss().to(device)
     writer.add_text("criterion", criterion.__str__())
-    train(dl_train, model, criterion, optimizer, args.epochs, args.lr, args.cos, args.schedule, out_path, model_filename, writer, gpu_id=args.gpu_id)
+    train(dl_train, model, criterion, optimizer, args.epochs, args.lr, args.cos, args.schedule, out_path, model_filename, writer, device, is_distributed, gpu_id=args.gpu_id)
 
 if __name__ == '__main__':
     logging.basicConfig(stream=sys.stdout, level=logging.INFO)
