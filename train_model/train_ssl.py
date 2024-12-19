@@ -181,6 +181,7 @@ def wrap_data(train_data, val_data, batch_size, batch_slide_num, batch_inst_num,
             mt.RandFlipd(["q", "k"], prob=0.5, spatial_axis=1),
             mt.ToTensord(["q", "k"], track_meta=False),
             mt.EnsureTyped(["q", "k"], track_meta=False),
+            mt.ToCupyd(keys=["q", "k"]),
         ]
     )
 
