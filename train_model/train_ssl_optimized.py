@@ -119,32 +119,32 @@ def train(train_loader, model, criterion, optimizer, max_epochs, lr, cos, schedu
         adjust_learning_rate(optimizer, epoch, lr, cos, schedule, max_epochs)
 
         for step in range(1, len(train_loader) + 1):
-                step_start = time.time()
-                # profiling: train dataload
-                # Download https://developer.nvidia.com/gameworksdownload#?dn=nsight-systems-2023-3 to visualize
-                batch_data = next(train_loader_iterator)
-                images_q, images_k = batch_data['q'].to(device), batch_data['k'].to(device)
+            step_start = time.time()
+            # profiling: train dataload
+            # Download https://developer.nvidia.com/gameworksdownload#?dn=nsight-systems-2023-3 to visualize
+            batch_data = next(train_loader_iterator)
+            images_q, images_k = batch_data['q'].to(device), batch_data['k'].to(device)
 
-                output, target = model(im_q=images_q, im_k=images_k)
-                target = target.to(device)
-                loss = criterion(output, target)
+            output, target = model(im_q=images_q, im_k=images_k)
+            target = target.to(device)
+            loss = criterion(output, target)
 
-                acc1, acc5 = accuracy(output, target, topk=(1, 5))
+            acc1, acc5 = accuracy(output, target, topk=(1, 5))
 
-                # compute gradient and do SGD step
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
+            # compute gradient and do SGD step
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
 
-                epoch_loss += loss.item()
-                acc5_total += acc5
-                acc1_total += acc1
-                iter_step = ((epoch-1)*step) + step
-                writer.add_scalar("iter_loss", loss.item(), global_step=iter_step)
-                writer.add_scalar("iter_acc5", acc5, global_step=iter_step)
-                writer.add_scalar("iter_acc1", acc1, global_step=iter_step)
-                writer.add_scalar("iter_loss", loss.item(), global_step=iter_step)
-                logging.info(f"{step}/{len(train_loader)}, train_loss: {loss.item():.4f} acc1: {acc1:.2f} acc5: {acc5:.2f} step time: {(time.time() - step_start):.4f}")
+            epoch_loss += loss.item()
+            acc5_total += acc5
+            acc1_total += acc1
+            iter_step = ((epoch-1)*step) + step
+            writer.add_scalar("iter_loss", loss.item(), global_step=iter_step)
+            writer.add_scalar("iter_acc5", acc5, global_step=iter_step)
+            writer.add_scalar("iter_acc1", acc1, global_step=iter_step)
+            writer.add_scalar("iter_loss", loss.item(), global_step=iter_step)
+            logging.info(f"{step}/{len(train_loader)}, train_loss: {loss.item():.4f} acc1: {acc1:.2f} acc5: {acc5:.2f} step time: {(time.time() - step_start):.4f}")
         epoch_loss /= step
         acc5_total /= step
         acc1_total /= step
@@ -284,10 +284,10 @@ def main():
         torch.manual_seed(args.seed)
         cudnn.deterministic = True
         logging.warning('You have chosen to seed training. '
-                      'This will turn on the CUDNN deterministic setting, '
-                      'which can slow down your training considerably! '
-                      'You may see unexpected behavior when restarting '
-                      'from checkpoints.')
+                        'This will turn on the CUDNN deterministic setting, '
+                        'which can slow down your training considerably! '
+                        'You may see unexpected behavior when restarting '
+                        'from checkpoints.')
 
     logging.info("=> creating model '{}'".format('x64'))
     # TODO: re-enable seq.ckpt
