@@ -5,8 +5,6 @@ from collections import defaultdict
 from monai.utils import Range
 from torch.utils.data import Sampler
 
-from train_util import *
-
 no_profiling = contextlib.nullcontext()
 
 class MySampler(Sampler):

@@ -8,6 +8,7 @@ Train a MoCo V1 model using self-supervised learning. Stats are logged to tensor
 import argparse
 import logging
 import os.path
+import math
 import random
 import sys
 import time
@@ -70,7 +71,7 @@ def parse_args():
     parser.add_argument('--file-list-path', default='./out/files.csv', type=str, help='path to list of file splits')
     parser.add_argument('--batch-slide-num', default=4, type=int)
     parser.add_argument('--batch-inst-num', default=0, type=int)
-    parser.add_argument('--gpu-id', nargs='+', default=[5,6], type=int, help='GPU id(s) to use.')
+    parser.add_argument('--gpu-id', nargs='+', default=[0], type=int, help='GPU id(s) to use.')
     parser.add_argument('--condition', default=False, type=bool, action=argparse.BooleanOptionalAction,
                         metavar='C', help='whether to use conditional sampling or not', dest='condition')
     parser.add_argument('--checkpoint', default=True, type=bool, action=argparse.BooleanOptionalAction,
@@ -82,6 +83,7 @@ __args = parse_args()
 os.environ["CUDA_VISIBLE_DEVICES"] = ','.join(map(str, __args.gpu_id))
 
 import monai.transforms as mt
+import torch
 import torch.backends.cudnn as cudnn
 import torch.nn as nn
 import torchvision.transforms as transforms
