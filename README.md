@@ -38,7 +38,6 @@ ipython train_model/train_ssl.py -- --no-condition --src-dir /data/TCGA-LUSC-til
 ipython train_model/train_ssl.py -- --no-condition --src-dir /data/TCGA-LUSC-tiles --epochs 300 --moco-k 65536
 
 ipython feature_extraction/extract_features_phikon2.py -- --src-dir /data/TCGA-LUSC-tiles --out-dir out/
-ipython feature_extraction/extract_features_phikon2.py -- --src-dir /data/CPTAC-tiles/ --out-dir out/
 ipython feature_extraction/extract_features_inceptionv4.py -- --src-dir /data/TCGA-LUSC-tiles \
   --out-dir out --model-pth out/ --model-pth 'out/models/MoCo/TCGA_LUSC/model/checkpoint_MoCo_TCGA_LUSC_0200_False_m128_n0_o0_K128.pth.tar'
 # ..repeat for other models..
