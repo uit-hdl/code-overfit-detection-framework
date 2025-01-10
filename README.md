@@ -13,10 +13,9 @@ The code here covers:
 The UMAPs and linear probing from the paper are [here](http://github.com/uit-hdl/...). It's kept separate to make it easier to use as standalone tools.
 
 # Dataset
-The dataset is TCGA-LUSC and CPTAC. Both can be downloaded from official portals (I'm not giving a link since it keeps changing). The annotations I used are in the [annotations folder](./annotations/).
-Note that for clinical annotations I used the work from [liu et al. (2018)](https://pubmed.ncbi.nlm.nih.gov/29625055/)
+The dataset is TCGA-LUSC. It can be downloaded from official portals (I'm not giving a link since it keeps changing). The annotations I used are in the [annotations folder](./annotations/).
+For clinical annotations, you only need to use the filename, but if you want extended clinical information I recommend download TCGA annotations here from [liu et al. (2018)](https://pubmed.ncbi.nlm.nih.gov/29625055/)
 The annotations are downloaded from the same datasets, look for "clinical" and "slide" which should give you two separate .tsv files.
-Otherwise, a lot of the information is in the filename itself.
 
 # Installation
 ```bash
@@ -24,15 +23,13 @@ pip install -r requirements.txt
 ```
 
 # Recreating the paper
-Assuming you have the raw dataset from the TCGA portal in "/data/TCGA-LUSC". We use ipython since it has a better/easier way of including paths (otherwise you might get "module not found")
+Assuming you have the raw dataset from the TCGA portal in "/data/TCGA-LUSC". We use ipython since regular python may give a "module not found":
 ```bash
 # create tiles and annotations
 # the current default color normalization is Vahadane, but you can change this in the script
 # according to many other papers, normalization has little impact on TSS bias, so you could consider changing color normalization to speed it up
 ipython preprocessing/process_tcga.py -- --wsi-path /data/TCGA-LUSC --out-dir /data/TCGA-LUSC-tiles
 ipython preprocessing/gen_tcga_tile_labels.py -- --data-dir /data/TCGA-LUSC-tiles --out-dir out
-# create a dataset that only has the top 5 institutions
-
 
 # train the model. For our computer this took about 3 days per model
 # you can also skip this and just use PhikonV2 (next steps) to avoid training
@@ -46,7 +43,7 @@ ipython feature_extraction/extract_features_inceptionv4.py -- --src-dir /data/TC
   --out-dir out --model-pth out/ --model-pth 'out/models/MoCo/TCGA_LUSC/model/checkpoint_MoCo_TCGA_LUSC_0200_False_m128_n0_o0_K128.pth.tar'
 # ..repeat for other models..
 ```
-After running the above, you'll have embeddings saved in './out/*.zarr'. These can then be used by our `feature_inspect` package.
+After running the above, you'll have embeddings saved in `./out/*.zarr`. These can then be used by our `feature_inspect` package.
 To view model stats for InceptionV4, you can use tensorboard: `tensorboard --logdir=out/models/MoCo/TCGA_LUSC/model/`
 
 # License
