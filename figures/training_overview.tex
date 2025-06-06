@@ -1,6 +1,14 @@
 \documentclass[tikz, margin=5mm]{standalone}
 \usepackage{tikz}
-\usetikzlibrary{shapes.geometric, arrows, positioning, decorations.pathreplacing, calc, matrix, fit}
+\usetikzlibrary{%
+  arrows,
+  calc,
+  decorations.pathreplacing,
+  fit,
+  matrix,
+  positioning,
+  shapes.geometric,
+  }
 % \usepackage[margin=0.5cm]{geometry}
 
 
@@ -32,13 +40,6 @@
   \draw[black, thick] (bottom left) rectangle (top right);
   \node[below left=0.0cm and 0.9cm of bottom left, anchor=north west, text width=4.2cm, align=center] (label) {Data};
 
-%  \matrix[mymatrix, below=0.1cm of label, draw] (mx1) {
-%    |[title]| \\
-%    % Labels \\
-%    Sensitive Variables \\
-%  };
-%  \node[below=0.0cm of mx1, text width=4.2cm, align=center] (label) {Annotations};
-
   \end{tikzpicture}
 };
 
@@ -57,16 +58,6 @@
 }
 
       \node at ([shift={(2*\offset, -\numLayers*\offset - 1.5)}]Model) (ssl) {DL Model};
-
-
-%\node[below left=-.2cm and -1.35cm of ssl] (monai) {
-%  \includegraphics[width=1.5cm, height=1.5cm]{./MONAI-logo-color.png}
-%};
-%
-%\node[below right=0.1cm and -1.35cm of ssl] (pytorch) {
-%  \includegraphics[width=1.5cm, height=1.5cm]{./Pytorch_logo.png}
-%};
-%
 \end{tikzpicture}
   };
 

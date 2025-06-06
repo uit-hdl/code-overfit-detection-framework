@@ -1,9 +1,5 @@
 #!/usr/bin/env python
 
-# this class should use simple_triton client to get embeddings from triton server
-# then use umap_plot to reduce the dimensionality of the embeddings
-# and save the reduced embeddings to a file
-
 import argparse
 from transformers import AutoImageProcessor, AutoModel
 import glob
@@ -16,6 +12,7 @@ from collections import defaultdict
 
 import numcodecs
 import zarr
+import zarr.storage
 
 import monai.transforms as mt
 import pandas as pd
@@ -34,7 +31,7 @@ from network.inception_v4 import InceptionV4
 def main():
     parser = argparse.ArgumentParser(description='Extract embeddings ')
 
-    parser.add_argument('--src-dir', default=os.path.join('/data', 'TCGA_LUSC-tiles'), type=str, help='path to dataset, folder of images')
+    parser.add_argument('--src-dir', default=os.path.join('/data', 'TCGA_LUSC', 'tiles'), type=str, help='path to dataset, folder of images')
     parser.add_argument('--gpu-id', default=0, type=int, help='GPU id to use.')
     parser.add_argument('--out-dir', default='out', type=str, help='path to save extracted embeddings')
     parser.add_argument('--debug-mode', default=False, type=bool, action=argparse.BooleanOptionalAction,
@@ -59,6 +56,9 @@ def main():
     for filename in glob.glob(f"{args.src_dir}{os.sep}**{os.sep}*", recursive=True):
         if os.path.isfile(filename) and filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
             data.append({CommonKeys.IMAGE: filename, "filename": filename})
+
+    if not data:
+        raise ValueError(f"No data found in {args.src_dir}")
 
     if args.debug_mode:
         limit = 30
@@ -86,16 +86,16 @@ def main():
                     CommonKeys.IMAGE: f.cpu().detach().numpy(),
                 }
 
-    root = zarr.group()
+    root = zarr.group(store=embedding_dest_path)
+
     for key, value in embedding_dict.items():
         dataset = root.create_dataset(
             key,
             data=value[CommonKeys.IMAGE],
+            shape=value[CommonKeys.IMAGE].shape,
             compressor=numcodecs.Blosc(cname='zstd', clevel=3, shuffle=numcodecs.Blosc.AUTOSHUFFLE)
         )
 
-    dir_store = zarr.DirectoryStore(embedding_dest_path)
-    n_copied, n_skipped, n_bytes_copied = zarr.copy_store(root.store, dir_store, log=stdout)
     logging.info(f"Wrote zarr embeddings to {embedding_dest_path}")
 
 if __name__ == "__main__":
