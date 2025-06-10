@@ -10,7 +10,7 @@ The code here covers:
 * [fine-tuning phikon/MoCo v1](./train_model/relabelling.py)
 * [Creating figures for the paper](./figures/)
 
-The UMAPs and linear probing from the paper are [here](http://github.com/uit-hdl/...). It's kept separate to make it easier to use as standalone tools.
+The code for UMAPs and linear probing from the paper are @ [github.com/uit-hdl/feature-inspect](http://github.com/uit-hdl/feature-inspect). It's kept separate to make it easier to use as standalone tools.
 
 # Dataset
 The dataset is TCGA-LUSC. It can be downloaded from official portals (I'm not giving a link since it keeps changing). The annotations I used are in the [annotations folder](./annotations/).

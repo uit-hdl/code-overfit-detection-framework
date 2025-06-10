@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 '''
-Fine-tune using the output from the embeddings of a model
+Make UMAP plots for the embeddings from a model
 To make this example work, save a .zarr array with model embeddings stored in arrays to the path specified in the embeddings-path argument
 Also provide a label-file with the labels for the embeddings, which has to have a format like:
 filename,label_1,label_2,label_3
@@ -11,7 +11,7 @@ filename,label_1,label_2,label_3
 The output will be stored in the out-dir, which will contain the trained model and tensorboard logs
 
 Example:
-  python examples/use_case_linear_probe.py --embeddings-path out/phikon_TCGA_LUSC-tiles_embedding.zarr \
+  python examples/make_umap.py --embeddings-path out/phikon_TCGA_LUSC-tiles_embedding.zarr \
     --label-file out/top5TSSfiles.csv \
     --out-dir out \
     --tensorboard-name tb_out \
@@ -21,6 +21,8 @@ import argparse
 import logging
 import os
 import sys
+
+import numpy.typing
 from sklearn.metrics import accuracy_score, cohen_kappa_score
 import torch.nn.functional as F
 from collections import defaultdict
@@ -35,8 +37,7 @@ import torch
 import zarr
 from IPython.utils.path import ensure_dir_exists
 
-from lp_inspect import make_lp
-from lp_inspect.model import LinearProbe
+from umap_inspect.explore import make_umap
 import logging
 
 from monai.networks import eval_mode
@@ -95,23 +96,15 @@ def find_all_arrays(group):
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='Fine-tune embeddings from a model using linear probe')
+    parser = argparse.ArgumentParser(description='Make UMAP plots from the embeddings from a model')
 
-    parser.add_argument('--epochs', default=20, type=int, metavar='N', help='number of total epochs to run')
-    parser.add_argument('-b', '--batch-size', default=256, type=int,
-                        metavar='N',
-                        help=f'batch size, this is the total batch size of all GPUs on the current node when using Data Parallel or Distributed Data Parallel')
     parser.add_argument('--embeddings-path', default=[], nargs='+', type=str, help="locations of embedding zarr (e.g. from save_embeddings.py)")
-    parser.add_argument('--embeddings-path-1', default=os.path.join('out', 'inception_TCGA_LUSC-tiles_embedding.zarr'), type=str,
-                        help="location of embedding zarr (e.g. from save_embeddings.py)")
     parser.add_argument('--label-file', type=str, help='path to file annotations')
     parser.add_argument('--label-key', type=str, help='default key to use for doing fine-tuning. If not set, will use the first column in the label-file')
     parser.add_argument('--out-dir', default='./out', type=str, help='path to save model output and tensorboards')
     parser.add_argument('--debug-mode', default=False, type=bool, action=argparse.BooleanOptionalAction,
                         metavar='D', help='turn debugging on or off. Will limit amount of data used. Development only',
                         dest='debug_mode')
-    parser.add_argument('--lr', '--learning-rate', default=1e-05, type=float,
-                        metavar='LR', help='initial learning rate', dest='lr')
     parser.add_argument(
         "--tensorboard-name",
         required=False,
@@ -122,11 +115,9 @@ def parse_args():
 
 if __name__ == "__main__":
     logging.basicConfig(stream=sys.stdout, level=logging.INFO)
-    loggers = [logging.getLogger()]  # get the root logger
-    loggers = loggers + [logging.getLogger(name) for name in logging.root.manager.loggerDict]
 
-    feature_inspect_logger = logging.getLogger("feature_inspect")
-    feature_inspect_logger.setLevel(logging.WARNING)
+    # feature_inspect_logger = logging.getLogger("feature_inspect")
+    # feature_inspect_logger.setLevel(logging.WARNING)
     ignite_logger = logging.getLogger("ignite")
     ignite_logger.setLevel(logging.WARNING)
     args = parse_args()
@@ -174,22 +165,6 @@ if __name__ == "__main__":
         # sort new_data by "filename"
         new_data.sort(key=lambda x: x["filename"])
         embedding_sets.append((ep, new_data))
-    # create two mock datasets that could have been produced by the code above, each with 256 entries
-    # mock_1 = [{"image": np.random.rand(256).astype(np.float32), "filename": f"img_{i}.png", "label": np.random.randint(0, 3)} for i in range(256)]
-    # mock_2 = [{"image": np.random.rand(256).astype(np.float32), "filename": mock_1[i]["filename"], "label": mock_1[i]["label"]} for i in range(256)]
-    # embedding_sets.append(("mock 1", mock_1))
-    # embedding_sets.append(("mock 2", mock_2))
-
-    # verify that each set in embedding_sets have the exact same "filename" entries
-    # ... only have to this once for sanity checks
-    # for i, ep in enumerate(embedding_sets):
-    #     ep_filenames = [d["filename"] for d in ep]
-    #     for j, ep2 in enumerate(embedding_sets):
-    #         if i == j:
-    #             continue
-    #         ep2_filenames = [d["filename"] for d in ep2]
-    #         if ep_filenames != ep2_filenames:
-    #             raise ValueError(f"embedding_sets[{i}] and embedding_sets[{j}] have different filenames")
 
     run_name = args.tensorboard_name or str(time())
     writer = init_tb_writer(os.path.join(args.out_dir, "lp_tb_logs"), run_name, extra=
@@ -203,65 +178,26 @@ if __name__ == "__main__":
     class_map_inv = {i: c for i, c in enumerate(labels)}
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    rounds = 10
-    lb = 0; ub = len(embedding_sets[0])
-    # randomly sample 10% of numbers from lb to ub
-    dropped_indices : List[np.ndarray] = []
-    for n in range(rounds):
-        indices = np.random.choice(np.arange(lb, ub), size=int(0.1 * len(embedding_sets[0])), replace=False)
-        dropped_indices.append(indices)
+    kept_indices : numpy.typing.NDArray[int]= np.random.choice(np.arange(0, 10000), size=10000, replace=False)
 
+    rounds = 1
     ensure_dir_exists(args.out_dir)
     gt_li = []
     pred_li = []
     for label,ep in embedding_sets:
-        accuracies = []
-        pred_ep = []
-        gt_ep = []
-        for n in range(rounds):
-            # drop any entry in ep at given indices
-            data = np.copy(ep)
-            mask = ~np.isin(data, dropped_indices[n])
-            data = data[mask]
+        data = np.copy(ep)
+        mask = np.isin(data, kept_indices)
+        data = data[mask].tolist()
 
-            dl_test, model, _ = make_lp(data=data.tolist(),
-                    out_dir=args.out_dir,
-                    balanced=True,
-                    writer=writer,
-                    epochs=args.epochs,
-                    eval_models = False,
-                    batch_size=args.batch_size,
-                    lr=args.lr)
-            preds = np.array([])
-            gts = np.array([])
-            with eval_mode(model):
-                for item in tqdm(dl_test):
-                    y = model(item["image"].to(device))
-                    prob = F.softmax(y).detach().to("cpu")
-                    pred = torch.argmax(prob, dim=1).numpy()
-                    preds = np.append(preds, pred)
-                    gt = item["label"].detach().cpu().numpy()
-                    gts = np.append(gts, gt)
-            pred_ep.append(preds)
-            gt_ep.append(gts)
-            # compute accuracy between preds and gts
-            accuracy = accuracy_score(gts, preds)
-            accuracies.append(accuracy)
-
-        # compute 95% conf
-        cl = 0.95  # confidence level
-        ci = stats.t.interval(cl, df=len(accuracies) - 1, loc=np.mean(accuracies),
-                              scale=np.std(accuracies, ddof=1) / np.sqrt(len(accuracies)))
-        print(f"{label}: ci={ci}, mean={np.mean(accuracies)}, std={np.std(accuracies, ddof=1)}")
-
-        pred_li.append(pred_ep)
-
-    if len(pred_li) == 2:
-        #compute kohens kappa between the two pred_li entries
-        for d1, d2 in zip(pred_li[0], pred_li[1]):
-            kappa = stats.kendalltau(d1, d2)[0]
-            print(f"kappa={kappa}")
-
+        # drop any entry in ep at given indices
+        dst_dist = os.path.join(os.path.dirname(args.out_dir), os.path.basename(args.out_dir) + f"_{os.path.basename(label).split("_")[0]}")
+        make_umap(data=[x["image"] for x in data],
+                  labels=[x["label"] for x in data],
+                out_dir=args.out_dir,
+                writer=writer,
+                do_ss=True,
+                  render_html=True,
+                  )
 
     logging.info("Inspect results with:\ntensorboard --logdir %s", os.path.join(args.out_dir, "tb_logs"))
     logging.info("Done")

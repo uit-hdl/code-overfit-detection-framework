@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import argparse
+import random
 from transformers import AutoImageProcessor, AutoModel
 import glob
 import logging
@@ -61,8 +62,10 @@ def main():
         raise ValueError(f"No data found in {args.src_dir}")
 
     if args.debug_mode:
-        limit = 30
+        limit = 256
         logging.warning(f"Debug mode - limiting data to {limit} samples")
+        # shuffle order of "data"
+        random.shuffle(data)
         data = data[:limit]
 
     embedding_dest_path = os.path.join(args.out_dir, f"phikon_{os.path.basename(args.src_dir)}_embedding.zarr")
@@ -86,15 +89,14 @@ def main():
                     CommonKeys.IMAGE: f.cpu().detach().numpy(),
                 }
 
-    root = zarr.group(store=embedding_dest_path)
-
     for key, value in embedding_dict.items():
-        dataset = root.create_dataset(
-            key,
-            data=value[CommonKeys.IMAGE],
+        dataset = zarr.create_array(store=embedding_dest_path,
+            name=key,
             shape=value[CommonKeys.IMAGE].shape,
-            compressor=numcodecs.Blosc(cname='zstd', clevel=3, shuffle=numcodecs.Blosc.AUTOSHUFFLE)
+            dtype=value[CommonKeys.IMAGE].dtype,
         )
+        dataset[:] = value[CommonKeys.IMAGE]
+
 
     logging.info(f"Wrote zarr embeddings to {embedding_dest_path}")
 

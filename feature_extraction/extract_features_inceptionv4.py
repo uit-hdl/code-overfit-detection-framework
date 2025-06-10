@@ -93,16 +93,14 @@ def main():
                 CommonKeys.IMAGE: f.cpu().detach().numpy(),
             }
 
-    root = zarr.group()
     for key, value in embedding_dict.items():
-        dataset = root.create_dataset(
-            key,
-            data=value[CommonKeys.IMAGE],
-            compressor=numcodecs.Blosc(cname='zstd', clevel=3, shuffle=numcodecs.Blosc.AUTOSHUFFLE)
-        )
+        dataset = zarr.create_array(store=embedding_dest_path,
+                                    name=key,
+                                    shape=value[CommonKeys.IMAGE].shape,
+                                    dtype=value[CommonKeys.IMAGE].dtype,
+                                    )
+        dataset[:] = value[CommonKeys.IMAGE]
 
-    dir_store = zarr.DirectoryStore(embedding_dest_path)
-    n_copied, n_skipped, n_bytes_copied = zarr.copy_store(root.store, dir_store, log=stdout)
     logging.info(f"Wrote zarr embeddings to {embedding_dest_path}")
 
 if __name__ == "__main__":
