@@ -286,7 +286,7 @@ def main():
                                   f'checkpoint_{model_name}_{data_dir_name}_#NUM#_{args.condition}_m{args.batch_size}_n{args.batch_slide_num}_o{args.batch_inst_num}_K{args.moco_k}.pth.tar')
     logging.info("Model dest filename: %s" % model_filename)
 
-    writer = SummaryWriter(log_dir=model_filename.replace("_#NUM#", "") + "_runs")
+    writer = SummaryWriter(log_dir=model_filename.replace("_#NUM#", "") + "_runs/" + str(time.time()))
     writer.add_text("git_sha", os.popen('git rev-parse HEAD').read().strip())
 
     train_data, val_data, _ = build_file_list(args.src_dir, args.file_list_path)
