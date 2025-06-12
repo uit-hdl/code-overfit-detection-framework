@@ -19,7 +19,13 @@ The annotations are downloaded from the same datasets, look for "clinical" and "
 
 # Installation
 ```bash
-pip install -r requirements.txt
+# install miniconda. Then:
+conda create -y -c conda-forge --name overfit-detection python=3.12.1 --file requirements.txt
+# OR, with python >=3.11:
+# python -m venv venv && ./venv/bin/activate && pip install -r requirements.txt
+
+# torch is now removed from conda, have to install post-hoc
+pip install monai torch torchvision opencv-python
 ```
 
 # Recreating the paper
