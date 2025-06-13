@@ -99,6 +99,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Make UMAP plots from the embeddings from a model')
 
     parser.add_argument('--embeddings-path', default=[], nargs='+', type=str, help="locations of embedding zarr (e.g. from save_embeddings.py)")
+    parser.add_argument('--sizes', default=[], nargs='+', type=int, help="how many points to use for each embedding. E.g. `10 1000` will produce two plots with 10 and 1000 points respectively.")
     parser.add_argument('--label-file', type=str, help='path to file annotations')
     parser.add_argument('--label-key', type=str, help='default key to use for doing fine-tuning. If not set, will use the first column in the label-file')
     parser.add_argument('--out-dir', default='./out', type=str, help='path to save model output and tensorboards')
@@ -131,7 +132,7 @@ if __name__ == "__main__":
         label_key = labels.columns[0]
 
     if args.debug_mode:
-        limit = 10 * args.batch_size
+        limit = 100
         args.epochs = min(2, args.epochs)
         # shuffle the order in labels
         labels = labels.sample(frac=1)
@@ -165,39 +166,47 @@ if __name__ == "__main__":
         # sort new_data by "filename"
         new_data.sort(key=lambda x: x["filename"])
         embedding_sets.append((ep, new_data))
+    # mock_1 = [{"image": np.random.rand(args.sizes[0]).astype(np.float32), "filename": f"img_{i}.png", "label": np.random.randint(0, 3)} for i in range(256)]
+    # embedding_sets.append(("mock1", mock_1))
+    # for i,n in enumerate(args.sizes[1:]):
+    #     mocky = [{"image": np.random.rand(n).astype(np.float32), "filename": mock_1[i]["filename"], "label": mock_1[i]["label"]} for i in range(256)]
+    #     embedding_sets.append((f"mock{i}", mocky))
 
     run_name = args.tensorboard_name or str(time())
-    writer = init_tb_writer(os.path.join(args.out_dir, "lp_tb_logs"), run_name, extra=
+    writer = init_tb_writer(os.path.join(args.out_dir, "umap_tb_logs"), run_name, extra=
     {
         "embeddings_path": ','.join(args.embeddings_path),
-        "epochs": args.epochs,
-        "batch": args.batch_size,
         "debug": str(args.debug_mode),
     })
     class_map = {c: i for i, c in enumerate(labels)}
     class_map_inv = {i: c for i, c in enumerate(labels)}
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    kept_indices : numpy.typing.NDArray[int]= np.random.choice(np.arange(0, 10000), size=10000, replace=False)
+    for n in args.sizes:
+        max_index = len(embedding_sets[0][1])
+        kept_indices : numpy.typing.NDArray[int] = np.random.choice(np.arange(0, max_index), size=min(n, max_index), replace=False)
 
-    rounds = 1
-    ensure_dir_exists(args.out_dir)
-    gt_li = []
-    pred_li = []
-    for label,ep in embedding_sets:
-        data = np.copy(ep)
-        mask = np.isin(data, kept_indices)
-        data = data[mask].tolist()
+        rounds = 1
+        ensure_dir_exists(args.out_dir)
+        gt_li = []
+        pred_li = []
+        for label,ep in embedding_sets:
+            data = np.copy(ep)[kept_indices].tolist()
 
-        # drop any entry in ep at given indices
-        dst_dist = os.path.join(os.path.dirname(args.out_dir), os.path.basename(args.out_dir) + f"_{os.path.basename(label).split("_")[0]}")
-        make_umap(data=[x["image"] for x in data],
-                  labels=[x["label"] for x in data],
-                out_dir=args.out_dir,
-                writer=writer,
-                do_ss=True,
-                  render_html=True,
-                  )
+            assert len(data) > 0, f"No data"
 
-    logging.info("Inspect results with:\ntensorboard --logdir %s", os.path.join(args.out_dir, "tb_logs"))
-    logging.info("Done")
+            labels = pd.DataFrame([{"label": x["label"], "filename": x["filename"]} for x in data])
+
+
+            # drop any entry in ep at given indices
+            dst_dist = os.path.join(os.path.dirname(args.out_dir), os.path.basename(args.out_dir) + f"_{os.path.basename(label).split("_")[0]}")
+            make_umap(values=[x["image"] for x in data],
+                      labels=labels,
+                    out_dir=dst_dist,
+                    writer=writer,
+                    do_ss=True,
+                      render_html=True,
+                      )
+
+        logging.info("Inspect results with:\ntensorboard --logdir %s", os.path.join(args.out_dir, "tb_logs"))
+        logging.info("Done")

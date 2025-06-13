@@ -174,6 +174,7 @@ if __name__ == "__main__":
         # sort new_data by "filename"
         new_data.sort(key=lambda x: x["filename"])
         embedding_sets.append((ep, new_data))
+
     # create two mock datasets that could have been produced by the code above, each with 256 entries
     # mock_1 = [{"image": np.random.rand(256).astype(np.float32), "filename": f"img_{i}.png", "label": np.random.randint(0, 3)} for i in range(256)]
     # mock_2 = [{"image": np.random.rand(256).astype(np.float32), "filename": mock_1[i]["filename"], "label": mock_1[i]["label"]} for i in range(256)]
@@ -220,9 +221,9 @@ if __name__ == "__main__":
         gt_ep = []
         for n in range(rounds):
             # drop any entry in ep at given indices
-            data = np.copy(ep)
-            mask = ~np.isin(data, dropped_indices[n])
-            data = data[mask]
+            data = np.delete(np.copy(ep), dropped_indices[n])
+
+            assert len(data) > 0, f"No data"
 
             dl_test, model, _ = make_lp(data=data.tolist(),
                     out_dir=args.out_dir,
@@ -255,12 +256,18 @@ if __name__ == "__main__":
         print(f"{label}: ci={ci}, mean={np.mean(accuracies)}, std={np.std(accuracies, ddof=1)}")
 
         pred_li.append(pred_ep)
+        gt_li.append(gt_ep)
 
     if len(pred_li) == 2:
         #compute kohens kappa between the two pred_li entries
         for d1, d2 in zip(pred_li[0], pred_li[1]):
-            kappa = stats.kendalltau(d1, d2)[0]
-            print(f"kappa={kappa}")
+            kappa = cohen_kappa_score(d1, d2)
+            print(f"kappa between predictors={kappa}")
+    for l,p,g in zip([l[0] for l in embedding_sets], pred_li, gt_li):
+        for d1, d2 in zip(p, g):
+            kappa = cohen_kappa_score(d1, d2)
+            print(f"kappa between {l} and gt={kappa}")
+
 
 
     logging.info("Inspect results with:\ntensorboard --logdir %s", os.path.join(args.out_dir, "tb_logs"))
