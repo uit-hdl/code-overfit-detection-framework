@@ -2,6 +2,7 @@
 
 import argparse
 import glob
+import cv2
 import logging
 import os
 import pickle
@@ -217,32 +218,25 @@ def main():
         
     # Visualize results
     from PIL import Image
+    ensure_dir_exists(args.out_dir)
 
     for idx, (img_path, saliency_map) in enumerate(zip(image_paths, saliency_maps)):
-        # Load original image in RGB
-        orig_img = Image.open(img_path).convert("RGB")
+        tcga_name = os.path.join(os.path.basename(os.path.dirname(img_path)), os.path.basename(img_path)).replace(os.sep, "__")
 
-        fig, axs = plt.subplots(1, 3, figsize=(12, 4))
+        orig_img = Image.open(img_path).convert("RGB").resize((224, 224))
+        orig_img.save(os.path.join(args.out_dir, f"original_inception_{tcga_name}.png"))
 
-        axs[0].imshow(orig_img)
-        axs[0].set_title("Original")
-        axs[0].axis('off')
 
-        axs[1].imshow(saliency_map, cmap='hot', interpolation='nearest')
-        axs[1].set_title(f"Saliency Map ({args.saliency_method})")
-        axs[1].axis('off')
-        
-        # Overlay saliency on original image
-        axs[2].imshow(orig_img)
-        axs[2].imshow(saliency_map, cmap='hot', alpha=0.4, interpolation='bilinear')
-        axs[2].set_title("Overlay")
-        axs[2].axis('off')
+        plt.imsave(os.path.join(args.out_dir, f"saliency_inception_{tcga_name}.png"),
+                   cv2.resize(saliency_map, (224, 224)),
+                   cmap='hot',
+                   format='png',
+                   )
 
-        plt.tight_layout()
-        fig.suptitle(os.path.join(os.path.basename(os.path.dirname(img_path)), os.path.basename(img_path)), fontsize=6, y=1.00)
+        saliency = Image.open(os.path.join(args.out_dir, f"saliency_inception_{tcga_name}.png")).convert("RGB")
+        saliency.save(os.path.join(args.out_dir, f"saliency_inception_{tcga_name}.png"))
 
-        plt.show()
-        plt.close()
+        Image.blend(orig_img, saliency, 0.5).convert("RGB").save(os.path.join(args.out_dir, f"overlay_inception_{tcga_name}.png"))
 
 
 if __name__ == "__main__":

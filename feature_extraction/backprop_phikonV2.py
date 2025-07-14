@@ -22,7 +22,9 @@ from monai.data import DataLoader, Dataset
 from monai.utils import CommonKeys
 import matplotlib.pyplot as plt
 from torchvision import transforms
+import cv2
 from tqdm import tqdm
+import numpy as np
 
 from misc.global_util import ensure_dir_exists
 from misc.monai_boilerplate import build_file_list
@@ -120,7 +122,7 @@ def main():
     for filename in glob.glob(f"{args.src_dir}{os.sep}**{os.sep}*", recursive=True):
         if os.path.isfile(filename) and filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
             data.append({CommonKeys.IMAGE: filename, "filename": filename})
-            if i > 3:
+            if i > 1:
                 break
             i += 1
 
@@ -159,34 +161,29 @@ def main():
 
     # Collect original image paths and filenames
     img_paths = [entry["filename"] for entry in data]
+    ensure_dir_exists(args.out_dir)
 
     for idx, (img_path, saliency_map) in enumerate(zip(image_paths, saliency_maps)):
-        # Load original image in RGB
-        orig_img = Image.open(img_path).convert("RGB")
+        tcga_name = os.path.join(os.path.basename(os.path.dirname(img_path)), os.path.basename(img_path)).replace(os.sep, "__")
 
-        fig, axs = plt.subplots(1, 3, figsize=(12, 4))
+        orig_img = Image.open(img_path).convert("RGB").resize((224, 224))
+        orig_img.save(os.path.join(args.out_dir, f"original_phikon_{tcga_name}.png"))
 
-        # Original image
-        axs[0].imshow(orig_img)
-        axs[0].set_title("Original")
-        axs[0].axis('off')
 
-        # Saliency map only
-        axs[1].imshow(saliency_map, cmap='hot', interpolation='nearest')
-        axs[1].set_title("Saliency Map")
-        axs[1].axis('off')
+        plt.imsave(os.path.join(args.out_dir, f"saliency_phikon_{tcga_name}.png"),
+                   saliency_map,
+                   cmap='hot',
+                   format='png',
+                   )
 
-        # Overlay: saliency map over original image
-        axs[2].imshow(orig_img)
-        axs[2].imshow(saliency_map, cmap='hot', alpha=0.4, interpolation='bilinear')
-        axs[2].set_title("Overlay")
-        axs[2].axis('off')
+        saliency = Image.open(os.path.join(args.out_dir, f"saliency_phikon_{tcga_name}.png")).convert("RGB")
+        saliency.save(os.path.join(args.out_dir, f"saliency_phikon_{tcga_name}.png"))
 
-        plt.tight_layout()
-        fig.suptitle(os.path.join(os.path.basename(os.path.dirname(img_path)), os.path.basename(img_path)), fontsize=6, y=1.00)
+        Image.blend(orig_img, saliency, 0.5).convert("RGB").save(os.path.join(args.out_dir, f"overlay_phikon_{tcga_name}.png"))
 
-        plt.show()
-        plt.close()
+
+
+
 
 if __name__ == "__main__":
     logging.basicConfig(stream=sys.stdout, level=logging.INFO)
