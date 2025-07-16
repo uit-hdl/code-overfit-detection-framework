@@ -251,6 +251,8 @@ if __name__ == "__main__":
 
         # compute 95% conf
         cl = 0.95  # confidence level
+        print(accuracies)
+        print(accuracies)
         ci = stats.t.interval(cl, df=len(accuracies) - 1, loc=np.mean(accuracies),
                               scale=np.std(accuracies, ddof=1) / np.sqrt(len(accuracies)))
         print(f"{label}: ci={ci}, mean={np.mean(accuracies)}, std={np.std(accuracies, ddof=1)}")

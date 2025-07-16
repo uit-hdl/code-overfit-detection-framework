@@ -11,11 +11,7 @@ filename,label_1,label_2,label_3
 The output will be stored in the out-dir, which will contain the trained model and tensorboard logs
 
 Example:
-  python examples/make_umap.py --embeddings-path out/phikon_TCGA_LUSC-tiles_embedding.zarr \
-    --label-file out/top5TSSfiles.csv \
-    --out-dir out \
-    --tensorboard-name tb_out \
-    --epochs 1
+  python make_umap.py --embeddings-path out/phikon__embedding.zarr out/inception__embedding.zarr --label-file annotations/top5TSSfiles.csv --label-key slide_id --sizes 10000 100000
 '''
 import argparse
 import logging

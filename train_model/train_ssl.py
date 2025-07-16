@@ -195,8 +195,8 @@ def train(train_loader, model, criterion, optimizer, max_epochs, lr, cos, schedu
 def wrap_data(train_data, val_data, batch_size, batch_slide_num, batch_inst_num, workers, is_conditional):
     logging.info('Creating dataset')
     grayer = transforms.Grayscale(num_output_channels=3)
+    jitterer = transforms.ColorJitter(brightness=.4, contrast=0.4, saturation=0.4, hue=0.01)
     cropper = transforms.RandomResizedCrop(299, scale=(0.2, 1.), antialias=True)
-    jitterer = transforms.ColorJitter(brightness=4, contrast=0.4, saturation=0.4, hue=0.01)
 
     transformations = mt.Compose(
         [
