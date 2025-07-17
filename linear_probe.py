@@ -204,7 +204,7 @@ if __name__ == "__main__":
     class_map_inv = {i: c for i, c in enumerate(labels)}
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    rounds = 10
+    rounds = 3
     lb = 0; ub = len(embedding_sets[0])
     # randomly sample 10% of numbers from lb to ub
     dropped_indices : List[np.ndarray] = []
@@ -253,8 +253,7 @@ if __name__ == "__main__":
         cl = 0.95  # confidence level
         print(accuracies)
         print(accuracies)
-        ci = stats.t.interval(cl, df=len(accuracies) - 1, loc=np.mean(accuracies),
-                              scale=np.std(accuracies, ddof=1) / np.sqrt(len(accuracies)))
+        ci = stats.t.interval(cl, df=len(accuracies) - 1, loc=np.mean(accuracies), scale=np.std(accuracies, ddof=1) / np.sqrt(len(accuracies)))
         print(f"{label}: ci={ci}, mean={np.mean(accuracies)}, std={np.std(accuracies, ddof=1)}")
 
         pred_li.append(pred_ep)

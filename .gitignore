@@ -1,4 +1,3 @@
-**/*.zarr
 luad-tiles/
 model_dir/
 out*
