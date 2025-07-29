@@ -30,7 +30,7 @@ from network.inception_v4 import InceptionV4
 # ipython extract_features_phikon2.py -- --src-dir TCGA-LUSC-testfiles --out-dir out --gpu-id 2
 
 def main():
-    parser = argparse.ArgumentParser(description='Extract embeddings ')
+    parser = argparse.ArgumentParser(description='Extract embeddings from images using PhikonV2')
 
     parser.add_argument('--src-dir', default=os.path.join('/data', 'TCGA_LUSC', 'tiles'), type=str, help='path to dataset, folder of images')
     parser.add_argument('--gpu-id', default=0, type=int, help='GPU id to use.')

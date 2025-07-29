@@ -31,7 +31,7 @@ Assuming you have the raw dataset from the TCGA portal in "/data/TCGA-LUSC". We 
 ipython preprocessing/process_tcga.py -- --wsi-path /data/TCGA-LUSC --out-dir /data/TCGA-LUSC-tiles
 ipython preprocessing/gen_tcga_tile_labels.py -- --data-dir /data/TCGA-LUSC-tiles --out-dir out
 
-# train the model. For our computer this took about 3 days per model
+# train the model. Can be skipped if you just want to use PhikonV2. For our setup the training took about 3 days per model
 # you can also skip this and just use PhikonV2 (next steps) to avoid training
 ipython train_model/train_ssl.py -- --condition --batch-slide-num 4 --src-dir /data/TCGA-LUSC-tiles --epochs 300 --moco-k 128
 ipython train_model/train_ssl.py -- --no-condition --src-dir /data/TCGA-LUSC-tiles --epochs 300 --moco-k 128
