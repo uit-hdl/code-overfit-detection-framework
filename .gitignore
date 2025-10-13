@@ -1,3 +1,4 @@
+*_results/
 paper_data/
 *.pth
 *.tar
