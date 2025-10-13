@@ -23,6 +23,7 @@ from monai.data import DataLoader, Dataset
 from monai.utils import CommonKeys
 from torchvision import transforms
 from tqdm import tqdm
+import torch.nn as nn
 
 from misc.global_util import ensure_dir_exists
 from misc.monai_boilerplate import build_file_list
@@ -43,7 +44,7 @@ def main():
     #parser.add_argument('--model-pth', default=os.path.join('out', 'models', 'MoCo', 'TCGA_LUSC', 'model', 'checkpoint_MoCo_TCGA_LUSC_0200_False_m128_n0_o0_K128.pth.tar'), type=str, help='path to dataset, folder of images')
     #parser.add_argument('--model-pth', default=os.path.join('out', 'models', 'MoCo', 'TCGA_LUSC', 'model', 'checkpoint_MoCo_TCGA_LUSC_0200_False_m128_n0_o0_K128.pth.tar'), type=str, help='path to dataset, folder of images')
     parser.add_argument('--model-pth', default=os.path.join('out', 'models', 'MoCo', 'TCGA_LUSC', 'model', 'checkpoint_MoCo_TCGA_LUSC_0200_False_m128_n0_o0_K65536.pth.tar'), type=str, help='path to dataset, folder of images')
-    parser.add_argument('--gpu-id', default=1, type=int, help='GPU id to use.')
+    parser.add_argument('--gpu-id', default=0, type=int, help='GPU id to use.')
     parser.add_argument('--out-dir', default='out', type=str, help='path to save extracted embeddings')
     parser.add_argument('--debug-mode', default=False, type=bool, action=argparse.BooleanOptionalAction,
                         metavar='D', help='turn debugging on or off. Will limit amount of data used. Development only',
@@ -54,6 +55,7 @@ def main():
 
     model = InceptionV4(num_classes=128)
     load_model(model, args.model_pth, device)
+    model.last_linear = nn.Identity()
 
     transformations = mt.Compose(
         [
@@ -67,6 +69,9 @@ def main():
     data = []
     for filename in glob.glob(f"{args.src_dir}{os.sep}**{os.sep}*", recursive=True):
         if os.path.isfile(filename) and filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
+            for top5 in ["TCGA-22", "TCGA-39", "TCGA-60", "TCGA-66", "TCGA-85"]:
+                if top5 not in filename:
+                    continue
             data.append({CommonKeys.IMAGE: filename, "filename": filename})
 
     if args.debug_mode:

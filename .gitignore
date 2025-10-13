@@ -1,3 +1,7 @@
+paper_data/
+*.pth
+*.tar
+**/*.zarr
 luad-tiles/
 model_dir/
 out*
