@@ -4,9 +4,9 @@ eval "$(conda shell.bash hook)"
 
 set -e
 
-for run in 1 2
+for run in 1
 do
-  for sz in twenty # quart half
+  for sz in twenty quart half
   do
     cd ~/code-overfit-detection-framework
     labelfile="$PWD/balanced_dataset_top5_${sz}_$run.csv"
