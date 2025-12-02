@@ -1,11 +1,9 @@
 #!/usr/bin/env bash
 
-
 # tensorboard logs whether or not checkpoint is enabled...
 
 base_cmd="ipython train_model/train_ssl.py -- --checkpoint --no-condition --src-dir ~/tiles_full/ --epochs 10 --moco-k 65536 --out-dir out_seq_ckpt"
 set -xe
-
 for bs in 32 64 128 256
 do
   eval "$base_cmd --batch-size $bs"

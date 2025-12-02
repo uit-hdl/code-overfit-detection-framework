@@ -264,10 +264,12 @@ if __name__ == "__main__":
         for d1, d2 in zip(pred_li[0], pred_li[1]):
             kappa = cohen_kappa_score(d1, d2)
             print(f"kappa between predictors={kappa}")
+            writer.add_scalar("kappa", kappa, global_step=0)
     for l,p,g in zip([l[0] for l in embedding_sets], pred_li, gt_li):
         for d1, d2 in zip(p, g):
             kappa = cohen_kappa_score(d1, d2)
             print(f"kappa between {l} and gt={kappa}")
+            writer.add_scalar("kappa", kappa, global_step=0)
 
 
 
