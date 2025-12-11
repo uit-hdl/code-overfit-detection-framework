@@ -99,32 +99,32 @@ def balanced_sample_dataset(df, subset_size) -> pd.DataFrame:
     df: headers:
      filename,bcr_patient_barcode,institution,gender,race,tumor_stage,slide_id,disease
     """
-    # get the institution that has the lowest number of samples for each stage
+    # get the institution that has the lowest number of samples for each stage.
     min_counts = {}
-    for stage in ["Stage I", "Stage II", "Stage III"]:
+    stages = df["tumor_stage"].unique()
+    for stage in stages:
         stage_counts = df[df["tumor_stage"] == stage].groupby("institution").size()
         min_counts[stage] = stage_counts.min()
 
-     # toy sample: df has len 100
+     # toy sample: df has len 100 with 5 institutions.
     insts = df["institution"].unique()
-
-    # 5 insts
-    # that means we want 20 samples per institution
+    # that means we have 20 samples per institution
     samples_per_inst = math.floor(len(df) / len(insts))
-    # if we're keeping 90%, we'll keep 18 of those 20
+    # if we're keeping 90%, we'll keep 18 of those 20 (dropping 2)
     dropped_per_inst = math.ceil(samples_per_inst - (samples_per_inst * subset_size))
     # of the 18, we want to balance per stage
-    # lets say they were evenly divided, 6 samples per stage
-    # we divide 2 samples per stage, resulting in e.g. (0, 0, 2)
-    # however, we cannot oversample (try to drop more samples in a stage than whats available).
+    # lets say they were divided as 18 being Stage 1, 1 Stage II and 1 Stage III sample.
+    # we need to draw out two. Lest say we do it from the last stage, e.g. (0, 0, 2)
+    # this is an issue, since there were only 1 Stage III sample.
     # so we need to figure out the maximum number of samples...
 
     drop_list = {}
     sort_counts = sorted(min_counts.items(), key=lambda x: x[1])
     dropped_previous = 0
 
-    for stage,counts in sort_counts[:-1]:
-        how_many_to_drop = np.random.randint(low=0, high=counts - dropped_previous)
+    # starting from the distribution with the lowest number of samples.
+    for stage,max_to_drop in sort_counts[:-1]:
+        how_many_to_drop = np.random.randint(low=0, high=min(max_to_drop , dropped_per_inst - dropped_previous) + 1)
         drop_list[stage] = how_many_to_drop
         dropped_previous += how_many_to_drop
 
@@ -132,7 +132,7 @@ def balanced_sample_dataset(df, subset_size) -> pd.DataFrame:
 
     new_dfs = []
     for inst in insts:
-        for i, stage in enumerate(["Stage I", "Stage II", "Stage III"]):
+        for i, stage in enumerate(stages):
             stage_df = df[(df["tumor_stage"] == stage) & (df["institution"] == inst)]
             samples_to_drop = drop_list[stage]
             if samples_to_drop >= 0:
