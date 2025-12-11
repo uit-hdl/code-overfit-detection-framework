@@ -250,6 +250,12 @@ if __name__ == "__main__":
         "epochs": args.epochs,
         "batch": args.batch_size,
         "debug": str(args.debug_mode),
+        "subset_size": args.subset_size,
+        "rounds": args.rounds,
+        "label-file": args.label_file,
+        "label-key": label_key,
+        "number_of_samples": len(embedding_set),
+        "number_of_labels": len(labels),
     })
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -270,6 +276,8 @@ if __name__ == "__main__":
                 data.append(ep)
 
         assert len(data) > 0, f"No data"
+        writer.add_scalar("subset_size", len(data), global_step=n)
+
 
         dl_test, model, _ = make_lp(data=data,
                 out_dir=args.out_dir,
@@ -300,6 +308,9 @@ if __name__ == "__main__":
         kappa = cohen_kappa_score(p, g)
         kappa_scores.append(kappa)
         writer.add_scalar("kappa", kappa, global_step=i)
+
+    for i,a in enumerate(accuracies):
+        writer.add_scalar("accuracy", a, global_step=i)
         
     cl = 0.95  # confidence level
     ci = stats.t.interval(cl, df=len(accuracies) - 1, loc=np.mean(accuracies), scale=np.std(accuracies, ddof=1) / np.sqrt(len(accuracies)))
