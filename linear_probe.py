@@ -19,27 +19,23 @@ Example:
 '''
 import argparse
 import logging
+import math
 import os
 import sys
-from sklearn.metrics import accuracy_score, cohen_kappa_score
-import torch.nn.functional as F
 from collections import defaultdict
 from time import time
-from typing import List
-
-import scipy.stats as stats
 
 import numpy as np
 import pandas as pd
+import scipy.stats as stats
 import torch
+import torch.nn.functional as F
 import zarr
 from IPython.utils.path import ensure_dir_exists
-
 from lp_inspect import make_lp
 from lp_inspect.model import LinearProbe
-import logging
-
 from monai.networks import eval_mode
+from sklearn.metrics import accuracy_score, cohen_kappa_score
 from tqdm import tqdm
 
 from misc.monai_boilerplate import init_tb_writer
@@ -93,6 +89,59 @@ def find_all_arrays(group):
         i += 1
     return (names, arrays)
 
+def dirichlet_sample(n):
+    """Generates n random floats summing to 1 using Dirichlet distribution."""
+    # A vector of ones defines the base distribution
+    return np.random.dirichlet(np.ones(n))
+
+def balanced_sample_dataset(df, subset_size) -> pd.DataFrame:
+    """
+    df: headers:
+     filename,bcr_patient_barcode,institution,gender,race,tumor_stage,slide_id,disease
+    """
+    # get the institution that has the lowest number of samples for each stage
+    min_counts = {}
+    for stage in ["Stage I", "Stage II", "Stage III"]:
+        stage_counts = df[df["tumor_stage"] == stage].groupby("institution").size()
+        min_counts[stage] = stage_counts.min()
+
+     # toy sample: df has len 100
+    insts = df["institution"].unique()
+
+    # 5 insts
+    # that means we want 20 samples per institution
+    samples_per_inst = math.floor(len(df) / len(insts))
+    # if we're keeping 90%, we'll keep 18 of those 20
+    dropped_per_inst = math.ceil(samples_per_inst - (samples_per_inst * subset_size))
+    # of the 18, we want to balance per stage
+    # lets say they were evenly divided, 6 samples per stage
+    # we divide 2 samples per stage, resulting in e.g. (0, 0, 2)
+    # however, we cannot oversample (try to drop more samples in a stage than whats available).
+    # so we need to figure out the maximum number of samples...
+
+    drop_list = {}
+    sort_counts = sorted(min_counts.items(), key=lambda x: x[1])
+    dropped_previous = 0
+
+    for stage,counts in sort_counts[:-1]:
+        how_many_to_drop = np.random.randint(low=0, high=counts - dropped_previous)
+        drop_list[stage] = how_many_to_drop
+        dropped_previous += how_many_to_drop
+
+    drop_list[sort_counts[-1][0]] = dropped_per_inst - sum(drop_list.values())
+
+    new_dfs = []
+    for inst in insts:
+        for i, stage in enumerate(["Stage I", "Stage II", "Stage III"]):
+            stage_df = df[(df["tumor_stage"] == stage) & (df["institution"] == inst)]
+            samples_to_drop = drop_list[stage]
+            if samples_to_drop >= 0:
+                stage_df = stage_df.sample(n=len(stage_df) - samples_to_drop, random_state=42)
+            new_dfs.append(stage_df)
+    new_df = pd.concat(new_dfs)
+
+    return new_df
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Fine-tune embeddings from a model using linear probe')
@@ -101,10 +150,10 @@ def parse_args():
     parser.add_argument('-b', '--batch-size', default=256, type=int,
                         metavar='N',
                         help=f'batch size, this is the total batch size of all GPUs on the current node when using Data Parallel or Distributed Data Parallel')
-    parser.add_argument('--embeddings-path', default=[], nargs='+', type=str, help="locations of embedding zarr (e.g. from save_embeddings.py)")
-    parser.add_argument('--embeddings-path-1', default=os.path.join('out', 'inception_TCGA_LUSC-tiles_embedding.zarr'), type=str,
-                        help="location of embedding zarr (e.g. from save_embeddings.py)")
-    parser.add_argument('--label-file', type=str, help='path to file annotations')
+    parser.add_argument('--subset-size', default=0.9, type=float, help="percentage of data to use for each CI computation")
+    parser.add_argument('--embeddings-path', default="./", type=str, help="locations of embedding zarr (e.g. from save_embeddings.py)")
+    parser.add_argument('--rounds', default=100, type=int, help='how many rounds to do for CI computation')
+    parser.add_argument('--label-file', default="./balanced_dataset_top5.csv", type=str, help='path to file annotations')
     parser.add_argument('--label-key', type=str, help='default key to use for doing fine-tuning. If not set, will use the first column in the label-file')
     parser.add_argument('--out-dir', default='./out', type=str, help='path to save model output and tensorboards')
     parser.add_argument('--debug-mode', default=False, type=bool, action=argparse.BooleanOptionalAction,
@@ -131,6 +180,8 @@ if __name__ == "__main__":
     ignite_logger.setLevel(logging.WARNING)
     args = parse_args()
 
+    if args.label_file is None or not os.path.exists(args.label_file):
+        raise ValueError(f"Label file '{args.label_file}' does not exist")
     labels = pd.read_csv(args.label_file, sep=",", header=0, dtype=defaultdict(lambda: str))
     # set index to be the first column
     labels = labels.set_index(labels.columns[0])
@@ -139,23 +190,40 @@ if __name__ == "__main__":
     if not args.label_key:
         label_key = labels.columns[0]
 
-    if args.debug_mode:
-        limit = 10 * args.batch_size
-        args.epochs = min(2, args.epochs)
-        # shuffle the order in labels
-        labels = labels.sample(frac=1)
-        labels = labels[:limit]
-        logging.warning(f"Debug mode enabled. Only using {limit} samples in train and validation sets")
-    labels = labels[label_key]
     lookup_index = defaultdict(lambda: {})
-    for fn,val in labels.items():
+    for fn, row in labels.iterrows():
         bn = os.path.basename(fn)
         dn = os.path.basename(os.path.dirname(fn))
-        lookup_index[dn][bn] = val
+        lookup_index[dn][bn] = row[label_key]
 
-    embedding_sets = []
-    for ep in args.embeddings_path:
-        data = load_zarr_store(ep)
+    embedding_set = []
+    if args.debug_mode:
+        mock_embedding = []
+        args.rounds = min(5, args.rounds)
+        labels = labels.sample(n=512)
+        labels = labels.reset_index()
+        for i in range(512):
+            mock_inst = np.random.randint(0, 5)
+            mock_stage = ["Stage I", "Stage II", "Stage III"][np.random.randint(0, 2)]
+            filename = f"img_{i}.png"
+            mock_embedding.append({
+                "image": np.random.rand(64).astype(np.float32),
+                "stage": mock_stage,
+                "filename": filename,
+                "label": mock_inst,
+                "institution": str(mock_inst)})
+
+            # set labels[i]['filename'] = filename
+            labels.loc[i, 'filename'] = filename
+
+        labels = labels.set_index(labels.columns[0])
+        print("Debug mode! Using mock data")
+        args.epochs = min(2, args.epochs)
+        # get 256 labels
+        logging.warning(f"Debug mode enabled. Only using 256 samples in train and validation sets")
+        embedding_set = mock_embedding
+    else:
+        data = load_zarr_store(args.embeddings_path)
         if not data:
             raise ValueError(f"No data found in {args.embeddings_path}")
 
@@ -168,110 +236,80 @@ if __name__ == "__main__":
                 continue
             d["label"] = lookup_index[dn][bn]
             new_data.append(d)
-        logging.info(f"{ep:} only keeping data from annotation file: {len(new_data)} out of {len(data)} entries")
+        logging.info(f"{args.embeddings_path}: only keeping data from annotation file: {len(new_data)} out of {len(data)} entries")
         if not new_data:
             raise ValueError(f"No data found in {args.label_file}")
         # sort new_data by "filename"
         new_data.sort(key=lambda x: x["filename"])
-        embedding_sets.append((ep, new_data))
-
-    # create two mock datasets that could have been produced by the code above, each with 256 entries
-    # mock_1 = [{"image": np.random.rand(256).astype(np.float32), "filename": f"img_{i}.png", "label": np.random.randint(0, 3)} for i in range(256)]
-    # mock_2 = [{"image": np.random.rand(256).astype(np.float32), "filename": mock_1[i]["filename"], "label": mock_1[i]["label"]} for i in range(256)]
-    # embedding_sets.append(("mock 1", mock_1))
-    # embedding_sets.append(("mock 2", mock_2))
-
-    # verify that each set in embedding_sets have the exact same "filename" entries
-    # ... only have to this once for sanity checks
-    # for i, ep in enumerate(embedding_sets):
-    #     ep_filenames = [d["filename"] for d in ep]
-    #     for j, ep2 in enumerate(embedding_sets):
-    #         if i == j:
-    #             continue
-    #         ep2_filenames = [d["filename"] for d in ep2]
-    #         if ep_filenames != ep2_filenames:
-    #             raise ValueError(f"embedding_sets[{i}] and embedding_sets[{j}] have different filenames")
+        embedding_set = new_data
 
     run_name = args.tensorboard_name or str(time())
     writer = init_tb_writer(os.path.join(args.out_dir, "lp_tb_logs"), run_name, extra=
     {
-        "embeddings_path": ','.join(args.embeddings_path),
+        "embeddings_path": args.embeddings_path,
         "epochs": args.epochs,
         "batch": args.batch_size,
         "debug": str(args.debug_mode),
     })
-    class_map = {c: i for i, c in enumerate(labels)}
-    class_map_inv = {i: c for i, c in enumerate(labels)}
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    rounds = 3
-    lb = 0; ub = len(embedding_sets[0])
-    # randomly sample 10% of numbers from lb to ub
-    dropped_indices : List[np.ndarray] = []
-    for n in range(rounds):
-        indices = np.random.choice(np.arange(lb, ub), size=int(0.1 * len(embedding_sets[0])), replace=False)
-        dropped_indices.append(indices)
-
     ensure_dir_exists(args.out_dir)
+
     gt_li = []
     pred_li = []
-    for label,ep in embedding_sets:
-        accuracies = []
-        pred_ep = []
-        gt_ep = []
-        for n in range(rounds):
-            # drop any entry in ep at given indices
-            data = np.delete(np.copy(ep), dropped_indices[n])
+    accuracies = []
+    pred_ep = []
+    gt_ep = []
 
-            assert len(data) > 0, f"No data"
+    for n in range(args.rounds):
+        sub_labels = balanced_sample_dataset(labels, subset_size=args.subset_size)
+        data = []
+        # only keep entries from data that is also in labels
+        for ep in embedding_set:
+            if ep["filename"] in sub_labels.index:
+                data.append(ep)
 
-            dl_test, model, _ = make_lp(data=data.tolist(),
-                    out_dir=args.out_dir,
-                    balanced=True,
-                    writer=writer,
-                    epochs=args.epochs,
-                    eval_models = False,
-                    batch_size=args.batch_size,
-                    lr=args.lr)
-            preds = np.array([])
-            gts = np.array([])
-            with eval_mode(model):
-                for item in tqdm(dl_test):
-                    y = model(item["image"].to(device))
-                    prob = F.softmax(y).detach().to("cpu")
-                    pred = torch.argmax(prob, dim=1).numpy()
-                    preds = np.append(preds, pred)
-                    gt = item["label"].detach().cpu().numpy()
-                    gts = np.append(gts, gt)
-            pred_ep.append(preds)
-            gt_ep.append(gts)
-            # compute accuracy between preds and gts
-            accuracy = accuracy_score(gts, preds)
-            accuracies.append(accuracy)
+        assert len(data) > 0, f"No data"
 
-        # compute 95% conf
-        cl = 0.95  # confidence level
-        print(accuracies)
-        print(accuracies)
-        ci = stats.t.interval(cl, df=len(accuracies) - 1, loc=np.mean(accuracies), scale=np.std(accuracies, ddof=1) / np.sqrt(len(accuracies)))
-        print(f"{label}: ci={ci}, mean={np.mean(accuracies)}, std={np.std(accuracies, ddof=1)}")
+        dl_test, model, _ = make_lp(data=data,
+                out_dir=args.out_dir,
+                balanced=True,
+                writer=writer,
+                epochs=args.epochs,
+                eval_models = False,
+                batch_size=args.batch_size,
+                lr=args.lr)
+        preds = np.array([])
+        gts = np.array([])
+        with eval_mode(model):
+            for item in tqdm(dl_test):
+                y = model(item["image"].to(device))
+                prob = F.softmax(y, dim=1).detach().to("cpu")
+                pred = torch.argmax(prob, dim=1).numpy()
+                preds = np.append(preds, pred)
+                gt = item["label"].detach().cpu().numpy()
+                gts = np.append(gts, gt)
+        pred_ep.append(preds)
+        gt_ep.append(gts)
+        # compute accuracy between preds and gts
+        accuracy = accuracy_score(gts, preds)
+        accuracies.append(accuracy)
 
-        pred_li.append(pred_ep)
-        gt_li.append(gt_ep)
+    kappa_scores = []
+    for i,(p,g) in enumerate(zip(pred_ep, gt_ep)):
+        kappa = cohen_kappa_score(p, g)
+        kappa_scores.append(kappa)
+        writer.add_scalar("kappa", kappa, global_step=i)
+        
+    cl = 0.95  # confidence level
+    ci = stats.t.interval(cl, df=len(accuracies) - 1, loc=np.mean(accuracies), scale=np.std(accuracies, ddof=1) / np.sqrt(len(accuracies)))
+    print(accuracies)
+    print(f"Accuracy ci={ci}, mean={np.mean(accuracies)}, std={np.std(accuracies, ddof=1)}")
 
-    if len(pred_li) == 2:
-        #compute kohens kappa between the two pred_li entries
-        for d1, d2 in zip(pred_li[0], pred_li[1]):
-            kappa = cohen_kappa_score(d1, d2)
-            print(f"kappa between predictors={kappa}")
-            writer.add_scalar("kappa", kappa, global_step=0)
-    for l,p,g in zip([l[0] for l in embedding_sets], pred_li, gt_li):
-        for d1, d2 in zip(p, g):
-            kappa = cohen_kappa_score(d1, d2)
-            print(f"kappa between {l} and gt={kappa}")
-            writer.add_scalar("kappa", kappa, global_step=0)
+    ci = stats.t.interval(cl, df=len(kappa_scores) - 1, loc=np.mean(kappa_scores), scale=np.std(kappa_scores, ddof=1) / np.sqrt(len(kappa_scores)))
+    print(kappa_scores)
+    print(f"kappa ci={ci}, mean={np.mean(kappa_scores)}, std={np.std(kappa_scores, ddof=1)}")
 
 
-
-    logging.info("Inspect results with:\ntensorboard --logdir %s", os.path.join(args.out_dir, "tb_logs"))
+    logging.info("Inspect results with:\ntensorboard --logdir %s", os.path.join(args.out_dir, "lp_tb_logs"))
     logging.info("Done")
