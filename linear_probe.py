@@ -324,14 +324,23 @@ if __name__ == "__main__":
         writer.add_scalar("accuracy", a, global_step=i)
         
     cl = 0.95  # confidence level
-    ci = stats.t.interval(cl, df=len(accuracies) - 1, loc=np.mean(accuracies), scale=np.std(accuracies, ddof=1) / np.sqrt(len(accuracies)))
+    ma = np.mean(accuracies)
+    ci = stats.t.interval(cl, df=len(accuracies) - 1, loc=ma, scale=np.std(accuracies, ddof=1) / np.sqrt(len(accuracies)))
     print(accuracies)
     print(f"Accuracy ci={ci}, mean={np.mean(accuracies)}, std={np.std(accuracies, ddof=1)}")
+    writer.add_scalar("accuracy_avg", ma)
+    lb, ub = ci
+    writer.add_scalar("accuracy_ci_lb", lb)
+    writer.add_scalar("accuracy_ci_ub", ub)
 
     ci = stats.t.interval(cl, df=len(kappa_scores) - 1, loc=np.mean(kappa_scores), scale=np.std(kappa_scores, ddof=1) / np.sqrt(len(kappa_scores)))
     print(kappa_scores)
-    print(f"kappa ci={ci}, mean={np.mean(kappa_scores)}, std={np.std(kappa_scores, ddof=1)}")
-
+    mk = np.mean(kappa_scores)
+    print(f"kappa ci={ci}, mean={mk}, std={np.std(kappa_scores, ddof=1)}")
+    writer.add_scalar("kappa_avg", mk)
+    lb, ub = ci
+    writer.add_scalar("kappa_ci_lb", lb)
+    writer.add_scalar("kappa_ci_ub", ub)
 
     logging.info("Inspect results with:\ntensorboard --logdir %s", os.path.join(args.out_dir, "lp_tb_logs"))
     logging.info("Done")
