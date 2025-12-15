@@ -197,6 +197,9 @@ if __name__ == "__main__":
         lookup_index[dn][bn] = row[label_key]
 
     embedding_set = []
+    #test_division = balanced_sample_dataset(labels, 0.5)
+    # count how many of each "institution" is in test_division
+    #counts = test_division.groupby("institution").size()
     if args.debug_mode:
         mock_embedding = []
         args.rounds = min(5, args.rounds)
