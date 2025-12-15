@@ -243,6 +243,10 @@ if __name__ == "__main__":
         new_data.sort(key=lambda x: x["filename"])
         embedding_set = new_data
 
+    # 1-10
+    # X
+    # X + 2
+
     run_name = args.tensorboard_name or str(time())
     writer = init_tb_writer(os.path.join(args.out_dir, "lp_tb_logs"), run_name, extra=
     {
@@ -273,7 +277,11 @@ if __name__ == "__main__":
         # only keep entries from data that is also in labels
         for ep in embedding_set:
             if ep["filename"] in sub_labels.index:
-                data.append(ep)
+                new_ep = {'image': ep['image'],
+                          'label': ep['label'],
+                          'filename': ep['filename']
+                          }
+                data.append(new_ep)
 
         assert len(data) > 0, f"No data"
         writer.add_scalar("subset_size", len(data), global_step=n)
