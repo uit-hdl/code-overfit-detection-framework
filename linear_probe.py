@@ -274,8 +274,16 @@ if __name__ == "__main__":
     pred_ep = []
     gt_ep = []
 
+    sublabels = []
+
     for n in range(args.rounds):
-        sub_labels = balanced_sample_dataset(labels, subset_size=args.subset_size)
+        try:
+            sub_labels.append(balanced_sample_dataset(labels, subset_size=args.subset_size))
+        except ValueError as ve:
+            print("...bad sampling, trying again")
+
+    import ipdb; ipdb.set_trace()
+    for sub_labels in sublabels:
         data = []
         # only keep entries from data that is also in labels
         for ep in embedding_set:
