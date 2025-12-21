@@ -53,7 +53,7 @@ def main():
 
     device = torch.device(f"cuda:{args.gpu_id}" if torch.cuda.is_available() else "cpu")
 
-    model = InceptionV4(num_classes=128)
+    model = InceptionV4(num_classes=1536)
     load_model(model, args.model_pth, device)
     model.last_linear = nn.Identity()
 

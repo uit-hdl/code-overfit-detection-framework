@@ -111,7 +111,7 @@ def balanced_sample_dataset(df, subset_size) -> pd.DataFrame:
     # that means we have 20 samples per institution
     samples_per_inst = math.floor(len(df) / len(insts))
     # if we're keeping 90%, we'll keep 18 of those 20 (dropping 2)
-    dropped_per_inst = math.ceil(samples_per_inst - (samples_per_inst * subset_size))
+    dropped_per_inst = math.floor(samples_per_inst - (samples_per_inst * subset_size))
     # of the 18, we want to balance per stage
     # lets say they were divided as 18 being Stage 1, 1 Stage II and 1 Stage III sample.
     # we need to draw out two. Lest say we do it from the last stage, e.g. (0, 0, 2)
@@ -128,7 +128,17 @@ def balanced_sample_dataset(df, subset_size) -> pd.DataFrame:
         drop_list[stage] = how_many_to_drop
         dropped_previous += how_many_to_drop
 
+    # FIXME: problem: there may not be samples in stage I.
+    # in that case, the low=... in how_many_to_drop below cannot be zero.
+    # right now we "resolve" it by using a while loop further below
     drop_list[sort_counts[-1][0]] = dropped_per_inst - sum(drop_list.values())
+
+    #for key in drop_list.keys():
+    #    drop_per_stage = drop_list[key]
+    #    available_per_stage = min_counts[key]
+    #    if drop_per_stage > available_per_stage:
+    #        print("there you go ... ")
+
 
     new_dfs = []
     for inst in insts:
@@ -136,7 +146,8 @@ def balanced_sample_dataset(df, subset_size) -> pd.DataFrame:
             stage_df = df[(df["tumor_stage"] == stage) & (df["institution"] == inst)]
             samples_to_drop = drop_list[stage]
             if samples_to_drop >= 0:
-                stage_df = stage_df.sample(n=len(stage_df) - samples_to_drop, random_state=42)
+                samples_to_keep = len(stage_df) - samples_to_drop
+                stage_df = stage_df.sample(n=samples_to_keep, random_state=42)
             new_dfs.append(stage_df)
     new_df = pd.concat(new_dfs)
 
@@ -276,14 +287,13 @@ if __name__ == "__main__":
 
     sublabels = []
 
-    for n in range(args.rounds):
+    while len(sublabels) < 100:
         try:
-            sub_labels.append(balanced_sample_dataset(labels, subset_size=args.subset_size))
+            sublabels.append(balanced_sample_dataset(labels, subset_size=args.subset_size))
         except ValueError as ve:
             print("...bad sampling, trying again")
 
-    import ipdb; ipdb.set_trace()
-    for sub_labels in sublabels:
+    for n,sub_labels in enumerate(sublabels):
         data = []
         # only keep entries from data that is also in labels
         for ep in embedding_set:
