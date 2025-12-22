@@ -25,7 +25,8 @@ def main():
     parser.add_argument(
         "-n",
         required=False,
-        default=1,
+        type=float,
+        default=1.0,
         help="sample factor",
     )
     parser.add_argument(
@@ -87,14 +88,17 @@ def main():
         inst_data = df[df["institution"] == inst]
         for stage in ["Stage I", "Stage II", "Stage III"]:
             stage_data = inst_data[inst_data["tumor_stage"] == stage]
-            sampled = stage_data.sample(n=math.ceil(int(min_counts[stage])/int(args.n)), random_state=42)
+            sampled = stage_data.sample(n=math.ceil(min_counts[stage]*args.n), random_state=42)
             inst_samples.append(sampled)
         balanced_dfs.append(pd.concat(inst_samples))
-
 
     # Combine all balanced samples
     balanced_df = pd.concat(balanced_dfs)
     balanced_df.to_csv(args.out_file, index=False)
+
+    print(f"Length of original dataset: {len(df)}")
+    print(f"Length of balanced dataset: {len(balanced_df)}")
+
 
     if args.write_remainder:
         # Get rows in df that are not in balanced_df
@@ -106,6 +110,7 @@ def main():
         
         remainder_df.to_csv(remainder_path, index=False)
         print(f"Remainder dataset written to: {remainder_path}")
+        print(f"Length of remainder dataset: {len(remainder_df)}")
 
     # Print tumor stage percentages by institution
     #print("Tumor stage distribution by institution (%):")
