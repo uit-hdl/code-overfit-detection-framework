@@ -4,6 +4,7 @@
 """
 import argparse
 import sys
+import os
 import math
 
 import numpy as np
@@ -33,6 +34,8 @@ def main():
         default="balanced_dataset_top5.csv",
         help="how many samples to include in the resulting dataset",
     )
+    parser.add_argument('--write-remainder', default=False, type=bool, action=argparse.BooleanOptionalAction,
+                        metavar='D', help='Write the remainder dataset to a file (`--out-file`_remainder.csv`',)
     args = parser.parse_args()
 
     # Load data
@@ -92,6 +95,17 @@ def main():
     # Combine all balanced samples
     balanced_df = pd.concat(balanced_dfs)
     balanced_df.to_csv(args.out_file, index=False)
+
+    if args.write_remainder:
+        # Get rows in df that are not in balanced_df
+        remainder_df = df.loc[df.index.difference(balanced_df.index)]
+        
+        # Split filename into root and extension (e.g., 'data' and '.csv')
+        root, ext = os.path.splitext(args.out_file)
+        remainder_path = f"{root}.remainder{ext}"
+        
+        remainder_df.to_csv(remainder_path, index=False)
+        print(f"Remainder dataset written to: {remainder_path}")
 
     # Print tumor stage percentages by institution
     #print("Tumor stage distribution by institution (%):")
