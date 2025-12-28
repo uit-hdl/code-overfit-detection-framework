@@ -90,11 +90,6 @@ def find_all_arrays(group):
         i += 1
     return (names, arrays)
 
-def dirichlet_sample(n):
-    """Generates n random floats summing to 1 using Dirichlet distribution."""
-    # A vector of ones defines the base distribution
-    return np.random.dirichlet(np.ones(n))
-
 def balanced_sample_dataset(df, subset_size) -> pd.DataFrame:
     """
     df: headers:
@@ -141,7 +136,7 @@ def balanced_sample_dataset(df, subset_size) -> pd.DataFrame:
             samples_to_drop = drop_list[stage]
             if samples_to_drop >= 0:
                 samples_to_keep = len(stage_df) - samples_to_drop
-                stage_df = stage_df.sample(n=samples_to_keep, random_state=42)
+                stage_df = stage_df.sample(n=samples_to_keep)
             new_dfs.append(stage_df)
     new_df = pd.concat(new_dfs)
 
@@ -233,6 +228,7 @@ def get_dataset_from_labels(labels, label_key, embeddings_path, debug_mode=False
 
 def main():
     args = parse_args()
+    sys.exit(1)
 
     if args.label_file is None or not os.path.exists(args.label_file):
         raise ValueError(f"Label file '{args.label_file}' does not exist")
@@ -274,17 +270,26 @@ def main():
     # len(labels) * x = new_train_len
     train_ratio_for_lp = new_train_len / original_number_of_samples
 
-    sublabels = []
+    i = 0
 
-    while len(sublabels) < args.rounds:
+    while i < args.rounds:
         try:
-            sublabels.append(balanced_sample_dataset(labels, subset_size=train_ratio_for_lp))
+            dst_labels = os.path.join(args.out_dir, "subsets", f"balanced_dataset_top5_subset_n{args.subset_size}_{i}.csv")
+            if os.path.exists(dst_labels):
+                i += 1
+                continue
+            new_df = balanced_sample_dataset(labels, subset_size=train_ratio_for_lp)
+            new_df.to_csv(dst_labels)
+            i += 1
         except ValueError as ve:
             print("...bad sampling, trying again")
 
     accuracies = []
     kappas = []
-    for n, sub_labels in enumerate(sublabels):
+    for n in range(args.rounds):
+        sub_labels = pd.read_csv(os.path.join(args.out_dir, "subsets", f"balanced_dataset_top5_subset_n{args.subset_size}_{n}.csv"))
+        sub_labels["filename"] = sub_labels["filename"].str.replace("//", "/")
+        sub_labels = sub_labels.set_index("filename")
         data = []
         # only keep entries from data that is also in labels
         for ep in embedding_set:
