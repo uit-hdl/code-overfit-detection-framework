@@ -247,6 +247,7 @@ def main():
     embedding_set = get_dataset_from_labels(labels, args.label_key, args.embeddings_path, args.debug_mode)
     embedding_set_test = get_dataset_from_labels(test_labels, args.label_key, args.test_embeddings_path, args.debug_mode)
     dl_test = DataLoader(Dataset(embedding_set_test), batch_size=args.batch_size, shuffle=False)
+    balanced=False
 
     run_name = args.tensorboard_name or str(time())
     writer = init_tb_writer(os.path.join(args.out_dir, "lp_tb_logs"), run_name, extra=
@@ -255,6 +256,7 @@ def main():
         "test_embeddings_path": args.test_embeddings_path,
         "epochs": args.epochs,
         "batch": args.batch_size,
+        "balanced": balanced,
         "debug": str(args.debug_mode),
         "subset_size": args.subset_size,
         "rounds": args.rounds,
@@ -298,7 +300,7 @@ def main():
 
         _, model, _, class_map = make_lp(data=data,
                                          out_dir=args.out_dir,
-                                         balanced=True,
+                                         balanced=balanced,
                                          writer=writer,
                                          epochs=args.epochs,
                                          eval_models=False,
