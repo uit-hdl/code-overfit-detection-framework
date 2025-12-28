@@ -210,12 +210,14 @@ def main():
         test_labels = pd.concat([first_row] * 200)
 
     run_name = args.tensorboard_name or str(time())
+    balanced = True
     writer = init_tb_writer(os.path.join(args.out_dir, "lp_tb_logs"), run_name, extra=
     {
         "embeddings_path": args.embeddings_path,
         "embeddings_path_test": args.test_embeddings_path,
         "epochs": args.epochs,
         "batch": args.batch_size,
+        "balanced": balanced,
         "debug": str(args.debug_mode),
         "rounds": args.rounds,
         "label-file": args.label_file,
@@ -233,7 +235,7 @@ def main():
 
     _, model, _, class_map = make_lp(data=embedding_set,
                                      out_dir=args.out_dir,
-                                     balanced=False,
+                                     balanced=balanced,
                                      writer=writer,
                                      epochs=args.epochs,
                                      eval_models=False,
