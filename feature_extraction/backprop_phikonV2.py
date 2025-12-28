@@ -142,7 +142,7 @@ def main():
         logging.error(f"Zarr file {os.path.join(os.getcwd(), embedding_dest_path)} exists - please remove it first")
         sys.exit(1)
 
-    dl = DataLoader(dataset=Dataset(data, transformations), batch_size=1, num_workers=1, shuffle=False)
+    dl = DataLoader(dataset=Dataset(data, transformations), batch_size=32, num_workers=8, shuffle=False)
     embedding_dict = {}
     logging.info(f"Processing {args.src_dir}")
     

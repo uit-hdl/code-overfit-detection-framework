@@ -29,7 +29,6 @@ import numpy as np
 import pandas as pd
 import scipy.stats as stats
 import torch
-from scipy import stats as scistats
 import torch.nn.functional as F
 import zarr
 from IPython.utils.path import ensure_dir_exists
@@ -41,58 +40,6 @@ from sklearn.metrics import accuracy_score, cohen_kappa_score
 from tqdm import tqdm
 
 from misc.monai_boilerplate import init_tb_writer
-
-
-def get_dataset_from_labels(labels, label_key, embeddings_path, debug_mode=False):
-    lookup_index = defaultdict(lambda: {})
-
-    if not label_key:
-        label_key = labels.columns[0]
-
-    for fn, row in labels.iterrows():
-        bn = os.path.basename(fn)
-        dn = os.path.basename(os.path.dirname(fn))
-        lookup_index[dn][bn] = row[label_key]
-
-    if debug_mode:
-        mock_embedding = []
-        num_samples = 1000
-        for i in range(num_samples):
-            mock_inst = np.random.randint(0, 5)
-            mock_stage = ["Stage I", "Stage II", "Stage III"][np.random.randint(0, 2)]
-            filename = f"img_{i}.png"
-            mock_embedding.append({
-                "image": np.random.rand(64).astype(np.float32),
-                "stage": mock_stage,
-                # "filename": filename,
-                "filename": labels.head(1).index[0],
-                "label": mock_inst,
-                "institution": str(mock_inst)})
-
-        logging.warning(f"Debug mode enabled. Only using {num_samples} samples in train  sets")
-        return mock_embedding
-
-    data = load_zarr_store(embeddings_path)
-    if not data:
-        raise ValueError(f"No data found in {embeddings_path}")
-
-    new_data = []
-    for d in data:
-        fn = d["filename"]
-        bn = os.path.basename(fn)
-        dn = os.path.basename(os.path.dirname(fn))
-        if not (dn in lookup_index and bn in lookup_index[dn]):
-            continue
-        d["label"] = lookup_index[dn][bn]
-        d["filename"] = os.path.join(os.getenv("PWD"), d["filename"].lstrip("/").replace("//", "/"))
-        new_data.append(d)
-    logging.info(
-        f"{embeddings_path}: only keeping data from annotation file: {len(new_data)} out of {len(data)} entries")
-    if not new_data:
-        raise ValueError(f"No data found in labels")
-    # sort new_data by "filename"
-    new_data.sort(key=lambda x: x["filename"])
-    return new_data
 
 
 def load_zarr_store(store_path):
@@ -148,9 +95,60 @@ def dirichlet_sample(n):
     # A vector of ones defines the base distribution
     return np.random.dirichlet(np.ones(n))
 
-def random_sample_for_bootstrap(df) -> pd.DataFrame:
-    # sample from df WITH repetition
-    new_df = df.sample(frac=1, replace=True)
+def balanced_sample_dataset(df, subset_size) -> pd.DataFrame:
+    """
+    df: headers:
+     filename,bcr_patient_barcode,institution,gender,race,tumor_stage,slide_id,disease
+    """
+    # get the institution that has the lowest number of samples for each stage.
+    min_counts = {}
+    stages = df["tumor_stage"].unique()
+    for stage in stages:
+        stage_counts = df[df["tumor_stage"] == stage].groupby("institution").size()
+        min_counts[stage] = stage_counts.min()
+
+     # toy sample: df has len 100 with 5 institutions.
+    insts = df["institution"].unique()
+    # that means we have 20 samples per institution
+    samples_per_inst = math.floor(len(df) / len(insts))
+    # if we're keeping 90%, we'll keep 18 of those 20 (dropping 2)
+    dropped_per_inst = math.floor(samples_per_inst - (samples_per_inst * subset_size))
+    # of the 18, we want to balance per stage
+    # lets say they were divided as 18 being Stage 1, 1 Stage II and 1 Stage III sample.
+    # we need to draw out two. Lest say we do it from the last stage, e.g. (0, 0, 2)
+    # this is an issue, since there were only 1 Stage III sample.
+    # so we need to figure out the maximum number of samples...
+
+    drop_list = {}
+    sort_counts = sorted(min_counts.items(), key=lambda x: x[1])
+    dropped_previous = 0
+
+    # starting from the distribution with the lowest number of samples.
+    for stage,max_to_drop in sort_counts[:-1]:
+        how_many_to_drop = np.random.randint(low=0, high=min(max_to_drop , dropped_per_inst - dropped_previous) + 1)
+        drop_list[stage] = how_many_to_drop
+        dropped_previous += how_many_to_drop
+
+    # FIXME: problem: there may not be samples in stage I.
+    # in that case, the low=... in how_many_to_drop below cannot be zero.
+    # right now we "resolve" it by using a while loop further below
+    drop_list[sort_counts[-1][0]] = dropped_per_inst - sum(drop_list.values())
+
+    new_dfs = []
+    for inst in insts:
+        for i, stage in enumerate(stages):
+            stage_df = df[(df["tumor_stage"] == stage) & (df["institution"] == inst)]
+            samples_to_drop = drop_list[stage]
+            if samples_to_drop >= 0:
+                samples_to_keep = len(stage_df) - samples_to_drop
+                stage_df = stage_df.sample(n=samples_to_keep, random_state=42)
+            new_dfs.append(stage_df)
+    new_df = pd.concat(new_dfs)
+
+    # print how many samples there are per institution now
+    for inst in insts:
+        print(f"Institution {inst}: {len(new_df[new_df['institution'] == inst])} samples")
+
     return new_df
 
 
@@ -162,6 +160,7 @@ def parse_args():
                         metavar='N',
                         help=f'batch size, this is the total batch size of all GPUs on the current node when using Data Parallel or Distributed Data Parallel')
     parser.add_argument('--embeddings-path', default="./", type=str, help="locations of embedding zarr (e.g. from save_embeddings.py)")
+    parser.add_argument('--subset-size', default=0.9, type=float, help="percentage of data to use for each CI computation")
     parser.add_argument('--test-embeddings-path', default="./", type=str, help="locations of embedding zarr (e.g. from save_embeddings.py)")
     parser.add_argument('--rounds', default=100, type=int, help='how many rounds to do for CI computation')
     parser.add_argument('--label-file', default="out_lp/balanced_dataset_top5_train.csv", type=str, help='path to file annotations')
@@ -181,14 +180,62 @@ def parse_args():
     )
     return parser.parse_args()
 
+def get_dataset_from_labels(labels, label_key, embeddings_path, debug_mode=False):
+    lookup_index = defaultdict(lambda: {})
+
+    if not label_key:
+        label_key = labels.columns[0]
+
+    for fn, row in labels.iterrows():
+        bn = os.path.basename(fn)
+        dn = os.path.basename(os.path.dirname(fn))
+        lookup_index[dn][bn] = row[label_key]
+
+    if debug_mode:
+        mock_embedding = []
+        num_samples = 1000
+        for i in range(num_samples):
+            mock_inst = np.random.randint(0, 5)
+            mock_stage = ["Stage I", "Stage II", "Stage III"][np.random.randint(0, 2)]
+            filename = f"img_{i}.png"
+            mock_embedding.append({
+                "image": np.random.rand(64).astype(np.float32),
+                "stage": mock_stage,
+                # "filename": filename,
+                "filename": labels.head(1).index[0],
+                "label": mock_inst,
+                "institution": str(mock_inst)})
+
+        logging.warning(f"Debug mode enabled. Only using {num_samples} samples in train  sets")
+        return mock_embedding
+
+    data = load_zarr_store(embeddings_path)
+    if not data:
+        raise ValueError(f"No data found in {embeddings_path}")
+
+    new_data = []
+    for d in data:
+        fn = d["filename"]
+        bn = os.path.basename(fn)
+        dn = os.path.basename(os.path.dirname(fn))
+        if not (dn in lookup_index and bn in lookup_index[dn]):
+            continue
+        d["label"] = lookup_index[dn][bn]
+        d["filename"] = os.path.join(os.getenv("PWD"), d["filename"].lstrip("/").replace("//", "/"))
+        new_data.append(d)
+    logging.info(
+        f"{embeddings_path}: only keeping data from annotation file: {len(new_data)} out of {len(data)} entries")
+    if not new_data:
+        raise ValueError(f"No data found in labels")
+    # sort new_data by "filename"
+    new_data.sort(key=lambda x: x["filename"])
+    return new_data
+
 def main():
     args = parse_args()
 
     if args.label_file is None or not os.path.exists(args.label_file):
         raise ValueError(f"Label file '{args.label_file}' does not exist")
-    if args.test_label_file is None or not os.path.exists(args.test_label_file):
-        raise ValueError(f"Testlabel file '{args.test_label_file}' does not exist")
-
     labels = pd.read_csv(args.label_file, sep=",", header=0, dtype=defaultdict(lambda: str))
     labels["filename"] = labels["filename"].str.replace("//", "/")
     labels = labels.set_index(labels.columns[0])
@@ -199,27 +246,19 @@ def main():
 
     embedding_set = get_dataset_from_labels(labels, args.label_key, args.embeddings_path, args.debug_mode)
     embedding_set_test = get_dataset_from_labels(test_labels, args.label_key, args.test_embeddings_path, args.debug_mode)
-
-    if args.debug_mode:
-        args.epochs = min(2, args.epochs)
-        args.rounds = min(5, args.rounds)
-        embedding_set = embedding_set_test[:800]
-        embedding_set_test = embedding_set_test[800:]
-        # just use the first entry in test_labels for all the entries and repeat it 200 rows
-        first_row = test_labels.head(1)
-        test_labels = pd.concat([first_row] * 200)
+    dl_test = DataLoader(Dataset(embedding_set_test), batch_size=args.batch_size, shuffle=False)
 
     run_name = args.tensorboard_name or str(time())
     writer = init_tb_writer(os.path.join(args.out_dir, "lp_tb_logs"), run_name, extra=
     {
         "embeddings_path": args.embeddings_path,
-        "embeddings_path_test": args.test_embeddings_path,
+        "test_embeddings_path": args.test_embeddings_path,
         "epochs": args.epochs,
         "batch": args.batch_size,
         "debug": str(args.debug_mode),
+        "subset_size": args.subset_size,
         "rounds": args.rounds,
         "label-file": args.label_file,
-        "test-label-file": args.test_label_file,
         "label-key": args.label_key,
         "number_of_samples": len(embedding_set),
         "number_of_labels": len(labels),
@@ -228,62 +267,52 @@ def main():
 
     ensure_dir_exists(args.out_dir)
 
-    val_ratio_for_lp = len(embedding_set_test) / len(embedding_set)
-    train_ratio_for_lp = 1 - val_ratio_for_lp
+    original_number_of_samples = len(labels) + len(test_labels)
+    new_train_len = original_number_of_samples * args.subset_size
+    # len(labels) * x = new_train_len
+    train_ratio_for_lp = new_train_len / original_number_of_samples
 
-    _, model, _, class_map = make_lp(data=embedding_set,
-                                     out_dir=args.out_dir,
-                                     balanced=False,
-                                     writer=writer,
-                                     epochs=args.epochs,
-                                     eval_models=False,
-                                     batch_size=args.batch_size,
-                                     lr=args.lr,
-                                     train_ratio=train_ratio_for_lp,
-                                     val_ratio=val_ratio_for_lp,
-                                     test_ratio=0.0)
+    sublabels = []
 
-    embedding_test_dir = os.path.dirname(args.test_embeddings_path)
-    if not os.path.exists(os.path.join(args.out_dir, "subsets")):
-        os.mkdir(os.path.join(args.out_dir, "subsets"))
-
-    for i in range(args.rounds):
-        dst_labels = os.path.join(args.out_dir, "subsets", f"balanced_dataset_top5_subset_{i}.csv")
-        if os.path.exists(dst_labels):
-            continue
-        new_df = random_sample_for_bootstrap(test_labels)
-        new_df.to_csv(dst_labels)
+    while len(sublabels) < args.rounds:
+        try:
+            sublabels.append(balanced_sample_dataset(labels, subset_size=train_ratio_for_lp))
+        except ValueError as ve:
+            print("...bad sampling, trying again")
 
     accuracies = []
     kappas = []
-    
-    # Create a lookup for quick access to embeddings
-    embedding_lookup = {entry["filename"]: entry for entry in embedding_set_test}
+    for n, sub_labels in enumerate(sublabels):
+        data = []
+        # only keep entries from data that is also in labels
+        for ep in embedding_set:
+            if ep["filename"] in sub_labels.index:
+                new_ep = {'image': ep['image'],
+                          'label': ep['label'],
+                          'filename': ep['filename']
+                          }
+                data.append(new_ep)
 
-    for i in range(args.rounds):
-        test_labels_for_run = pd.read_csv(os.path.join(args.out_dir, "subsets", f"balanced_dataset_top5_subset_{i}.csv"))
-        test_labels_for_run["filename"] = test_labels_for_run["filename"].str.replace("//", "/")
-        
-        # Iterate over the labels index to preserve repetitions from the bootstrap
-        embedding_set_test_for_run = []
-        for fn in test_labels_for_run["filename"]:
-            # Ensure the path matches the lookup key
-            # We normalize the filename to match how it was stored in get_dataset_from_labels
-            if fn in embedding_lookup:
-                embedding_set_test_for_run.append(embedding_lookup[fn])
-            else:
-                # Alternative path normalization if needed
-                norm_fn = "/" + fn.lstrip("/")
-                if norm_fn in embedding_lookup:
-                    embedding_set_test_for_run.append(embedding_lookup[norm_fn])
-                else:
-                    print(f"{fn} not found in embedding lookup")
+        assert len(data) > 0, f"No data"
+        writer.add_scalar("subset_size", len(data), global_step=n)
 
-        writer.add_scalar("test_size", len(embedding_set_test_for_run), i)
-        dl_test = DataLoader(Dataset(embedding_set_test_for_run), batch_size=args.batch_size)
+        _, model, _, class_map = make_lp(data=data,
+                                         out_dir=args.out_dir,
+                                         balanced=True,
+                                         writer=writer,
+                                         epochs=args.epochs,
+                                         eval_models=False,
+                                         batch_size=args.batch_size,
+                                         lr=args.lr,
+                                         train_ratio=0.9,
+                                         val_ratio=0.1,
+                                         test_ratio=0.0)
+
         class_map_inv = {v: k for k, v in class_map.items()}
-        writer.add_scalar("num_labels", len(list(class_map.keys())), i)
-        model_accuracy, kappa = evaluate_model(model, dl_test, os.path.join(args.out_dir, f"prediction_model_{i}.csv"), class_map=class_map_inv, device=device, writer=writer, step=args.epochs)
+        writer.add_scalar("num_labels", len(list(class_map.keys())), n)
+        model_accuracy, kappa = evaluate_model(model, dl_test, os.path.join(args.out_dir, f"prediction_model_{n}.csv"), class_map=class_map_inv, device=device, writer=writer, step=args.epochs)
+        writer.add_scalar("model_accuracy", model_accuracy, n)
+        writer.add_scalar("kappa", kappa, n)
         accuracies.append(model_accuracy)
         kappas.append(kappa)
 
@@ -291,7 +320,7 @@ def main():
         "b": range(len(accuracies)),
         "accuracy": accuracies
     })
-    accuracy_file=os.path.join(args.out_dir, "accuracies.csv")
+    accuracy_file=os.path.join(args.out_dir, f"accuracies_{str(args.subset_size)}.csv")
     accuracy_df.to_csv(accuracy_file, index=False)
     print(f"Wrote accuracies to {accuracy_file}")
 
@@ -330,5 +359,4 @@ if __name__ == "__main__":
     ignite_logger.setLevel(logging.WARNING)
 
     main()
-
     logging.info("Done")

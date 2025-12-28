@@ -88,7 +88,7 @@ def main():
         inst_data = df[df["institution"] == inst]
         for stage in ["Stage I", "Stage II", "Stage III"]:
             stage_data = inst_data[inst_data["tumor_stage"] == stage]
-            sampled = stage_data.sample(n=math.ceil(min_counts[stage]*args.n), random_state=42)
+            sampled = stage_data.sample(n=math.ceil(min_counts[stage]*float(args.n)), random_state=42)
             inst_samples.append(sampled)
         balanced_dfs.append(pd.concat(inst_samples))
 

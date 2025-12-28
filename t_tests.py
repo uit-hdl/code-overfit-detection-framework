@@ -11,6 +11,7 @@ This script will calculate the t-test for the predicted and correct labels.
 """
 import argparse
 import sys
+import os
 from typing import Optional, Tuple
 
 import numpy as np
@@ -93,20 +94,41 @@ def main(argv: Optional[list[str]] = None) -> int:
     # Additional t_test_ind: compare the predictions against each other across files
     if len(preds_by_file) >= 2:
         print("Cross-file t_test_ind on predicted_label (pairwise):")
-        for (fa, xa), (fb, xb) in combinations(preds_by_file.items(), 2):
-            t_stat, p_val = scistats.ttest_rel(xa, xb, nan_policy="omit")
-            n1, n2 = int(xa.size), int(xb.size)
-            df = n1 + n2 - 2
-            mean_a, mean_b = float(np.mean(xa)), float(np.mean(xb))
-            std_a = float(np.std(xa, ddof=1)) if n1 > 1 else float("nan")
-            std_b = float(np.std(xb, ddof=1)) if n2 > 1 else float("nan")
+        
+        output_dir = "out"
+        output_file = os.path.join(output_dir, "t_test.csv")
+        os.makedirs(output_dir, exist_ok=True)
+        
+        file_exists = os.path.isfile(output_file)
+        
+        with open(output_file, "a", encoding="utf-8") as f:
+            if not file_exists:
+                f.write("fileA,fileB,t,p,meanA,meanB\n")
+                
+            for (fa, xa), (fb, xb) in combinations(preds_by_file.items(), 2):
+                t_stat, p_val = scistats.ttest_rel(xa, xb, nan_policy="omit")
+                n1, n2 = int(xa.size), int(xb.size)
+                df = n1 + n2 - 2
+                mean_a, mean_b = float(np.mean(xa)), float(np.mean(xb))
+                std_a = float(np.std(xa, ddof=1)) if n1 > 1 else float("nan")
+                std_b = float(np.std(xb, ddof=1)) if n2 > 1 else float("nan")
 
-            print(
-                f"  [{fa}] vs [{fb}]\n"
-                f"    nA = {n1}, nB = {n2}, df = {df}\n"
-                f"    meanA(pred) = {fmt(mean_a)} (sd={fmt(std_a)}), meanB(pred) = {fmt(mean_b)} (sd={fmt(std_b)})\n"
-                f"    t = {abs(float(t_stat)):.2f}, two-tailed p = {fmt(float(p_val))}"
-            )
+                def fmt(v: float) -> str:
+                    try:
+                        if np.isnan(v) or np.isinf(v):
+                            return str(v)
+                    except Exception:
+                        pass
+                    return f"{v:.6f}"
+
+                print(
+                    f"  [{fa}] vs [{fb}]\n"
+                    f"    nA = {n1}, nB = {n2}, df = {df}\n"
+                    f"    meanA(pred) = {fmt(mean_a)} (sd={fmt(std_a)}), meanB(pred) = {fmt(mean_b)} (sd={fmt(std_b)})\n"
+                    f"    t = {abs(float(t_stat)):.2f}, two-tailed p = {fmt(float(p_val))}"
+                )
+                
+                f.write(f"{fa},{fb},{float(t_stat)},{float(p_val)},{mean_a},{mean_b}\n")
 
     return exit_code
 
